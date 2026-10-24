@@ -1,0 +1,82 @@
+{
+  "name": "@ummgames/dev",
+  "version": "0.1.0",
+  "description": "Shared dev tools for Uncle Matt Makes Games: capture, trailer and store art, portal build plugins, agent tooling and configs.",
+  "license": "MIT",
+  "author": "Uncle Matt Makes",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unclemattmakes/ummgames-dev.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.25.0",
+  "bin": {
+    "umm-dev": "./bin/umm-dev.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.mjs"
+    },
+    "./vite": {
+      "types": "./src/vite/index.d.ts",
+      "default": "./src/vite/index.mjs"
+    },
+    "./testing": {
+      "types": "./src/testing/index.d.ts",
+      "default": "./src/testing/index.mjs"
+    },
+    "./biome": "./config/biome.preset.json",
+    "./tsconfig": "./config/tsconfig.json",
+    "./vitest": {
+      "types": "./config/vitest.d.ts",
+      "default": "./config/vitest.mjs"
+    },
+    "./playwright": {
+      "types": "./config/playwright.d.ts",
+      "default": "./config/playwright.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "src",
+    "config",
+    "runtime",
+    "presets",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "typecheck": "tsc -p tsconfig.json && tsc -p runtime/tsconfig.json",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run --project unit",
+    "test:slow": "vitest run --project slow"
+  },
+  "peerDependencies": {
+    "playwright": ">=1.50",
+    "vite": ">=7"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.9",
+    "@types/node": "22.19.1",
+    "playwright": "1.62.1",
+    "typescript": "6.0.3",
+    "vite": "8.2.1",
+    "vitest": "4.1.10"
+  }
+}

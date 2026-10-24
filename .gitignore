@@ -1,0 +1,6 @@
+node_modules/
+test-results/
+*.log
+.DS_Store
+# Names that must never appear in this public repo. Local only; see CLAUDE.md rule 1.
+.private-names
