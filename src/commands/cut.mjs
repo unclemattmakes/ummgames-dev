@@ -11,15 +11,22 @@ const USAGE = `usage: umm-dev cut <edl.json> [--draft] [--print] [--font <file>]
 
 Cuts one mp4 from an edit list: shots trimmed and re-timed from game frames, sped, reversed,
 reframed or graded; joined with cuts, dissolves or matched wipes; overlays, text cards, fades
-and optional music. Paths in the edit list are relative to the game root.
+and optional music. The edit list's path is relative to the working directory; the paths inside
+it are relative to the game root.
 
 options:
-  --draft          fast encodes, written beside the output as <out>-draft.mp4
-  --print          print the ffmpeg commands instead of running them (also without ffmpeg)
-  --font <file>    a .ttf or .otf for text cards when the edit list names none
-  --check          validate the edit list and exit
+  --draft          fast encodes, written beside the output as <out stem>-draft.mp4
+  --print          print the ffmpeg commands instead of running them (what happens anyway
+                   when ffmpeg is not on PATH)
+  --font <file>    a .ttf or .otf for text cards when the edit list sets no "font",
+                   relative to the working directory
+  --check          validate the edit list, print "<file>: ok" and exit
+  -h, --help       print this help
 
-docs/media.md lists the edit list's fields.`
+exit codes: 0 written, printed or valid; 1 an invalid edit list, a missing clip, an ffmpeg
+failure, or an output over "maxMB" (the file is still written); 2 a usage mistake.
+
+docs/media.md lists the edit list's fields and their defaults.`
 
 /** @param {string[]} argv @param {{ cwd: string }} ctx */
 export async function run(argv, ctx) {

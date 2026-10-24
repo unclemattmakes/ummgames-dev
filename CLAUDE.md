@@ -26,10 +26,17 @@ game as a devDependency pinned to a tag. Read README.md for what is here and how
 6. **A tool reads its game's settings from the game.** `loadConfig(section)` in `src/config.mjs`
    finds `umm-dev.config.mjs` at the game's root. Defaults are generic: no game's URL flags, debug
    global or paths.
-7. **Every command is documented.** Each `src/commands/<name>.mjs` exports `describe` and `run`, and
-   its area has a page in `docs/`. The README's command table lists it.
+7. **Docs move with the code.** Each `src/commands/<name>.mjs` exports `describe` and `run`, and its
+   area has a page in `docs/` in the shared layout (docs/maintaining.md, "Writing docs"). A
+   behaviour change updates four things in the same commit: the `--help` text, the options table,
+   the `.d.ts` JSDoc and the Config table's defaults. A new config section also goes into
+   `UmmDevConfig` in `src/index.d.ts`. `tests/docs.test.mjs` checks links, `--help` and Config
+   tables; it does not check the prose, so read your own page against the code.
 8. **Releases are tags.** Bump `version`, add a CHANGELOG entry, tag `v<version>`. Games pin
    `github:unclemattmakes/ummgames-dev#v<version>` and move when they choose. Never move a tag.
+
+**Before changing anything, read docs/maintaining.md:** where each kind of thing goes, why each
+rule exists, and how to release.
 
 ## Commands
 

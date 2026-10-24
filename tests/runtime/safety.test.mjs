@@ -82,7 +82,9 @@ describe('copy --force on a folder', () => {
     const by = Object.fromEntries(r.map((x) => [x.file, x]))
     expect(by['src/kit/a.ts']?.outcome).toBe('updated')
     expect(by['src/kit/b.ts']?.outcome).toBe('refused')
-    expect(by['src/kit/b.ts']?.reason).toMatch(/never overwrites.*umm-dev copy kit\/b\.ts --force/)
+    expect(by['src/kit/b.ts']?.reason).toMatch(
+      /never overwrites.*umm-dev copy kit\/b\.ts --to src\/kit\/b\.ts --force/,
+    )
     expect(read(game, 'src/kit/b.ts')).toBe('export const mine = 1\n')
     expect(read(game, 'src/kit/a.ts')).not.toContain('// tuned')
   })

@@ -63,6 +63,18 @@ function git(args, cwd) {
 const umm = (args, cwd) =>
   spawnSync(process.execPath, [BIN, 'guard', ...args], { cwd, encoding: 'utf8' })
 
+describe('guard hook with the denylist off', () => {
+  it('skips the denylist when guard.denylist is false, as it does for null', () => {
+    for (const off of [false, null]) {
+      const r = repo({ denylist: off, hooks: { 'pre-commit': ['denylist'] } })
+      fs.writeFileSync(path.join(r, 'a.txt'), 'x\n')
+      git(['add', '.'], r)
+      const res = umm(['hook', 'pre-commit'], r)
+      expect(res.status, `${off}: ${res.stderr}`).toBe(0)
+    }
+  })
+})
+
 describe('guard em-dash', () => {
   it('finds every line with one in the named files, and in every listed file with none named', () => {
     const r = repo()

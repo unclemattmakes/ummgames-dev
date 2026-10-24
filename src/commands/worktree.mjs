@@ -16,20 +16,28 @@ export const describe = 'hydrate a new git worktree, or remove one without follo
 const HELP = `usage: umm-dev worktree hydrate [<path>] [--main <path>] [--skip-install]
        umm-dev worktree remove <name|path>... [--dry-run] [--force]
 
-  hydrate   install, link and copy what a fresh worktree lacks (the game's worktree config),
-            then count entries against the main checkout. Ends "Hydration OK." or exits 1.
-            <path> defaults to the current directory.
+  hydrate   run the install, then link, copy and write the env keys a fresh worktree lacks
+            (the game's worktree config), then count entries in each linked or copied path
+            against the main checkout. Ends "Hydration OK." (exit 0) or "HYDRATION FAILED"
+            (exit 1): trust no test count from a tree that did not end OK. <path> defaults to
+            the current directory. A fresh worktree has no umm-dev of its own, so run it from
+            the main checkout and name the worktree's path.
     --main <path>     the checkout to hydrate from (default: git's main checkout)
-    --skip-install    do not run worktree.install; fail if node_modules is missing
-  remove    unlink every link in the worktree (never its target), prove every outside target
-            kept its entries, then delete the folder and prune git's list. <name> is a folder
-            under worktree.dir (.claude/worktrees), or a path.
-    --dry-run         list the links and their targets, change nothing
-    --force           remove even with uncommitted changes, or a detached HEAD on a commit no
-                      ref contains (both are lost)
-            Ignored files are never checked: they are deleted with the folder.
+    --skip-install    do not run worktree.install; a missing node_modules then fails
+  remove    the only safe way to delete a hydrated worktree (rm -rf and git worktree remove
+            --force follow its links into the main checkout). Unlinks every link (never its
+            target), proves every outside target kept its entries, deletes the folder, prunes
+            git's list. Run it from the main checkout. <name> is a folder name under
+            worktree.dir (default .claude/worktrees); give any other worktree as an absolute
+            path (a relative path is also read under worktree.dir).
+    --dry-run         list the links and their targets; change nothing, prune nothing
+    --force           also remove a tree with uncommitted changes (untracked files included)
+                      or a detached HEAD on a commit no branch or tag contains. Both are LOST.
+                      It never skips the other refusals.
+            Ignored files are never checked: they are deleted with the folder, --force or not.
 
-exit: 0 ok; 1 a check failed or something was refused; 64 usage`
+exit: 0 ok; 1 a check failed, a removal was refused, or git failed; 64 usage, or hydrate
+      refused (not a git checkout, or the main checkout itself)`
 
 /** @param {string} line */
 const say = (line) => console.log(line)

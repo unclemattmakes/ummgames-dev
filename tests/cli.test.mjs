@@ -1,9 +1,9 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { listCommands } from '../bin/umm-dev.mjs'
+import { listCommands, wantsHelp } from '../bin/umm-dev.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const BIN = path.join(ROOT, 'bin/umm-dev.mjs')
@@ -20,6 +20,27 @@ describe('umm-dev', () => {
   it('prints help and exits 0', () => {
     const out = execFileSync(process.execPath, [BIN, 'help'], { encoding: 'utf8' })
     expect(out).toContain('usage: umm-dev')
+  })
+
+  it('prints help for --help after a subcommand, and runs nothing', () => {
+    for (const args of [
+      ['gpu', 'wait', '--help'],
+      ['gpu', 'status', '-h'],
+      ['guard', 'em-dash', '--help'],
+      ['merge', 'keep-both', '--help'],
+      ['worktree', 'remove', 'x', '--help'],
+    ]) {
+      const res = spawnSync(process.execPath, [BIN, ...args], { encoding: 'utf8', timeout: 10_000 })
+      expect(res.status, args.join(' ')).toBe(0)
+      expect(res.stdout, args.join(' ')).toContain('usage: umm-dev')
+    }
+  })
+
+  it('leaves --help after -- to the wrapped command', () => {
+    expect(wantsHelp(['wait', '--help'])).toBe(true)
+    expect(wantsHelp(['run', '-h', '--', 'vite'])).toBe(true)
+    expect(wantsHelp(['run', '--name', 'x', '--', 'vite', '--help'])).toBe(false)
+    expect(wantsHelp(['run', '--', '-h'])).toBe(false)
   })
 
   it('exits 2 on an unknown command', () => {

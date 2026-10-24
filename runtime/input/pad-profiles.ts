@@ -26,19 +26,19 @@
  * or set the controller's desktop layout to Gamepad), which presents the
  * already-standard "Steam Virtual Gamepad".
  *
- * Raw-order provenance (don't guess at these — they're derived):
+ * Raw-order provenance (don't guess at these: they're derived):
  * Linux `hid-steam` registers the evdev capabilities; browsers number
  * buttons by ascending keycode from BTN_JOYSTICK (0x120) and axes by
  * ascending ABS code. Keycodes: BTN_THUMB 0x121, BTN_THUMB2 0x122,
  * BTN_BASE 0x126, BTN_A..BTN_THUMBR 0x130–0x13e, BTN_DPAD_* 0x220–0x223,
  * BTN_GRIPL/R/L2/R2 0x224–0x227. ABS: X 0, Y 1, RX 3, RY 4, HAT0X/Y
  * 16/17 (left pad), HAT1X/Y 18/19 (right pad), HAT2X 20 (RIGHT trigger),
- * HAT2Y 21 (LEFT trigger — yes, right sorts before left). Triggers are
+ * HAT2Y 21 (LEFT trigger: yes, right sorts before left). Triggers are
  * registered 0..32767 so joydev rescales them to rest at −1, full pull
  * +1. The driver pre-negates stick Y, so up = −1 matches standard.
  */
 
-/** Structural gamepad shape — everything beyond the state arrays is
+/** Structural gamepad shape: everything beyond the state arrays is
  *  optional so unit tests (and older browsers) can hand in bare
  *  `{ axes, buttons }` objects and get raw-passthrough behavior. */
 export type GamepadLike = {
@@ -117,8 +117,8 @@ const STEAM_RAW: PadProfile = {
     { btn: 6 }, // 3  Y
     { btn: 7 }, // 4  LB / L1
     { btn: 8 }, // 5  RB / R1
-    { axis: 9, btn: 9 }, // 6  LT — analog HAT2Y + digital full-press
-    { axis: 8, btn: 10 }, // 7  RT — analog HAT2X + digital full-press
+    { axis: 9, btn: 9 }, // 6  LT: analog HAT2Y + digital full-press
+    { axis: 8, btn: 10 }, // 7  RT: analog HAT2X + digital full-press
     { btn: 11 }, // 8  Back / View
     { btn: 12 }, // 9  Start / Menu
     { btn: 14 }, // 10 L3
@@ -142,7 +142,7 @@ const STEAM_RAW: PadProfile = {
 /**
  * Steam Controller (2015). Same driver, smaller capability set: no
  * Quick Access, no lower grips, and ABS_RX/RY is the right *touchpad*
- * (it has no right stick) — which still makes a serviceable camera-look
+ * (it has no right stick), which still makes a serviceable camera-look
  * on normalized axes 2/3.
  *
  * Raw buttons: 0 L-pad click, 1 R-pad click, 2 A, 3 B, 4 X, 5 Y, 6 LB,
@@ -182,7 +182,7 @@ const VALVE_VENDOR = '28de'
 /** Product → profile. 1302 wired SC2, 1303 SC2 Bluetooth LE, 1304/1305
  *  the SC2 wireless pucks, 1205 Steam Deck built-in; 1102 wired SC1,
  *  1142 SC1 dongle. (The Steam Virtual Gamepad, 28de:11ff, never lands
- *  here — Steam Input presents it as XInput, so browsers report
+ *  here: Steam Input presents it as XInput, so browsers report
  *  `mapping: "standard"` and we pass it through above the profile
  *  lookup.) */
 const VALVE_PROFILES: Readonly<Record<string, PadProfile>> = Object.freeze({
@@ -205,7 +205,7 @@ function profileFor(id: string): PadProfile | null {
  * Rescale a rest-at-−1 trigger axis to [0, 1]. Exactly 0 is treated as
  * released: joydev delivers initial-state events so a resting trigger
  * reads −1 from the first frame, but if a backend ever reports 0 until
- * first touch, the naive (v+1)/2 would show a phantom half-pull — and a
+ * first touch, the naive (v+1)/2 would show a phantom half-pull, and a
  * genuinely held trigger never sits at a noiseless exact 0.
  */
 function triggerFromAxis(v: number): number {
@@ -219,7 +219,7 @@ const TRIGGER_PRESSED_THRESHOLD = 0.1
  * Standard-order view of one pad. Browser-mapped pads pass through
  * untouched (extra buttons beyond 16 included, e.g. Elite paddles);
  * known Valve raw pads go through their profile; anything else passes
- * through raw — identical to the pre-normalization behavior.
+ * through raw, identical to the pre-normalization behavior.
  */
 export function normalizeGamepad(pad: GamepadLike): NormalizedGamepad {
   const id = pad.id ?? ''
@@ -263,7 +263,7 @@ export function normalizeGamepad(pad: GamepadLike): NormalizedGamepad {
  * Pick the pad the player is actually holding: among connected entries
  * that have buttons at all, the one with the newest `timestamp` (it
  * advances on every state change, so phantom receiver slots never win
- * once the real pad moves). Ties — including the all-idle boot state —
+ * once the real pad moves). Ties (including the all-idle boot state)
  * fall to the earliest slot, which preserves the old `[0]` behavior on
  * single-pad setups. Mock pads without the metadata fields are treated
  * as connected with timestamp 0.
@@ -284,7 +284,7 @@ export function selectActiveGamepad<T extends GamepadLike>(
   return best
 }
 
-/** All connected pads, normalized — for capture flows that listen to
+/** All connected pads, normalized, for capture flows that listen to
  *  every controller rather than just the active one. */
 export function normalizedGamepads(): NormalizedGamepad[] {
   const pads = navigator.getGamepads?.() ?? []

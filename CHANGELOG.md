@@ -1,5 +1,59 @@
 # Changelog
 
+## Unreleased
+
+**A full documentation pass,** for people and for AI agents.
+- **One layout for every area page:**
+  1. what it is for;
+  2. Quick start;
+  3. options tables;
+  4. Config tables with defaults;
+  5. file formats;
+  6. how it works;
+  7. Troubleshooting with the real messages;
+  8. For agents.
+- **New pages:**
+  - `docs/README.md`, the map of every page;
+  - `getting-started.md`;
+  - `adopting.md`, for a game with its own copies;
+  - `upgrading.md`;
+  - `agents.md`, with a block to paste into a game's CLAUDE.md;
+  - `troubleshooting.md`;
+  - `known-issues.md`, the bugs found in this pass and not yet fixed, with workarounds;
+  - `maintaining.md`.
+- **Corrections from adopting the kit in a real npm game by following only the docs:**
+  - the agents block works with either package manager;
+  - typechecking `umm-dev.config.mjs` needs `allowJs`, and the file in the tsconfig's `include`;
+  - the presets' tools must be installed by the game;
+  - Playwright empties capture's default output folder;
+  - the portal spec needs its own Playwright config;
+  - `store --steps check` lists what a portal needs.
+- `CHANGELOG.md` now ships in the package.
+- `CaptureClock` types `ready`'s second argument.
+- `tests/docs.test.mjs` checks that every link and anchor resolves, every command's `--help`
+  runs, and every config section has a Config table.
+
+**`defineConfig` is typed.** `UmmDevConfig` covers every section, and every section's type is
+exported. With `// @ts-check` in `umm-dev.config.mjs`, a misspelt section or key is a type error.
+
+**Fixes:**
+- `--help` after a subcommand prints the usage and runs nothing. `gpu wait --help` used to wait.
+- A hook skips the denylist when `guard.denylist` is `false`, as it does for `null`. It used to
+  fail every commit.
+- `copy`'s refusal names the `--to` it needs. Followed literally, the old hint wrote to the
+  default path.
+
+**Runtime files: comments only.** The doc comments changed in five files:
+- `runtime/portal/portal-sdk.ts`;
+- `runtime/portal/build-target.ts`;
+- `runtime/input/pad-profiles.ts`;
+- `runtime/boot/dev-splash.ts`;
+- `runtime/dev/palette.ts`.
+
+No code changed in any of them. After moving to the release that carries this, `umm-dev drift`
+shows untouched copies of these files as `changed upstream`; `umm-dev copy` updates them in
+place.
+
 ## 0.1.0 (2026-10-24)
 
 The first release. These are tools that each game used to keep its own drifting copy of, merged into one package.

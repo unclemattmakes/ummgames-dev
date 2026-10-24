@@ -20,10 +20,15 @@ const HELP = `usage: umm-dev copy <runtime path> [--to <path in game>] [--force]
   <runtime path>  a file or folder under runtime/ (dev/fuzzy.ts, runtime/dev, input)
   --to <path>     where it goes, from the game root: a file, or a folder (trailing /)
                   default: <runtime.into>/<path under runtime/>, runtime.into = "src"
+                  (portal/portal-sdk.ts -> src/portal/portal-sdk.ts). A game that keeps
+                  the file elsewhere must pass --to <its path>, or it gets a second copy.
   --force         overwrite a copy changed here; a file that is not a copy only
-                  when <runtime path> names that one file
+                  when <runtime path> names that one file (a folder copy never does)
   --dry-run       say what would be written, write nothing
   --list          list the runtime files this version ships
+
+Over an existing file it writes only an untouched copy, unless --force.
+Take over a game's own file one at a time: copy <file> --to <its path> --force.
 
 exit: 0 written or already current; 1 something refused; 2 usage`
 

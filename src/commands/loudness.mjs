@@ -14,11 +14,14 @@ export const describe = 'meter audio files: integrated LUFS, true peak, momentar
 
 const HELP = `usage: umm-dev loudness <file...> [--target <LUFS>] [--tolerance <LU>] [--max-peak <dBTP>] [--json]
 
-  --target <LUFS>    integrated loudness each file must be near (web games: about -16 to -14)
-  --tolerance <LU>   how far from the target is in range (default 1)
-  --max-peak <dBTP>  the highest true peak allowed (say -1)
-  --json             one JSON array, a row per file
+  --target <LUFS>    integrated loudness each file must be near; none: not checked
+                     (web games: about -16 to -14)
+  --tolerance <LU>   how far from the target is in range, either side (default 1)
+  --max-peak <dBTP>  the highest true peak allowed (say -1); none: not checked
+  --json             one JSON array, a row per file (-inf as null)
   defaults come from the game's umm-dev.config.mjs: loudness: { target, tolerance, maxPeak }
+
+Needs ffmpeg and ffprobe on PATH. Silence, and a file under 400 ms, read -inf LUFS.
 
 exit: 0 measured and in range; 1 a file out of range; 2 usage, or ffmpeg could not read a file`
 

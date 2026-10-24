@@ -11,6 +11,11 @@
  * `leftRoom`, invite links, usernames) are optional. A solo game never calls them; off the portal
  * they do nothing. A room is the game's own code for a session, carried in the invite's
  * parameters as `{ room: CODE }` (the parameter's name is an option).
+ *
+ * The call order: `createPortalSdk` first in boot (it sends `loadingStart`), `loadingStop()` once
+ * the first frame is about to show, `setGameplay(true/false)` around play, and at a break
+ * `setGameplay(false)`, `await midgameAd()`, `setGameplay(true)`. See docs/portal.md in
+ * `@ummgames/dev`.
  */
 import { PORTAL } from './build-target'
 
@@ -61,6 +66,7 @@ declare global {
 }
 
 export interface PortalSdk {
+  /** `crazygames` with the SDK, `none` for the stub. */
   readonly name: 'crazygames' | 'none'
   /** Boot is done and the first frame is about to show. */
   loadingStop(): void
@@ -147,7 +153,9 @@ export const NO_PORTAL: PortalSdk = Object.freeze({
 })
 
 /**
- * The portal SDK, initialised, or the stub. Never rejects. `audio` is muted while an ad plays.
+ * The portal SDK, initialised, or the stub. Never rejects. `audio.setMuted(true)` runs when an
+ * ad starts and `setMuted(false)` when it ends, whatever the player chose, so keep it apart from
+ * the player's own mute.
  */
 export async function createPortalSdk(
   audio: { setMuted(muted: boolean): void },

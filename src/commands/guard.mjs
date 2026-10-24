@@ -30,20 +30,43 @@ export const describe = 'repo guards: em-dash, CLAUDE.md size, path denylist, gi
 
 const HELP = `usage: umm-dev guard em-dash [<path>...] [--staged] [--message <file>]
        umm-dev guard claude-md
-       umm-dev guard denylist [--staged | --tree | --history | --files <path>... | --stdin]
+       umm-dev guard denylist [--staged | --tree | --history | --stdin | --files <path>...]
                               [--rules <file.json>] [--max-bytes N] [--quiet] [--list-rules]
        umm-dev guard install-hooks [--dir <hooks dir>] [--force]
-       umm-dev guard hook <pre-commit | commit-msg> [args]
+       umm-dev guard hook <hook name> [args]
 
-  em-dash        no em-dash: every line of <path>s (every file git lists when none), only the
-                 lines a commit adds (--staged), or a commit message (--message)
-  claude-md      every CLAUDE.md within its line cap (guard.claudeMd), every relative link alive
-  denylist       the game's rule table (guard.denylist, or --rules) over staged files, the tree,
-                 all history, or named files. Ships no rules.
-  install-hooks  write pre-commit and commit-msg hooks into git's hooks dir that run guard hook
-  hook           what the hooks run: the checks guard.hooks lists for that hook
+  em-dash        no em-dash (U+2014). With <path>s: every line of those files or folders that
+                 git lists. With none: every file git lists (tracked, plus untracked not
+                 ignored). Binary files and guard.emDash.exclude are skipped.
+    --staged          only the lines the commit adds; lets through a line moved unchanged and
+                      any merge, cherry-pick, revert or rebase in progress
+    --message <file>  a commit message, minus its # lines
+  claude-md      every CLAUDE.md git lists within its line cap (guard.claudeMd), the root
+                 mentioning guard.claudeMd.mustMention when set, every relative link alive
+  denylist       the game's rule table (guard.denylist, or --rules) over what you name. Ships
+                 no rules: with none it exits 2. Give one mode; given several, the first in
+                 this list wins.
+    --staged          staged files, at their staged size (what the pre-commit hook runs)
+    --tree            every tracked file, at its size on disk (CI)
+    --history         every blob on every ref (CI, before a repository goes public)
+    --stdin           paths on stdin, newline or NUL separated, sized from disk
+    --files <path>... named paths, sized from disk; no git needed (also: bare paths)
+    --rules <file>    a JSON rule table, from the current directory, instead of the config
+    --max-bytes <n>   override the table's maxBytes
+    --quiet           print nothing when clean
+    --list-rules      print the rule table and exit 0
+  install-hooks  write a hook into git's hooks dir (git rev-parse --git-path hooks, which
+                 follows core.hooksPath) for each guard.hooks entry with checks. Rewrites only
+                 a file exactly as this tool wrote it; leaves any other file, an edited one and
+                 a symlink alone (exit 1). Only when someone runs it: never from an install.
+    --dir <dir>       write into this folder instead
+    --force           replace whatever is there (a symlink: the link, never its target)
+  hook           what the hooks run: every check guard.hooks lists for <hook name>
 
-exit: 0 clean; 1 found something; 2 the check itself failed or has nothing to check against`
+  Options are per subcommand, as listed; umm-dev guard --help prints this. Docs: docs/guard.md.
+
+exit: 0 clean; 1 found something, or install-hooks left a hook alone; 2 the check itself
+      failed (bad option, bad rule table, git error) or has nothing to check against`
 
 const DEFAULTS = {
   emDash: { exclude: /** @type {string[]} */ ([]) },
@@ -272,7 +295,7 @@ function hook(argv, cwd, cfg) {
           ? emDash(['--message', args[0] ?? ''], cwd, cfg)
           : emDash(['--staged'], cwd, cfg)
     } else if (c === 'denylist') {
-      if (cfg.denylist == null) continue
+      if (cfg.denylist == null || cfg.denylist === false) continue
       rc = denylist(['--staged', '--quiet'], cwd, cfg)
     } else if (c === 'claude-md') {
       rc = claudeMd(cfg)

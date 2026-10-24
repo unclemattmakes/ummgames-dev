@@ -116,7 +116,7 @@ export function copyRuntime({
           runtimePath,
           file,
           outcome: 'refused',
-          reason: `exists and is not a copy; a folder copy never overwrites it, even with --force (name the file: umm-dev copy ${runtimePath.slice('runtime/'.length)} --force)`,
+          reason: `exists and is not a copy; a folder copy never overwrites it, even with --force (name the file: umm-dev copy ${runtimePath.slice('runtime/'.length)} --to ${file} --force)`,
         })
         continue
       }

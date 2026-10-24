@@ -1,7 +1,7 @@
 // @ts-check
 /**
- * `umm-dev gpu run [<name> <minutes>] [--name N] [--minutes M] [--long] -- <command...>`
- * `umm-dev gpu status [--json]` · `umm-dev gpu wait [--timeout M]` · `umm-dev gpu release <name>`
+ * `umm-dev gpu run [<name> [<minutes>]] [--name N] [--minutes M] [--long] [--wait-limit M] -- <command...>`
+ * `umm-dev gpu status [--json]` · `umm-dev gpu wait [--timeout M]` · `umm-dev gpu release <name> [--force]`
  *
  * One machine-wide GPU lease for parallel agent sessions. See src/agent/lease.mjs for the
  * protocol and docs/agent.md for how to use it and how it shares a lock with older scripts.
@@ -18,26 +18,39 @@ import { loadConfig } from '../config.mjs'
 
 export const describe = 'share one GPU between parallel sessions: run, status, wait, release'
 
-const HELP = `usage: umm-dev gpu run [<name> <minutes>] [options] -- <command...>
+const HELP = `usage: umm-dev gpu run [<name> [<minutes>]] [options] -- <command...>
        umm-dev gpu status [--json]
        umm-dev gpu wait [--timeout <minutes>]
        umm-dev gpu release <name> [--force]
 
-  run       queue, take the lease, run the command, hand the lease back (always, even on
-            failure or Ctrl-C), exit with the command's code
-    --name <name>        who is asking (default: GPU_LEASE_NAME, else the checkout's folder name)
-    --minutes <n>        the booking, whole minutes (default gpu.defaultMinutes, 25)
+  run       queue, take the lease, run the command, hand the lease back (always: on success,
+            failure, Ctrl-C or a signal), exit with the command's code. Options and the two
+            positionals go before --; everything after -- is the command, run without a
+            shell (put a pipeline or && in a package script).
+    --name <name>        who is asking; give each session its own (default: GPU_LEASE_NAME,
+                         else the folder name of the checkout's root)
+    --minutes <n>        the booking, whole minutes >= 1 (default gpu.defaultMinutes, 25)
     --long               lift the gpu.maxHoldMinutes cap (45) for one genuinely long run;
                          GPU_LONG=1 does the same
-    --wait-limit <n>     give up after this many minutes in the queue (default 240)
-  status    who holds it, for how long, who waits (sweeps dead tickets)
-  wait      block until nobody holds it and nobody waits; does not take it
-  release   hand back a lease left behind under <name>; --force releases anyone's
+    --wait-limit <n>     minutes to wait in the queue before giving up (default
+                         gpu.waitLimitMinutes, 240)
+  status    who holds it, since when, its booking, who waits; sweeps dead tickets
+    --json               the same as JSON
+  wait      block until nobody holds it and nobody waits. It does not take the lease
+    --timeout <n>        minutes before giving up (default gpu.waitLimitMinutes, 240)
+  release   remove a lease left behind under <name> (its run is gone). It does not check
+            that the holder has stopped
+    --force              release whoever holds it, whatever the name
 
-  The lease dir is GPU_LEASE_DIR, else ~/.umm-dev/gpu. Never per repository.
+  The lease dir is GPU_LEASE_DIR, else ~/.umm-dev/gpu: one per machine, never per repository,
+  and config cannot move it. Other env: GPU_LEASE_NAME, GPU_LONG=1, GPU_PRIORITY=normal,
+  GPU_POLL_SECONDS (default 3), UMM_DEV_BASH (Windows: the bash for the bridge, or none).
+  Never delete files in the lease dir by hand. Docs: docs/agent.md.
 
-exit: run: the command's code, 2 gave up waiting, 124 killed past its booking (gpu.overrun
-      "kill"), 130 interrupted; wait: 0 free, 2 timed out; release: 0 done, 1 refused; 64 usage`
+exit: run: the command's own code; 2 gave up waiting; 124 stopped at the end of its booking
+      (gpu.overrun "kill"); 127 the command could not start; 130 interrupted; 64 usage
+      status: 0; wait: 0 free, 2 still busy at the timeout; release: 0 released or nothing
+      held, 1 refused (held under another name); 64 usage`
 
 const WATCHDOG = fileURLToPath(new URL('../agent/watchdog.mjs', import.meta.url))
 

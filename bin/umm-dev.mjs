@@ -38,6 +38,17 @@ async function help() {
   }
 }
 
+/**
+ * `--help` or `-h` anywhere before `--`: print the command's help and run nothing, even after a
+ * subcommand (`gpu wait --help` would otherwise wait). What follows `--` belongs to a wrapped
+ * command (`gpu run -- vite --help`).
+ * @param {string[]} args the arguments after the command name
+ */
+export function wantsHelp(args) {
+  const own = args.includes('--') ? args.slice(0, args.indexOf('--')) : args
+  return own.includes('--help') || own.includes('-h')
+}
+
 /** @param {string[]} argv */
 export async function main(argv) {
   const [name, ...rest] = argv
@@ -50,6 +61,10 @@ export async function main(argv) {
     return 2
   }
   const command = await load(name)
+  if (wantsHelp(rest)) {
+    const code = await command.run(['--help'], { cwd: process.cwd() })
+    return typeof code === 'number' ? code : 0
+  }
   const code = await command.run(rest, { cwd: process.cwd() })
   return typeof code === 'number' ? code : 0
 }

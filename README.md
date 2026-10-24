@@ -13,27 +13,41 @@ is there for the next. It covers:
 ## Install
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.1.0
+pnpm add -D github:unclemattmakes/ummgames-dev#v0.1.0     # or: npm i -D github:unclemattmakes/ummgames-dev#v0.1.0
+pnpm exec umm-dev help                                     # or: npx umm-dev help
 ```
 
-**Pin a tag.** A game moves to a newer version only when it chooses to, by adding the newer tag the
-same way. The lockfile records the exact commit.
+**Pin a tag.** A game moves to a newer version only when it chooses to
+([docs/upgrading.md](docs/upgrading.md)). The lockfile records the exact commit. The repo is
+public, so installing needs no credentials.
 
 **Requirements:**
-- pnpm 10 or 11, and Node 22 or later.
-- The media commands need `ffmpeg` on `PATH`.
-- Capture and store art need Playwright's Chromium (`pnpm exec playwright install chromium`).
+- pnpm 10 or 11, or npm 11.
+- Node 22 or later.
+- The media commands need `ffmpeg` and `ffprobe` on `PATH`.
+- Capture and store art need a Chromium: Playwright's (`pnpm exec playwright install chromium`),
+  or else an installed Chrome or Edge.
+
+## Where to start
+
+| You want to | Read |
+|---|---|
+| Add the kit to a new game | [docs/getting-started.md](docs/getting-started.md) |
+| Replace a game's own copies of these tools | [docs/adopting.md](docs/adopting.md) |
+| Brief an AI agent working in a game | [docs/agents.md](docs/agents.md) |
+| Look something up | [docs/README.md](docs/README.md), the map of every page |
+| Change the kit itself | [docs/maintaining.md](docs/maintaining.md) |
 
 ## Tools are linked, runtime code is copied
 
 - **Linked tools.** Commands, Vite plugins, test helpers and config presets run from
-  `node_modules`. None of them ships in a game's build.
+  `node_modules`. None of them ships in a game's build, and nobody edits them in a game.
 - **Copied runtime code.** Code that ships inside a game lives in `runtime/`: the portal SDK
-  adapter, the splash, the perf HUD, the gamepad profiles.
-  - `umm-dev copy <path>` writes one of those files into the game, with a header naming this repo,
-    the path and the commit. From then on the game owns its copy.
-  - `umm-dev drift` shows how far each copy has moved from the version it came from, and how far
-    behind the latest version it is.
+  adapter, the splash, the dev palette and perf HUD, the gamepad profiles.
+  - `umm-dev copy <path>` writes one of those files into the game. Line 1 is a header naming this
+    repo, the version and the path, plus a hash of the body. From then on the game owns its copy.
+  - `umm-dev drift` shows, for each copy, whether the game changed it and whether the installed
+    kit has a newer version of it ([docs/runtime.md](docs/runtime.md)).
 
 ## Commands
 
@@ -59,13 +73,31 @@ Run `pnpm exec umm-dev help` for the list, and `umm-dev <command> --help` for a 
 its own section, so a game configures only the tools it uses.
 
 ```js
+// @ts-check
 import { defineConfig } from '@ummgames/dev'
 
 export default defineConfig({
-  capture: {},
-  store: {},
+  capture: { debugGlobal: '__game' },
+  runtime: { into: 'src' },
 })
 ```
+
+**`defineConfig` is typed.** With `// @ts-check` at the top, an editor flags an unknown section or
+a mistyped key. `tsc` does too, once the game's tsconfig has `"allowJs": true` and lists
+`umm-dev.config.mjs` in `include` ([docs/getting-started.md](docs/getting-started.md#3-take-the-presets)).
+Each section's keys and defaults are in a "Config" table on its area's page:
+
+| Section | Read by | Page |
+|---|---|---|
+| `capture`, `store`, `loop` | `capture`, `cut`, `store`, `loop` | [media.md](docs/media.md) |
+| `gpu`, `worktree` | `gpu`, `worktree` | [agent.md](docs/agent.md) |
+| `guard` | `guard` | [guard.md](docs/guard.md) |
+| `runtime` | `copy`, `drift` | [runtime.md](docs/runtime.md) |
+| `loudness` | `loudness` | [audio.md](docs/audio.md) |
+
+The root is the nearest folder at or above the working directory that holds a `package.json`, so
+commands work from a subfolder or from a git worktree. A section merges over the defaults one
+level deep.
 
 ## Vite plugins and testing
 
@@ -78,6 +110,7 @@ export default defineConfig(({ mode }) => {
   const portal = mode === PORTAL_MODE
   return {
     base: portal ? './' : '/',
+    build: { outDir: portal ? 'dist-portal' : 'dist' },
     plugins: portal
       ? [portalSdk(), portalPrune(), portalSiteOnly()]
       : [headers({ immutableAssets: true }), notFoundPage()],
@@ -134,6 +167,18 @@ export default defineConfig(playwrightConfig({ device: devices['Desktop Chrome']
 `@ummgames/dev/media` is the code behind the media commands: the capture clock, the edit-list
 validator and planner, the store checks. `@ummgames/dev/audio` is the loudness meter, for meters
 that run inside a game's own tools.
+
+## For AI agents
+
+Agents working in a game that uses the kit should follow [docs/agents.md](docs/agents.md). It has
+a block to paste into the game's `CLAUDE.md`. Agents changing this repo follow its
+[CLAUDE.md](https://github.com/unclemattmakes/ummgames-dev/blob/main/CLAUDE.md) and
+[docs/maintaining.md](docs/maintaining.md).
+
+## Versions
+
+Releases are tags that never move; every one is listed in [CHANGELOG.md](CHANGELOG.md). Moving a
+game to a newer tag is covered in [docs/upgrading.md](docs/upgrading.md).
 
 ## Licence
 

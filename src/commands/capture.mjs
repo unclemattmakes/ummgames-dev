@@ -9,29 +9,38 @@ export const describe = 'record shots of the game in virtual time, frame-exact (
 
 const USAGE = `usage: umm-dev capture <shot...> [options]
        umm-dev capture --all [options]
-       umm-dev capture --list
+       umm-dev capture --list [--file <shots.json>]
        umm-dev capture --compare <dirA> <dirB>
 
 Records each shot at exactly capture.fps in virtual time: the page's clock waits for every
 frame to be written, so a slow GPU makes a capture slower, never choppier. Per shot, in
-<out>/<name>/: the frames, <name>.mp4, meta.json, and sheet.jpg with --sheet.
+<out>/<name>/: the frames (f00000.jpg on), <name>.mp4, meta.json, states.jsonl with a
+capture.state hook, and sheet.jpg with --sheet.
 
 options:
-  --file <shots.json>   the shots (default capture.shots: ${CAPTURE_DEFAULTS.shots})
-  --out <dir>           output folder (default capture.out: ${CAPTURE_DEFAULTS.out})
+  --file <shots.json>   the shots file, relative to the working directory
+                        (default capture.shots, relative to the game root: ${CAPTURE_DEFAULTS.shots})
+  --out <dir>           output folder, relative to the working directory
+                        (default capture.out, relative to the game root: ${CAPTURE_DEFAULTS.out})
   --all                 every shot in the file
-  --sheet               a contact sheet per shot, tiles labelled with their game frame
-  --every <s>           seconds between sheet tiles (default 0.1)
-  --crop <w:h:x:y>      crop the sheet's tiles, in canvas px
-  --igpu                Chromium on the integrated GPU
-  --tag <t>             write to <name>@<t>, to --compare two runs of one shot
-  --list                print the shots and exit
-  --compare <a> <b>     are two capture folders the same footage? exit 0 if so
+  --sheet               a contact sheet per shot, each tile labelled with its game frame
+  --every <s>           seconds between sheet tiles (default 0.1); implies --sheet
+  --crop <w:h:x:y>      crop each sheet tile, in canvas px; implies --sheet
+  --igpu                run Chromium on the integrated GPU
+  --tag <t>             write to <name>@<t> instead of <name>, to --compare two runs of one shot
+  --list                print each shot's name and why, then exit
+  --compare             compare two capture folders, given as the two arguments
+  -h, --help            print this help
+
+exit codes: 0 every shot passed (with --compare: the same footage); 1 a shot failed its expect
+or lost a frame, an unknown shot, a setup error (with --compare: different footage); 2 a usage
+mistake.
 
 umm-dev.config.mjs, section capture: url, vite, port (CAPTURE_PORT overrides), path, query,
 debugGlobal, ready, hold, bootFrames, hide, prep, state, shotUrl, fps, seed, skip, size, dpr,
 grab, canvas, keyTarget, quality, crf, shots, out, font, browser, bootTimeout.
-docs/media.md has each one and the shot fields.`
+A shotUrl replaces the default URL: merge the shot's own query in it, or the shot loses it.
+docs/media.md has each key and every shot field.`
 
 /** @param {string[]} argv @param {{ cwd: string }} ctx */
 export async function run(argv, ctx) {

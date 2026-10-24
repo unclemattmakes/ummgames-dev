@@ -32,6 +32,10 @@ const HELP = `usage: umm-dev drift [--json] [--diff] [--strict]
             repo; offline, the copy is compared with the installed file instead.
   --strict  exit 1 when any copy is not current (for CI)
 
+Finds copies by their line 1 header (git ls-files in a checkout). Each is current,
+changed here, changed upstream, changed here and upstream, or no longer shipped.
+After bumping the kit, run each "take it:" line as printed: it keeps the copy's path.
+
 exit: 0 reported (drift or not); 1 --strict and something drifted; 2 usage`
 
 /**

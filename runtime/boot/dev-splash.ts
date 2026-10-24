@@ -21,7 +21,8 @@
  *       <img class="dev-splash__portrait" alt="" width="384" height="384" decoding="async" />
  *       <h1 class="dev-splash__mark">Uncle Matt Makes:
  *         <span class="dev-splash__blank" aria-hidden="true">
- *           <span class="dev-splash__sizer">…one per word…</span>
+ *           <span class="dev-splash__sizer">stuff</span>
+ *           <span class="dev-splash__sizer">Games</span>
  *           <span class="dev-splash__line"><span class="dev-splash__typed"></span><span
  *             class="dev-splash__caret"></span></span>
  *         </span>
@@ -30,6 +31,11 @@
  *     </div>
  *     <div class="dev-splash__bar" aria-hidden="true"><div class="dev-splash__fill"></div></div>
  *   </div>
+ *
+ * One `dev-splash__sizer` per word in `words`, each a direct child of the blank: they stack in
+ * one grid cell, invisible, so the blank is as wide as the widest word. Only `.dev-splash__typed`
+ * and `.dev-splash__fill` are required; without them the splash removes itself. The face it
+ * waits for is Bitter (`font`), which the page serves.
  *
  * The timing is pure functions of the clock (`splashFrameAt`, `splashFrameCut`, `fadeAt`), so
  * it is unit-testable without a DOM.

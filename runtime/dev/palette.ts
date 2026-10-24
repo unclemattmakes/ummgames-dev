@@ -12,7 +12,8 @@
  *
  * Load it lazily from a dev build only, so none of it ships in the production entry chunk.
  * Tuner panels are single-active: opening one closes the other, and running an open one again
- * closes it.
+ * closes it. A tuner panel given its own `id` needs the same `tunerId` here, so `destroy()`
+ * finds it. This file imports every other file in its folder: copy the folder.
  */
 import { type CommandBarOptions, installCommandBar } from './command-bar'
 import type { PerfHud } from './perf-hud'
@@ -62,7 +63,7 @@ export function tunerTools(
   )
 }
 
-/** The perf HUD's on/off toggle. */
+/** The perf HUD's on/off toggle. The default hint names `?perf=1`, which the game reads itself. */
 export function perfHudTool(hud: PerfHud, hint = 'Also ?perf=1'): DevTool {
   return {
     id: 'toggle.perf',

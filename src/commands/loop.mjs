@@ -12,18 +12,25 @@ export const describe = 'make a site loop: a silent 720p faststart mp4 and a pos
 const USAGE = `usage: umm-dev loop <video.mp4 | edl.json> [options]
 
 The loop a games site shows on a card: a silent H.264 mp4 with its long edge capped (never
-upscaled) and +faststart, and <stem>.poster.webp beside it, the clip's most detailed sampled
-frame. Give it a cut or a store preview, or an edit list to cut first.
+upscaled) and +faststart, and <stem>.poster.<fmt> beside it, the clip's most detailed sampled
+frame. Give it a cut or a store preview, or an edit list to cut first (to a temp file; the edit
+list's "out" is ignored). The input path is relative to the working directory.
 
 options:
-  --out <dir>        output folder (default loop.out: ${LOOP_DEFAULTS.out})
+  --out <dir>        output folder, relative to the working directory
+                     (default loop.out, relative to the game root: ${LOOP_DEFAULTS.out})
   --name <stem>      output file stem (default the input's)
-  --edge <px>        long edge cap (default ${LOOP_DEFAULTS.edge})
-  --crf <n>          x264 CRF (default ${LOOP_DEFAULTS.crf})
-  --poster <fmt>     webp or jpg (default ${LOOP_DEFAULTS.posterFormat})
-  --poster-at <s>    take the poster at this time instead of sampling
+  --edge <px>        long-edge cap (default loop.edge: ${LOOP_DEFAULTS.edge})
+  --crf <n>          x264 CRF (default loop.crf: ${LOOP_DEFAULTS.crf})
+  --poster <fmt>     webp or jpg (default loop.posterFormat: ${LOOP_DEFAULTS.posterFormat})
+  --poster-at <s>    take the poster at this time instead of sampling (default loop.posterAt)
+  -h, --help         print this help
 
-umm-dev.config.mjs, section loop: out, edge, crf, posterFormat, posterQuality, samples, posterAt.`
+exit codes: 0 written; 1 the input is not a video, the loop would overwrite its input, an
+invalid edit list, or an ffmpeg failure; 2 a usage mistake.
+
+umm-dev.config.mjs, section loop: out, edge, crf, posterFormat, posterQuality, samples, posterAt.
+docs/media.md has each key.`
 
 /** @param {string[]} argv @param {{ cwd: string }} ctx */
 export async function run(argv, ctx) {

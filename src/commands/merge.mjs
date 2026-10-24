@@ -20,17 +20,25 @@ const HELP = `usage: umm-dev merge keep-both <file.md>...
        umm-dev merge driver <keep-both|resolve-table> %O %A %B [%L] [%P]
 
   keep-both      a conflict where both sides APPENDED blocks: keep both, ours first, with a
-                 blank line between when both meet on text. Markdown only.
+                 blank line between when both meet on text. Markdown (.md, .markdown) only.
   resolve-table  a conflict where both sides rewrote rows of one table, each a different subset:
                  take each row from the side that changed it against the merge base (the
-                 index's stage 1), keyed on the first cell. Refuses a row both changed.
-  driver         the same, called by git as a merge driver (see docs/agent.md). On a refusal it
-                 leaves the ordinary conflict markers and exits 1, so git reports a conflict.
+                 index's stage 1, so run it during the merge), keyed on the first cell. Refuses
+                 a row both changed, a non-row line in the conflict, a repeated key, and sides
+                 holding different keys.
+  driver         the same, called by git as a merge driver (.gitattributes and git config lines
+                 in docs/agent.md). git's own three-way merge runs first; only a conflict
+                 reaches the resolver. On a refusal it leaves the ordinary conflict markers and
+                 exits 1, so git reports a conflict for a person.
 
-  Look before you run one: an append at the end of a file is keep-both; the same table rows
-  rewritten is resolve-table (keep-both would duplicate every row).
+  Look before you run one: blocks appended at the end of a file mean keep-both; the same table
+  rows rewritten mean resolve-table (keep-both would duplicate every row). By hand, the file is
+  rewritten in place and not staged: read it, then git add it.
 
-exit: 0 resolved; 1 refused (the file is left as it was); 64 usage`
+exit: keep-both, resolve-table: 0 every file resolved; 1 a file refused (that file is left as
+      it was); 64 usage
+      driver: 0 merged or resolved; 1 conflict left for a person; 2 git merge-file failed;
+      64 usage`
 
 /**
  * @param {string[]} argv

@@ -1,142 +1,573 @@
 # Runtime code: copy and drift
 
-Code that ships inside a game's build lives in `runtime/`, as TypeScript. A game does not import it
-from `node_modules`; it **copies** a file in, and from then on the copy is the game's to change.
-`umm-dev drift` shows how far each copy has moved, on both sides.
+Code that ships inside a game's build lives in `runtime/`, as TypeScript: the perf HUD, the dev
+command bar, the gamepad profiles, the loading splash, the portal SDK adapter. It is **copied**,
+not linked. `umm-dev copy` writes a file into the game with a header on line 1, and from then on
+the copy is the game's to change. `umm-dev drift` reports how far each copy has moved from the
+version it came from, and how far the installed version has moved since. Reach for it when a game
+wants one of these files, and when the game bumps the kit's tag.
 
-| Folder | What it holds |
-|---|---|
-| `runtime/dev/` | The perf recorder and HUD, the Ctrl/Cmd+K command bar over a dev tool registry, its fuzzy matcher, a live tuner panel, and the palette helpers that wire them together. |
-| `runtime/input/` | `pad-profiles.ts`: remaps raw Valve pads (Steam Controller, Steam Deck) that arrive with `mapping: ""` to standard order, and picks the pad in use. |
-| `runtime/boot/` | `dev-splash.ts` and `dev-splash.css`: the "Uncle Matt Makes: ___" loading splash. |
-| `runtime/portal/` | The portal SDK adapter and build target. |
+## Quick start
 
-Each file imports nothing outside its own folder, so a folder copies as a unit. Each typechecks
-under `runtime/tsconfig.json` (strict, Bundler resolution, DOM, `types: []`).
+From the game's root (`npx umm-dev` under npm):
+
+```sh
+pnpm exec umm-dev copy --list                 # what this version ships
+pnpm exec umm-dev copy dev/perf-recorder.ts   # one file, to src/dev/perf-recorder.ts
+pnpm exec umm-dev drift                       # a line per copy
+```
+
+When it works, copy prints a line per file and drift calls the copy `current`:
+
+```
+written  src/dev/perf-recorder.ts  (from dev/perf-recorder.ts)
+
+1 runtime copies in /path/to/game; installed @ummgames/dev v0.1.0
+
+  src/dev/perf-recorder.ts  v0.1.0   current
+```
+
+**Where a copy lands.** Without `--to`, a file goes to `<runtime.into>/<its path under runtime/>`,
+and `runtime.into` is `src`. So `runtime/portal/portal-sdk.ts` lands at
+`src/portal/portal-sdk.ts`. A game that keeps the file somewhere else (an adapter at
+`src/boot/portal-sdk.ts`, say) must name that path:
+
+```sh
+pnpm exec umm-dev copy portal/portal-sdk.ts --to src/boot/portal-sdk.ts
+```
+
+Without `--to`, copy finds nothing at `src/portal/portal-sdk.ts`, writes a second copy there,
+says `written`, and exits 0. Run with `--dry-run` first whenever the game already has the file.
 
 ## `umm-dev copy`
 
-```sh
-umm-dev copy dev                      # every file in runtime/dev/, to src/dev/
-umm-dev copy input/pad-profiles.ts    # one file, to src/input/pad-profiles.ts
-umm-dev copy boot/dev-splash.ts --to src/boot/splash.ts
-umm-dev copy dev --to src/tools/dev/  # a folder, into another folder
-umm-dev copy --list                   # what this version ships
+```
+umm-dev copy <runtime path> [--to <path in game>] [--force] [--dry-run]
+umm-dev copy --list
 ```
 
-| Option | Effect |
+`<runtime path>` is a file or a folder under `runtime/`, with or without the `runtime/` prefix:
+`dev/fuzzy.ts`, `runtime/dev`, `input`. A folder names every file under it.
+
+| Option | Value | Default | What it does |
+|---|---|---|---|
+| `--to` | a path from the game root | `<runtime.into>/<path under runtime/>` | Where it goes. A trailing `/`, an existing folder, or a folder copy means "inside this folder"; otherwise it is the file's exact path. Relative to the game root, not the current folder. |
+| `--force` | | off | Overwrite a copy that was changed here. Overwrite a file that is not a copy only when `<runtime path>` names that one file. |
+| `--dry-run` | | off | Say what would be written; write nothing. Refusals still show. |
+| `--list` | | | List the runtime files this version ships, and exit. |
+| `-h`, `--help` | | | Print the usage. |
+
+**Destinations.**
+
+| Command | Writes |
 |---|---|
-| `--to <path>` | Where it goes, from the game root. A trailing `/`, an existing folder, or a folder copy means "inside this folder". Default: `<runtime.into>/<path under runtime/>`. |
-| `--force` | Overwrite a copy that was changed here. A file that is not a copy is overwritten only when `<runtime path>` names that one file. |
-| `--dry-run` | Say what would be written; write nothing. |
-| `--list` | List the runtime files. |
+| `copy dev/fuzzy.ts` | `src/dev/fuzzy.ts` |
+| `copy dev` | `src/dev/<each file>` |
+| `copy boot/dev-splash.ts --to src/boot/splash.ts` | `src/boot/splash.ts` |
+| `copy portal --to src/boot/` | `src/boot/build-target.ts`, `src/boot/portal-sdk.ts` |
+| `copy dev --to src/tools/dev/` | `src/tools/dev/<each file>` |
 
-Line 1 of every copy is a header, in the file type's comment syntax:
+**Outcomes.** One line per file:
 
-```ts
-// Copied from ummgames-dev v0.1.0 runtime/dev/fuzzy.ts (sha256 9f2c1e0a7b3d4c55). Owned here now; `umm-dev drift` compares.
-```
+| Outcome | Meaning |
+|---|---|
+| `written` | Nothing was there; the copy is new. |
+| `updated` | An untouched copy (or, with `--force`, a changed one) was replaced. |
+| `current` | The file already matches, header and all. Nothing written. |
+| `refused` | Not written. The line says why, on stderr. |
+| `would-write` | `--dry-run`: this file would be written or updated. |
 
-- **`v0.1.0`** is the installed package's version: the tag the original can be fetched at.
-- **The hash** is the first 16 hex digits of the SHA-256 of everything after line 1, with CRLF
-  read as LF, so a checkout's line endings never count as a change.
+After writing, copy names any relative import that has no file beside the copy:
+`imports ./registry, which is not beside it: copy that too`. Copy that sibling to the same folder.
+
+**Exit codes.**
+
+| Code | When |
+|---|---|
+| 0 | Every file written, updated or already current; also `--list`, `--help`, and a `--dry-run` that would refuse nothing. |
+| 1 | Some file was refused, or, with `--dry-run`, would be. A folder copy still writes the files it can. |
+| 2 | A usage error, or no runtime file or folder by that name. |
 
 **Copy never clobbers work.** Over an existing file it writes only when that file is an untouched
-copy (its body still hashes to its header), which is how a game takes an upstream change.
-A copy changed here needs `--force`. A file that is not a copy (the game's own code, or a
-copy from before these headers) needs `--force` **and** a path naming exactly that file:
-`umm-dev copy dev --force` overwrites changed copies in the folder but never the game's own
-files, and lists each one as refused. To adopt runtime code over files a game already has, copy
-them one at a time (`umm-dev copy dev/fuzzy.ts --force`), leaving out any file whose name the
-game uses for its own code (copy that one elsewhere with `--to`). After writing, it names any
-relative import that has no file beside it: copy that sibling too.
+copy: its body still hashes to its header. That is how a game takes an upstream change.
 
-File types: `.ts .tsx .js .mjs .cjs .glsl .wgsl` take `//`, `.css` takes `/* */`,
-`.html .svg .xml .md` take `<!-- -->`, `.sh .py .yaml .toml` take `#`. JSON cannot carry a header,
-so it cannot be copied.
+- **A copy changed here** needs `--force`.
+- **A file that is not a copy** (the game's own code, or a copy from before these headers) needs
+  `--force` and a `<runtime path>` that names that one file. A folder copy never overwrites one,
+  even with `--force`, and lists it as refused.
 
-The game's `umm-dev.config.mjs` can move the default folder:
+### Taking over a file the game already has
 
-```js
-export default defineConfig({ runtime: { into: 'src/shared' } })
+A game that wrote its own version of a runtime file (or copied one by hand before these headers)
+adopts the kit's version one file at a time:
+
+```sh
+pnpm exec umm-dev copy portal/portal-sdk.ts --to src/boot/portal-sdk.ts --dry-run
+pnpm exec umm-dev copy portal/portal-sdk.ts --to src/boot/portal-sdk.ts --force
+```
+
+```
+refused  src/boot/portal-sdk.ts: exists and is not a copy; --force overwrites
+updated  src/boot/portal-sdk.ts  (from portal/portal-sdk.ts)
+         imports ./build-target, which is not beside it: copy that too
+```
+
+1. Name the game's file with `--to`, even when it sits at the default path.
+2. Diff the game's old file against the copy (`git diff`) and carry over anything the game
+   needs. The game's changes then sit below the header, and drift reports them as
+   `changed here`.
+3. Copy the siblings it names, with `--to` pointing at the same folder.
+
+A file whose name the game uses for unrelated code is not taken over: copy the runtime file to
+another path with `--to`.
+
+### Taking an upstream change
+
+After the game bumps the kit's tag:
+
+```sh
+pnpm exec umm-dev drift
+```
+
+```
+  src/boot/portal-sdk.ts  v0.1.0   changed upstream
+                                   take it: umm-dev copy portal/portal-sdk.ts --to src/boot/portal-sdk.ts
+  src/dev/perf-hud.ts     v0.1.0   changed here and upstream
+                                   merge by hand: umm-dev drift --diff
+```
+
+- **`changed upstream`:** run the line drift prints. The copy is untouched, so it updates in
+  place with no `--force`.
+- **`changed here and upstream`:** the game changed its copy and the kit changed the original.
+  Read `umm-dev drift --diff`, then decide. To keep the game's changes on the new version: save
+  them (`drift --diff` shows them), run the same copy with `--force`, and apply them again. Drift
+  then reports `changed here` against the new tag.
+- **`changed here`:** nothing to take. The copy is the game's.
+
+Take each file with the `--to` that drift prints. A folder copy (`copy dev`) writes only to the
+default paths: it updates copies there, and writes a second copy of any file the game keeps
+elsewhere.
+
+### Examples
+
+```sh
+umm-dev copy dev                                     # every file in runtime/dev/, to src/dev/
+umm-dev copy input/pad-profiles.ts                   # one file, to src/input/pad-profiles.ts
+umm-dev copy boot/dev-splash.ts --to src/boot/splash.ts
+umm-dev copy dev --to src/tools/dev/                 # a folder, into another folder
+umm-dev copy dev/fuzzy.ts --to src/dev/fuzzy.ts --force   # replace one changed copy
 ```
 
 ## `umm-dev drift`
 
-```sh
-umm-dev drift            # a line per copy
-umm-dev drift --diff     # and the changes
-umm-dev drift --json     # { root, installed, copies: [...] }
-umm-dev drift --strict   # exit 1 when any copy is not current (CI)
+```
+umm-dev drift [--json] [--diff] [--strict]
 ```
 
-It finds copies by their header (through `git ls-files` in a checkout, so ignored output is
-skipped; otherwise a walk that skips `node_modules`, `.git` and `dist*`) and compares three hashes:
+It finds every copy by its header and compares three hashes: the header's (the body when it was
+copied), the body's now, and the installed `runtime/` file's.
+
+| Option | Value | Default | What it does |
+|---|---|---|---|
+| `--json` | | off | Print `{ root, installed, copies: [...] }` instead of the table. |
+| `--diff` | | off | After the table, show the changes for each copy that is not current. |
+| `--strict` | | off | Exit 1 when any copy is not current (for CI). |
+| `-h`, `--help` | | | Print the usage. |
 
 | Status | Meaning | Next step |
 |---|---|---|
-| `current` | Unchanged here, and the installed `runtime/` file is the same. | None. |
+| `current` | Unchanged here, and the installed file is the same. | None. |
 | `changed here` | The game edited its copy. Upstream has not moved. | None: the copy is the game's. |
-| `changed upstream` | The installed version's file differs from what was copied. | `umm-dev copy <path> --to <file>` takes it (the copy is untouched, so no `--force`). |
+| `changed upstream` | The installed version's file differs from what was copied. | Run the `take it:` line drift prints. |
 | `changed here and upstream` | Both moved. | Merge by hand; `--diff` shows both sides. |
 | `no longer shipped` | The installed version has no such file. | None: the copy is wholly the game's. |
 
-**`--diff`** shows the original against the game's copy, and the original against the installed
-file. The original is free when only one side moved (it is the other side). When both moved,
-drift needs the file at the header's tag:
+A status compares hashes, not versions. A copy taken at `v0.1.0` stays `current` under `v0.2.0`
+when that file did not change.
+
+**`--json`.** Each entry in `copies` has `file`, `runtimePath`, `version`, `hash`, `localHash`,
+`upstreamHash` (`null` when no longer shipped), `changedHere`, `changedUpstream` and `status`
+(`current`, `changed-here`, `changed-upstream`, `changed-both` or `gone-upstream`).
+
+**`--diff`.** It shows the original against the game's copy, and the original against the
+installed file. The original is free when only one side moved (it is the other side). When both
+moved, drift needs the file at the header's tag:
 
 1. `UMM_DEV_REPO`, if set, names a local clone: `git -C $UMM_DEV_REPO show <tag>:<path>`.
-2. Otherwise it fetches `https://raw.githubusercontent.com/unclemattmakes/ummgames-dev/<tag>/<path>`.
+2. Otherwise it fetches `https://raw.githubusercontent.com/unclemattmakes/ummgames-dev/<tag>/<path>`,
+   with an 8 s timeout.
 
-Either way the text must hash to the header's hash, or it is not used. A header is data from
-the game, so drift trusts only a tag of the form `v1.2.3` and a path of plain segments under
-`runtime/` (no `.` or `..`). Every read stays inside the installed `runtime/`, and every
-fetch stays inside this repo's `runtime/` at that tag. Offline, or with neither,
+Either way the text must hash to the header's hash, or it is not used. Offline, or with neither,
 drift says why and diffs the copy against the installed file instead.
 
-**Exit codes:** drift is information, not an error.
+**Exit codes.** Drift is information, not an error.
 
 | Code | When |
 |---|---|
-| 0 | Reported, drifted or not. |
+| 0 | Reported, drifted or not. Also when there are no copies. |
 | 1 | `--strict`, and some copy is not current. |
 | 2 | A usage error. |
 
-## The runtime files
+### Examples
 
-**`dev/perf-recorder.ts`.** A ring of frame times (600 samples by default). Call `sample(now)` per
-rAF, or `push(ms)` for a measured value such as GPU time. `stats()` gives fps, p50/p95/p99,
-min/max and hitches over `hitchMs` (default 33.4). It allocates nothing per frame.
+```sh
+umm-dev drift            # a line per copy
+umm-dev drift --diff     # and the changes
+umm-dev drift --json     # for a script
+umm-dev drift --strict   # in CI: fail when a copy moved
+UMM_DEV_REPO=../ummgames-dev umm-dev drift --diff   # diff offline, from a clone with tags
+```
 
-**`dev/perf-hud.ts`.** A fixed panel fed by `tick(stats, info?, cost?, gpu?)`. A row turns amber
-over its budget. `createPerfHud({ budget })` merges over a 60 Hz default.
+## `runtime/dev/`
 
-**`dev/registry-types.ts`, `registry.ts`, `fuzzy.ts`, `command-bar.ts`.** A `DevTool` is a
-scene, panel, toggle, param or action. `installCommandBar(tools, { suspendKeys })` opens on
-Ctrl/Cmd+K. `suspendKeys` is the game's hook: hold its keyboard while the bar is open, and
-return the release.
+Dev tools a game loads in its dev build: a frame-time recorder and HUD, a Ctrl/Cmd+K command bar
+over a tool list, and a live tuner panel. Import them lazily from a dev-only path, so none of it
+reaches the production entry chunk. `palette.ts` reaches every other file here, so copy the whole
+folder (`umm-dev copy dev`) to use it.
 
-**`dev/tuner-panel.ts`.** Sliders over any object shaped like `TuningSet`. Save POSTs the values
-to `saveUrl(id)` (default `/__dev/tuning/<id>`); the game's dev server writes the file.
+| File | Imports |
+|---|---|
+| `perf-recorder.ts`, `fuzzy.ts`, `registry-types.ts`, `tuner-panel.ts` | nothing |
+| `perf-hud.ts` | `perf-recorder` (types) |
+| `registry.ts` | `registry-types` |
+| `command-bar.ts` | `fuzzy`, `registry`, `registry-types` |
+| `palette.ts` | `command-bar`, `perf-hud`, `registry`, `registry-types`, `tuner-panel` |
 
-**`dev/palette.ts`.** The game owns its tool list. This gives it `tunerTools(sets)`,
-`perfHudTool(hud)` and `paramTool(param, value, label)`, and `installDevPalette(tools, options)`
-installs the bar.
+### `perf-recorder.ts`
 
-**`input/pad-profiles.ts`.** Read pads through `activeGamepad()`: standard order, the pad used
-last, or null. `layout` says whether a Valve profile was applied.
+**Exports:** `createPerfRecorder(capacity?, hitchMs?)`, `percentile(sorted, q)`,
+`PERF_RING_CAPACITY` (600), `HITCH_THRESHOLD_MS` (33.4), and the types `PerfRecorder`,
+`PerfStats`.
 
-**`boot/dev-splash.ts` and `dev-splash.css`.** The splash drives markup already in the page (its
-doc comment has the markup; inline the CSS in `<head>`). Call it with the game's seams:
+A ring of frame times. `sample(now)` records the time since the last call (the first call only
+sets the baseline). `push(ms, now?)` records a measured value, such as GPU time. `stats()` gives
+`fps`, `avgMs`, `p50Ms`, `p95Ms`, `p99Ms`, `minMs`, `maxMs`, `count` and `hitchCount` (frames over
+`hitchMs`) over what the ring holds. `toCsv()` dumps `frame_index,t_ms,dt_ms`. `reset()` empties
+it. `sample()` and `push()` allocate nothing; call `stats()` a few times a second, not per frame.
+
+| Argument | Default | What it does |
+|---|---|---|
+| `capacity` | 600 | Samples in the ring: ten seconds at 60 Hz, less on a faster display. |
+| `hitchMs` | 33.4 | A frame over this counts as a hitch. |
+
+### `perf-hud.ts`
+
+**Exports:** `createPerfHud(options?)`, `DEFAULT_BUDGET`, `formatCount(n)`, and the types
+`PerfHud`, `PerfHudOptions`, `PerfBudget`, `RenderInfoLite`, `FrameCost`, `PerfDiagnostics`.
+
+A fixed panel, hidden until `setVisible(true)`. `tick(stats, info?, cost?, gpu?)` draws it, and
+returns at once while hidden. A row turns amber over its budget. It imports no renderer: pass the
+renderer's counters as `RenderInfoLite`.
 
 ```ts
+import { createPerfHud } from './dev/perf-hud'
+import { createPerfRecorder } from './dev/perf-recorder'
+
+const frames = createPerfRecorder()
+const hud = createPerfHud({ budget: { drawCalls: 400 } })
+hud.setVisible(new URLSearchParams(location.search).has('perf'))
+let drawnAt = 0
+function frame(now: number) {
+  frames.sample(now)
+  if (now - drawnAt > 250) {
+    hud.tick(frames.stats())
+    drawnAt = now
+  }
+  requestAnimationFrame(frame)
+}
+requestAnimationFrame(frame)
+```
+
+| Option | Default | What it does |
+|---|---|---|
+| `budget` | `DEFAULT_BUDGET` | Merged over the 60 Hz default: `frameP95Ms` 16.7, `gpuP95Ms` 12, `simMs` 2, `renderMs` 4, `drawCalls` 250, `triangles` 750 000. |
+| `parent` | `document.body` | Where the panel goes. |
+| `id` | `'perf-hud'` | The panel's element id. |
+
+### `registry-types.ts`, `registry.ts`, `fuzzy.ts`, `command-bar.ts`
+
+**Exports:**
+- `registry-types.ts`: `DEV_TOOL_GROUPS` and the types `DevTool`, `DevToolGroup`, `SceneTool`,
+  `PanelTool`, `ToggleTool`, `ParamTool`, `ActionTool`.
+- `registry.ts`: `runTool(tool)`, `buildUrl(mutations, href?)`, `urlHas(param, value?, search?)`,
+  `toolHasState(tool)`, `toolIsOn(tool)`.
+- `fuzzy.ts`: `fuzzyScore(query, text)`: lower is better, `null` for no match.
+- `command-bar.ts`: `installCommandBar(tools, options?)`, `filterTools(tools, query)`, and the
+  types `CommandBar`, `CommandBarOptions`.
+
+A `DevTool` is one of five kinds: `scene` (sets `?param=value` and navigates), `panel` (opens a
+docked panel), `toggle` (a live on/off), `param` (a boot-time URL param that reloads) and
+`action` (a one-shot command). `group` is any string; `DEV_TOOL_GROUPS` holds the usual ones.
+
+The bar opens and closes on Ctrl/Cmd+K. Esc closes it, the arrows move, Enter runs. Typed keys
+never reach the game. `suspendKeys` is the game's hook: hold the game's keyboard when the bar
+opens, and return the release.
+
+```ts
+import { installCommandBar } from './dev/command-bar'
+import type { DevTool } from './dev/registry-types'
+
+const tools: DevTool[] = [
+  { id: 'action.respawn', label: 'Respawn player', group: 'Actions', kind: 'action', run: respawn },
+  { id: 'scene.editor', label: 'Level editor', group: 'Scenes', kind: 'scene', param: 'edit' },
+]
+const bar = installCommandBar(tools, { suspendKeys: () => input.suspend() })
+```
+
+| Option | Default | What it does |
+|---|---|---|
+| `suspendKeys` | none | Called on open; the function it returns is called on close. |
+| `placeholder` | `'Search dev tools…'` | The input's placeholder. |
+
+The bar's colors read `--dev-ink`, `--dev-ink-dim`, `--dev-line`, `--dev-accent` and
+`--dev-font-mono` when the page sets them.
+
+### `tuner-panel.ts`
+
+**Exports:** `openTunerPanel(set, onClose, options?)`, `saveTuning(set, saveUrl?)`, and the types
+`TuningSet`, `TuningSpec`, `TuningField`, `TunerPanel`, `TunerPanelOptions`.
+
+A slider and a number box per field of a `TuningSet`, docked top left. Edits write `set.values`
+in place, so whatever reads that object feels them on its next step. **Save** POSTs the values as
+JSON to `saveUrl(id)`; the game's dev server writes the file. **Revert** returns to `set.saved`,
+**Defaults** to the spec's defaults, and **Copy** puts the JSON on the clipboard.
+
+```ts
+import { openTunerPanel } from './dev/tuner-panel'
+
+const move = {
+  id: 'move',
+  title: 'Movement',
+  spec: { speed: { label: 'Speed', default: 6, min: 0, max: 20, step: 0.1, unit: 'm/s' } },
+  values: { speed: 6 },
+  saved: { speed: 6 },
+}
+const panel = openTunerPanel(move, () => {})
+```
+
+| Option | Default | What it does |
+|---|---|---|
+| `saveUrl` | `` id => `/__dev/tuning/${id}` `` | Where Save POSTs. |
+| `savedText` | `` id => `saved ${id}` `` | The status line after a save. |
+| `id` | `'dev-tuner'` | The panel's element id. |
+
+### `palette.ts`
+
+**Exports:** `installDevPalette(tools, options?)`, `tunerTools(sets, options?)`,
+`perfHudTool(hud, hint?)`, `paramTool(param, value, label, keywords?, group?)`, and the type
+`DevPalette`.
+
+The game owns its tool list. This gives it the tools most games share, and installs the bar.
+Tuner panels share one dock: opening one closes the other, and running an open one again closes
+it.
+
+```ts
+const { installDevPalette, perfHudTool, paramTool, tunerTools } = await import('./dev/palette')
+const palette = installDevPalette(
+  [
+    ...tunerTools([move]),
+    perfHudTool(hud),
+    paramTool('backend', 'webgl2', 'Force WebGL2 backend', 'fallback'),
+  ],
+  { suspendKeys: () => input.suspend() },
+)
+```
+
+| Function | Option | Default | What it does |
+|---|---|---|---|
+| `installDevPalette` | `suspendKeys`, `placeholder` | | Passed to the command bar. |
+| `installDevPalette` | `tunerId` | `'dev-tuner'` | The tuner element `destroy()` removes. Match `tunerTools`' `id`. |
+| `tunerTools` | `saveUrl`, `savedText`, `id` | | Passed to each tuner panel. |
+| `tunerTools` | `hint` | `` set => `Live-edit the ${set.id} tuning` `` | The line under each tool. |
+| `perfHudTool` | `hint` | `'Also ?perf=1'` | The line under the tool. The game reads `?perf` itself. |
+| `paramTool` | `group` | `'Render'` | The group shown beside it. |
+
+## `runtime/input/`
+
+### `pad-profiles.ts`
+
+**Exports:** `activeGamepad()`, `normalizedGamepads()`, `normalizeGamepad(pad)`,
+`selectActiveGamepad(pads)`, `parseGamepadVendorProduct(id)`, and the types `NormalizedGamepad`,
+`NormalizedButton`, `GamepadLike`, `PadLayout`.
+
+Read pads through `activeGamepad()` instead of `navigator.getGamepads()[0]`. It returns the pad
+used last, in the W3C standard order, or `null`. Raw Valve pads (Steam Controller, Steam Deck)
+that arrive with `mapping: ""` are remapped to standard order; any other pad passes through.
+`layout` says which: `'standard'`, `'steam-raw'`, `'steam-raw-2015'` or `'raw'`.
+
+```ts
+import { activeGamepad } from './input/pad-profiles'
+
+const pad = activeGamepad()
+if (pad?.buttons[0]?.pressed) jump()
+const moveX = pad?.axes[0] ?? 0
+```
+
+No options. A Valve pad's grips and other extras sit at button 17 and up.
+
+## `runtime/boot/`
+
+### `dev-splash.ts` and `dev-splash.css`
+
+**Exports:** `startDevSplash(options)`, `SPLASH_WORDS`, `SPLASH_TIMINGS`, the pure timing
+functions `splashBeats`, `splashFrameAt`, `splashFrameCut`, `landedAfterLoad` and `fadeAt`, and
+the types `DevSplash`, `DevSplashOptions`, `SplashTimings`, `SplashBeat`, `SplashFrame`.
+
+The "Uncle Matt Makes: ___" loading splash. The blank types a word at a time and lands on the
+last word, over a load bar. It drives markup already in the page, so it is up from the first
+paint. Inline `dev-splash.css` in `<head>`, and put this in `<body>`, with one sizer per word:
+
+```html
+<div id="dev-splash" role="status" aria-label="Uncle Matt Makes: Games. Loading.">
+  <div class="dev-splash__lockup">
+    <img class="dev-splash__portrait" alt="" width="384" height="384" decoding="async" />
+    <h1 class="dev-splash__mark">Uncle Matt Makes:
+      <span class="dev-splash__blank" aria-hidden="true">
+        <span class="dev-splash__sizer">stuff</span>
+        <span class="dev-splash__sizer">Games</span>
+        <span class="dev-splash__line"><span class="dev-splash__typed"></span><span
+          class="dev-splash__caret"></span></span>
+      </span>
+      <span class="visually-hidden">Games</span>
+    </h1>
+  </div>
+  <div class="dev-splash__bar" aria-hidden="true"><div class="dev-splash__fill"></div></div>
+</div>
+```
+
+```ts
+import { startDevSplash } from './boot/dev-splash'
+
 const splash = startDevSplash({
   root: document.getElementById('dev-splash'),
-  portraitUrl: '/brand/portrait.webp', // the brand image; null for the wordmark alone
-  words: ['stuff', 'simulations', 'Games'], // the last is the one it lands on
-  waitForSteady: true, // go only after splash.steady() as well as splash.ready()
-  onLift: () => iris.open(), // as the fade starts
+  portraitUrl: '/brand/portrait.webp',
+  words: ['stuff', 'Games'],
+  onLift: () => title.start(),
 })
 // during boot: splash.progress(0.4) … splash.ready(); once frames are smooth: splash.steady()
-// while splash.covering(), treat confirms as already held
+// while splash.covering(), treat every confirm as already held
+// on a boot error: splash.fail()
 ```
+
+It goes once `ready()` (and `steady()`, by default) have been called and the last word has held
+for `holdMs`, or on a skip after `ready()`. A skip is a click, a tap, Enter, Space or a pad's A.
+With `prefers-reduced-motion`, it shows the last word at once.
+
+| Option | Default | What it does |
+|---|---|---|
+| `root` | required | The `#dev-splash` element. `null`, or markup missing `.dev-splash__typed` or `.dev-splash__fill`, removes it and returns a splash that does nothing. |
+| `portraitUrl` | none | The brand image. `null` or absent removes the `<img>` and leaves the wordmark. |
+| `words` | `SPLASH_WORDS` | The blank's words; the last is the one it lands on. Match the sizers. |
+| `timings` | `SPLASH_TIMINGS` | Merged over the defaults: `holdMs` 1200, `fadeMs` 500, `faceWaitMs` 600, and the typing speeds. |
+| `waitForSteady` | `true` | Wait for `steady()` as well as `ready()`. |
+| `onLift` | none | Called as the fade starts. |
+| `onGone` | none | Called once it is removed from the page. |
+| `font` | `'700 1em Bitter'` | The face it waits for (up to `faceWaitMs`) before typing; `null` not to wait. The game serves the font. |
+| `mark` | `'boot:title'` | A `performance.mark` set as it lifts; `null` for none. |
+| `skipKeys` | `['Enter', ' ']` | `KeyboardEvent.key` values that skip. |
+| `padSkip` | `true` | Whether a pad's A (button 0) skips. |
+| `now` | `performance.now` | The clock, for tests. |
+
+## `runtime/portal/`
+
+`build-target.ts` (`PORTAL`, `PORTAL_MODE`) and `portal-sdk.ts` (`createPortalSdk`, `NO_PORTAL`
+and the `PortalSdk` interface): the web portal SDK adapter, a stub everywhere but the portal
+build. `portal-sdk.ts` imports `./build-target`, so copy both into one folder:
+
+```sh
+pnpm exec umm-dev copy portal --to src/boot/   # or wherever the game keeps its boot code
+```
+
+How a game wires it in, and its options: [portal.md](portal.md).
+
+## Config: `runtime`
+
+In the game's `umm-dev.config.mjs`. `umm-dev copy` reads it; `umm-dev drift` reads no config.
+
+```js
+import { defineConfig } from '@ummgames/dev'
+
+export default defineConfig({ runtime: { into: 'src/shared' } })
+```
+
+| Key | Type | Default | What it does |
+|---|---|---|---|
+| `into` | string | `'src'` | The folder, from the game root, that a copy without `--to` goes under: `<into>/<path under runtime/>`. |
+
+## File formats
+
+### The copy header
+
+Line 1 of every copy, in the file type's comment syntax:
+
+```ts
+// Copied from ummgames-dev v0.1.0 runtime/dev/fuzzy.ts (sha256 1872b1d747ecb7a2). Owned here now; `umm-dev drift` compares.
+```
+
+| Field | Example | What it is |
+|---|---|---|
+| version | `v0.1.0` | The installed package's version when it was copied: the tag the original can be fetched at. `v` and three numbers, with an optional `-suffix`. |
+| runtime path | `runtime/dev/fuzzy.ts` | The file in this package. Plain segments under `runtime/`: no `.` or `..`. |
+| hash | `1872b1d747ecb7a2` | The first 16 hex digits of the SHA-256 of the body when it was copied. |
+
+- **The body** is everything after line 1. The hash reads CRLF as LF, so a checkout's line
+  endings never count as a change. Copy writes LF.
+- **The header is data from the game.** Drift trusts only a version and a path of those forms.
+  Every read stays inside the installed `runtime/`, and every fetch inside this repo's
+  `runtime/` at that tag. A file whose line 1 does not parse is not a copy.
+
+| Comment syntax | Extensions |
+|---|---|
+| `// …` | `.ts .tsx .mts .cts .js .jsx .mjs .cjs .glsl .wgsl .vert .frag` |
+| `/* … */` | `.css` |
+| `<!-- … -->` | `.html .svg .xml .md` |
+| `# …` | `.sh .py .yaml .yml .toml` |
+
+**JSON cannot be copied.** It has no comments, so it cannot carry a header. Copy refuses a
+destination of any type missing above (`no comment syntax for .json`). `runtime/tsconfig.json`
+and `runtime/env.d.ts` are the folder's own tooling and are never listed.
+
+## How it works
+
+- **Copy** resolves the runtime path to files, plans each destination, and stamps each file:
+  header, then the source with LF endings. Over an existing file it compares the body's hash
+  with the header's before it writes.
+- **Drift** lists the game's files (`git ls-files --cached --others --exclude-standard` in a
+  checkout, so ignored files are skipped; otherwise a walk that skips `node_modules`, `.git`,
+  `dist*`, `test-results`, `coverage` and `.vite`). It keeps each file whose line 1 is a header,
+  and compares the three hashes.
+- **The game root** is the nearest folder at or above the current one holding a `package.json`.
+- **Each runtime file imports nothing outside its own folder**, so a folder copies as a unit.
+  Each typechecks under `runtime/tsconfig.json` (strict, Bundler resolution, DOM, `types: []`).
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| A second copy appears under `src/<folder>/`, beside the game's own. | Copied without `--to`; the game keeps the file elsewhere. | Delete the new file (it is untouched). Copy again with `--to <the game's path>`. |
+| `refused  <file>: exists and is not a copy; --force overwrites` | The game has its own file at the destination. | To replace it: `umm-dev copy <path> --to <file> --force`. To keep it: copy elsewhere with `--to`. |
+| `refused  <file>: exists and is not a copy; a folder copy never overwrites it, even with --force (name the file: umm-dev copy <path> --to <file> --force)` | A folder copy reached the game's own file. | Run the command the hint gives, if the kit's version should replace the game's. Leave it if the file is game-specific. |
+| `refused  <file>: changed here since it was copied (umm-dev drift --diff shows how); --force overwrites` | The game edited its copy. | `umm-dev drift --diff`. Keep it, or replace that one file with `--to <file> --force`. |
+| `refused  <file>: no comment syntax for .json` | The destination's type cannot carry a header. | Use a destination with an extension from the table above. |
+| `umm-dev copy: no runtime file or folder "<path>". umm-dev copy --list shows them.` | No such runtime path. | `umm-dev copy --list`. |
+| `imports ./<name>, which is not beside it: copy that too` | The copy needs a sibling file. | Copy the sibling into the same folder. |
+| `(the original at <tag> is not available: <url> unreachable (...))` | Drift is offline, or the tag is not on the public repo. | Set `UMM_DEV_REPO` to a local clone with its tags. Until then the diff is against the installed file. |
+| `(the original at <tag> is not available: UMM_DEV_REPO has no <tag>:<path>; ...)` | The clone lacks that tag. | `git -C $UMM_DEV_REPO fetch --tags`. |
+| `no runtime copies in <root>`, though there are copies. | Their line 1 was edited, or git ignores them. | Restore the header (take the file again with `--to <file> --force`), or stop ignoring the folder. |
+| A merged copy still says `changed here and upstream`. | Its header still names the old tag and hash. | Take the new version with `--to <file> --force`, then apply the game's changes again. |
+
+## For agents
+
+- **Never edit or remove line 1 of a copy.** It is how drift finds the copy, and what it compares
+  against. Edit below it.
+- **Run `umm-dev drift` after editing a copy, and before bumping the kit's tag.** Report what it
+  says.
+- **Never edit `node_modules/@ummgames/dev`.** A change there is lost on the next install and
+  never reaches other games. Fix the game's copy, and report the kit bug upstream.
+- **Take files one at a time, with `--to <the game's path>`.** The default destination is
+  `<runtime.into>/<path under runtime/>`: `src/portal/portal-sdk.ts` for
+  `portal/portal-sdk.ts`. A game that keeps the file anywhere else gets a second copy. Run
+  `--dry-run` first and check every path it prints.
+- **Never pass `--force` to a folder copy.** It overwrites every changed copy in the folder.
+- **Upgrade with drift's own lines.** After a bump, run each `take it:` line as printed. Treat
+  `changed here and upstream` as a decision for the user, not a `--force`.
