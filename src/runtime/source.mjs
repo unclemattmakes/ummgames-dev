@@ -7,6 +7,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { isSafeRuntimePath } from './header.mjs'
 
 /** This package's root: the folder holding its package.json. */
 export const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -69,11 +70,25 @@ export function resolveRuntime(spec, pkgRoot = PACKAGE_ROOT) {
 }
 
 /**
+ * The absolute path of a runtime file, refusing any path that is unsafe or resolves outside
+ * `<pkgRoot>/runtime`.
+ * @param {string} runtimePath
+ * @param {string} [pkgRoot]
+ */
+export function runtimeFile(runtimePath, pkgRoot = PACKAGE_ROOT) {
+  const base = path.resolve(pkgRoot, 'runtime')
+  const file = path.resolve(pkgRoot, ...runtimePath.split('/'))
+  if (!isSafeRuntimePath(runtimePath) || !file.startsWith(base + path.sep))
+    throw new Error(`not a runtime path: ${runtimePath}`)
+  return file
+}
+
+/**
  * The installed text of a runtime file, or `null` when this version no longer ships it.
  * @param {string} runtimePath
  * @param {string} [pkgRoot]
  */
 export function readRuntime(runtimePath, pkgRoot = PACKAGE_ROOT) {
-  const file = path.join(pkgRoot, ...runtimePath.split('/'))
+  const file = runtimeFile(runtimePath, pkgRoot)
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null
 }

@@ -21,7 +21,16 @@ import { cutEdl, resolveClip } from './cut.mjs'
 import { EDL_DEFAULTS, validateEdl } from './edl.mjs'
 import { checkKit, loadPreset } from './spec.mjs'
 import { renderStill } from './stills.mjs'
-import { ffmpeg, hasBin, launchChromium, MediaError, probe, readJson, rel } from './util.mjs'
+import {
+  ffmpeg,
+  hasBin,
+  launchChromium,
+  MediaError,
+  probe,
+  readJson,
+  rel,
+  removeInside,
+} from './util.mjs'
 
 export const STORE_DEFAULTS = {
   /** A preset in presets/ by name, or a path to one (relative to the game root). */
@@ -127,7 +136,7 @@ export function reviewSheet(store, v, log) {
   const clips = path.resolve(store.root, /** @type {string} */ (edl.clips))
   const stem = path.basename(v.edl, '.json')
   const dir = path.resolve(store.root, store.out, 'review', `.${stem}`)
-  fs.rmSync(dir, { recursive: true, force: true })
+  removeInside(dir, path.resolve(store.root, store.out, 'review'))
   fs.mkdirSync(dir, { recursive: true })
   const tw = W >= H ? 640 : 360
   const th = Math.round((tw * H) / W / 2) * 2
@@ -175,7 +184,7 @@ export function reviewSheet(store, v, log) {
       { cwd: dir },
     )
   }
-  fs.rmSync(dir, { recursive: true, force: true })
+  removeInside(dir, path.resolve(store.root, store.out, 'review'))
   return out
 }
 

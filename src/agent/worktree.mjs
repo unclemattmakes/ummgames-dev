@@ -354,9 +354,11 @@ export function removeWorktrees(names, o, say) {
     const r = removeOne(p, name, main, registered, o, say)
     if (r !== 0) failed++
   }
-  try {
-    git(['worktree', 'prune'], main)
-  } catch {}
+  if (!o.dryRun) {
+    try {
+      git(['worktree', 'prune'], main)
+    } catch {}
+  }
   return failed > 0 ? 1 : 0
 }
 
@@ -377,6 +379,16 @@ function removeOne(p, name, main, registered, o, say) {
     say(`REFUSING: ${p} is not a worktree git knows about.`)
     return 1
   }
+  // Deleting p deletes everything under it: another worktree nested there (in an ignored folder,
+  // so p still looks clean) would go with it, and the prune would then drop its registration.
+  const nested = registered.filter((r) => !same(r, p) && inside(r, p))
+  if (inside(main, p) && !nested.some((r) => same(r, main))) nested.push(main)
+  if (nested.length > 0) {
+    say(`REFUSING ${name}: it contains ${nested.length} other checkout(s) git knows about:`)
+    for (const r of nested) say(`   ${r}`)
+    say('   Remove those first.')
+    return 1
+  }
   if (!fs.existsSync(p)) {
     say(`${name}: folder already gone; pruning only.`)
     return 0
@@ -389,12 +401,26 @@ function removeOne(p, name, main, registered, o, say) {
   try {
     branch = git(['rev-parse', '--abbrev-ref', 'HEAD'], p)
   } catch {}
-  const dirty = git(['status', '--porcelain'], p).split('\n').filter(Boolean)
+  // --untracked-files=all: a status.showUntrackedFiles=no setting would otherwise hide new files.
+  // Ignored files are not checked: they go with the folder (docs/agent.md and --help say so).
+  const dirty = git(['status', '--porcelain', '--untracked-files=all'], p)
+    .split('\n')
+    .filter(Boolean)
   if (dirty.length > 0 && !o.force) {
     say(
       `REFUSING ${name}: ${dirty.length} uncommitted change(s). Commit them, or pass --force to discard.`,
     )
     return 1
+  }
+  // A detached HEAD on a commit no ref contains would be left dangling, then garbage-collected.
+  if (branch === 'HEAD' && !o.force) {
+    const holders = git(['for-each-ref', '--contains', 'HEAD', '--format=%(refname)'], p)
+    if (holders === '') {
+      say(
+        `REFUSING ${name}: its detached HEAD is on a commit no branch or tag contains. Branch it (git branch <name>), or pass --force to lose it.`,
+      )
+      return 1
+    }
   }
 
   const links = findLinks(p)

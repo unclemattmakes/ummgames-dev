@@ -192,7 +192,7 @@ describe('guard install-hooks', () => {
     fs.writeFileSync(path.join(hooksDir, 'commit-msg'), '#!/bin/sh\nexit 0\n')
     const inst = umm(['install-hooks'], r)
     expect(inst.status).toBe(1) // commit-msg was someone else's
-    expect(inst.stdout).toContain('is not ours')
+    expect(inst.stdout).toContain('is not a hook this tool wrote')
     expect(fs.readFileSync(path.join(hooksDir, 'commit-msg'), 'utf8')).toBe('#!/bin/sh\nexit 0\n')
     expect(fs.readFileSync(path.join(hooksDir, 'pre-commit'), 'utf8')).toContain(
       'guard hook pre-commit',
@@ -236,5 +236,40 @@ describe('guard install-hooks', () => {
       },
     )
     expect(ok.status, ok.stderr).toBe(0)
+  })
+})
+
+describe('guard install-hooks never overwrites what it did not write', () => {
+  it('leaves a symlinked hook and its target alone, and --force replaces only the link', () => {
+    const r = repo()
+    const hooksDir = path.join(r, '.git', 'hooks')
+    fs.mkdirSync(hooksDir, { recursive: true })
+    const target = path.join(tmp, `shared-hook-${n}`)
+    fs.writeFileSync(target, '#!/bin/sh\necho shared\n')
+    fs.symlinkSync(target, path.join(hooksDir, 'pre-commit'), 'file')
+    const res = umm(['install-hooks'], r)
+    expect(res.status).toBe(1)
+    expect(res.stdout).toContain('is a link')
+    expect(fs.readFileSync(target, 'utf8')).toBe('#!/bin/sh\necho shared\n')
+    expect(umm(['install-hooks', '--force'], r).status).toBe(0)
+    expect(fs.lstatSync(path.join(hooksDir, 'pre-commit')).isSymbolicLink()).toBe(false)
+    expect(fs.readFileSync(path.join(hooksDir, 'pre-commit'), 'utf8')).toContain(
+      'guard hook pre-commit',
+    )
+    expect(fs.readFileSync(target, 'utf8')).toBe('#!/bin/sh\necho shared\n')
+  })
+
+  it('rewrites its own unedited hook, but keeps one a person edited', () => {
+    const r = repo()
+    expect(umm(['install-hooks'], r).status).toBe(0)
+    const again = umm(['install-hooks'], r)
+    expect(again.status).toBe(0)
+    expect(again.stdout).toContain('rewrote')
+    const hook = path.join(r, '.git', 'hooks', 'pre-commit')
+    fs.appendFileSync(hook, '# my own addition\n')
+    const edited = umm(['install-hooks'], r)
+    expect(edited.status).toBe(1)
+    expect(edited.stdout).toContain('edited since')
+    expect(fs.readFileSync(hook, 'utf8')).toContain('# my own addition')
   })
 })

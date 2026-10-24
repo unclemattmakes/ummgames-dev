@@ -33,7 +33,12 @@ describe('header', () => {
   it('hashes CRLF and LF bodies the same', () => {
     expect(bodyHash('a\r\nb\r\n')).toBe(bodyHash('a\nb\n'))
     expect(bodyHash('a\nb\n')).toHaveLength(16)
-    const crlf = stamp({ file: 'x.ts', version: 'v1', runtimePath: 'runtime/k/a.ts', source: A_TS })
+    const crlf = stamp({
+      file: 'x.ts',
+      version: 'v1.0.0',
+      runtimePath: 'runtime/k/a.ts',
+      source: A_TS,
+    })
       .split('\n')
       .join('\r\n')
     const copy = /** @type {NonNullable<ReturnType<typeof parseCopy>>} */ (parseCopy(crlf))

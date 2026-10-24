@@ -9,6 +9,7 @@ import * as storeCmd from '../../src/commands/store.mjs'
 import { loadConfig } from '../../src/config.mjs'
 import {
   CAPTURE_DEFAULTS,
+  captureShots,
   mergeQuery,
   shotEvents,
   shotUrl,
@@ -18,7 +19,7 @@ import { clockScript } from '../../src/media/clock.mjs'
 import { LOOP_DEFAULTS, loopScale, posterScore } from '../../src/media/loop.mjs'
 import { stillHtml } from '../../src/media/stills.mjs'
 import { STORE_DEFAULTS } from '../../src/media/store.mjs'
-import { pageFn } from '../../src/media/util.mjs'
+import { isSafeName, MediaError, pageFn, removeInside } from '../../src/media/util.mjs'
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'umm-dev-media-'))
 afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }))
@@ -129,7 +130,7 @@ describe('shots', () => {
         { name: 'c', dur: 1, keys: 'x' },
       ]),
     ).toEqual([
-      'shot 0 (a b): "name" must be a folder-safe string',
+      'shot 0 (a b): "name" must be a folder-safe string (letters, digits, . _ @ -; not only dots)',
       'shot 0 (a b): "dur" must be seconds > 0',
       'shot 1 (c): "from" must be seconds >= 0',
       'shot 1 (c): "size" must be [w, h] in px',
@@ -184,6 +185,62 @@ describe('loop', () => {
     const detailed = Uint8Array.from({ length: 100 }, (_, i) => (i % 2 ? 200 : 40))
     expect(posterScore(detailed)).toBeGreaterThan(posterScore(flatWhite))
     expect(posterScore(flatWhite)).toBeGreaterThan(posterScore(flatBlack))
+  })
+})
+
+describe('deletes stay inside their folder', () => {
+  it('a safe name is one folder, never only dots', () => {
+    for (const ok of ['move', 'move@b', 'k-land.v2', '.hidden', 'a..b'])
+      expect(isSafeName(ok), ok).toBe(true)
+    for (const bad of ['.', '..', '...', '', 'a/b', 'a\\b', 'x/../../..', '../x', 'a b', 3])
+      expect(isSafeName(bad), String(bad)).toBe(false)
+  })
+
+  it('rejects . and .. as shot names', () => {
+    const msg = '"name" must be a folder-safe string (letters, digits, . _ @ -; not only dots)'
+    expect(
+      validateShots([
+        { name: '..', dur: 1 },
+        { name: '.', dur: 1 },
+      ]),
+    ).toEqual([`shot 0 (..): ${msg}`, `shot 1 (.): ${msg}`])
+  })
+
+  it('removeInside refuses the parent itself, anything outside it, and a prefix sibling', () => {
+    const parent = path.join(tmp, 'guard', 'out')
+    const inside = path.join(parent, 'shot')
+    const sibling = path.join(tmp, 'guard', 'out-other')
+    for (const d of [inside, sibling]) fs.mkdirSync(d, { recursive: true })
+    const bad = [parent, `${parent}${path.sep}.`, path.join(parent, '..'), tmp, sibling]
+    for (const d of [...bad, `${inside}${path.sep}..`])
+      expect(() => removeInside(d, parent), d).toThrow(MediaError)
+    expect(fs.existsSync(parent) && fs.existsSync(sibling)).toBe(true)
+    removeInside(inside, parent)
+    expect(fs.existsSync(inside)).toBe(false)
+    expect(fs.existsSync(parent)).toBe(true)
+  })
+
+  it('a hostile --tag deletes nothing', async () => {
+    const game = path.join(tmp, 'hostile')
+    fs.mkdirSync(game, { recursive: true })
+    fs.writeFileSync(path.join(game, 'package.json'), '{}')
+    fs.writeFileSync(path.join(game, 'shots.json'), JSON.stringify([{ name: 'intro', dur: 1 }]))
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      for (const tag of ['x/../../..', '..', '.'])
+        expect(await captureCmd.run(['intro', '--tag', tag, '--out', 'cap'], { cwd: game })).toBe(2)
+    } finally {
+      err.mockRestore()
+    }
+    await expect(
+      captureShots({
+        cfg: { ...CAPTURE_DEFAULTS, root: game },
+        shots: [{ name: 'intro', dur: 1 }],
+        out: path.join(game, 'cap'),
+        tag: 'x/../../..',
+      }),
+    ).rejects.toThrow(/--tag must be a folder-safe name/)
+    expect(fs.existsSync(path.join(game, 'shots.json'))).toBe(true)
   })
 })
 

@@ -115,7 +115,10 @@ and pnpm would run it in every worktree.
   `umm-dev guard hook <name>`.
 - It fails closed: no node, or no package, refuses the commit, because "cannot check" must never
   read as "nothing wrong".
-- It will not overwrite a hook it did not write; `--force` does. Re-run it to rewrite its own.
+- It rewrites a hook only when the file is exactly a script this package wrote. It leaves alone
+  a hook someone else wrote, one of its own that a person has edited since, and a symlink
+  (writing through it would overwrite the target). `--force` replaces any of them; for a symlink
+  it removes the link and writes a new file, leaving the target untouched.
 - A hook is advisory (`git commit --no-verify` skips it), so CI should run the same checks.
 
 Which checks each hook runs is config, so changing them never needs a reinstall. Every listed

@@ -7,7 +7,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { validateEdl } from './edl.mjs'
 import { planCut } from './graph.mjs'
-import { ffmpeg, hasBin, MediaError, rel } from './util.mjs'
+import { ffmpeg, hasBin, MediaError, rel, removeInside } from './util.mjs'
 
 /**
  * Find a clip on disk. A capture folder's `<clip>/<clip>.mp4` first, then a loose
@@ -58,7 +58,7 @@ export function cutEdl(edl, opts) {
     resolveClip: (c, d, f) => resolveClip(c, d, f, { lenient: print }),
   })
   if (!print) {
-    fs.rmSync(plan.segDir, { recursive: true, force: true })
+    removeInside(plan.segDir, path.dirname(plan.out))
     fs.mkdirSync(plan.segDir, { recursive: true })
   } else log(`mkdir -p ${JSON.stringify(plan.segDir)}`)
   try {
@@ -67,7 +67,7 @@ export function cutEdl(edl, opts) {
       ffmpeg(c.args, { print, log })
     }
   } finally {
-    if (!print) fs.rmSync(plan.segDir, { recursive: true, force: true })
+    if (!print) removeInside(plan.segDir, path.dirname(plan.out))
   }
   if (print) {
     log(`# would write ${plan.out} (${plan.length.toFixed(2)} s)`)

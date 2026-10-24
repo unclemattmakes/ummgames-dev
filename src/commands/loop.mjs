@@ -5,7 +5,7 @@ import path from 'node:path'
 import { loadConfig } from '../config.mjs'
 import { cutEdl } from '../media/cut.mjs'
 import { LOOP_DEFAULTS, makeLoop } from '../media/loop.mjs'
-import { guard, parse, readJson, rel, UsageError } from '../media/util.mjs'
+import { guard, parse, readJson, rel, removeInside, UsageError } from '../media/util.mjs'
 
 export const describe = 'make a site loop: a silent 720p faststart mp4 and a poster (docs/media.md)'
 
@@ -75,7 +75,7 @@ export async function run(argv, ctx) {
       console.log(`wrote ${rel(cfg.root, r.mp4)} (${r.mb.toFixed(2)} MB)`)
       console.log(`wrote ${rel(cfg.root, r.poster)} (from ${r.posterAt.toFixed(2)} s)`)
     } finally {
-      if (tmp) fs.rmSync(tmp, { recursive: true, force: true })
+      if (tmp) removeInside(tmp, os.tmpdir())
     }
     return 0
   })

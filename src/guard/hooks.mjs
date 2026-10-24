@@ -43,6 +43,24 @@ exec node "$bin" guard hook ${name} "$@"
 }
 
 /**
+ * Hook scripts earlier versions of this package wrote, so a re-install can replace them. Append
+ * the old `hookScript` here whenever it changes. (None yet: this is the first published form.)
+ * @type {((name: string) => string)[]}
+ */
+const EARLIER = []
+
+/**
+ * A hook is ours only if it is exactly a script this package wrote: one that merely carries the
+ * marker may hold someone's edits, which a rewrite would throw away.
+ * @param {string} name
+ * @param {string} text
+ */
+export function isOurs(name, text) {
+  const t = text.replace(/\r\n/g, '\n')
+  return [hookScript, ...EARLIER].some((f) => f(name) === t)
+}
+
+/**
  * @param {{ cwd: string, dir?: string, hooks: string[], force?: boolean }} o
  * @param {(line: string) => void} say
  * @returns {number}
@@ -62,9 +80,26 @@ export function installHooks(o, say) {
   let refused = 0
   for (const name of o.hooks) {
     const file = path.join(dir, name)
-    const exists = fs.existsSync(file)
-    if (exists && !fs.readFileSync(file, 'utf8').includes(HOOK_MARK) && !o.force) {
-      say(`install-hooks: ${file} exists and is not ours; left alone (--force replaces it).`)
+    /** @type {fs.Stats | null} */
+    let st = null
+    try {
+      st = fs.lstatSync(file)
+    } catch {}
+    const exists = st !== null
+    if (st?.isSymbolicLink()) {
+      // Writing through a link would overwrite whatever it points at.
+      if (!o.force) {
+        say(
+          `install-hooks: ${file} is a link; left alone (--force replaces the link, not its target).`,
+        )
+        refused++
+        continue
+      }
+      fs.unlinkSync(file)
+    } else if (st && !o.force && !isOurs(name, fs.readFileSync(file, 'utf8'))) {
+      say(
+        `install-hooks: ${file} exists and is not a hook this tool wrote (or was edited since); left alone (--force replaces it).`,
+      )
       refused++
       continue
     }

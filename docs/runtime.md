@@ -27,7 +27,7 @@ umm-dev copy --list                   # what this version ships
 | Option | Effect |
 |---|---|
 | `--to <path>` | Where it goes, from the game root. A trailing `/`, an existing folder, or a folder copy means "inside this folder". Default: `<runtime.into>/<path under runtime/>`. |
-| `--force` | Overwrite a copy that was changed here, or a file that is not a copy. |
+| `--force` | Overwrite a copy that was changed here. A file that is not a copy is overwritten only when `<runtime path>` names that one file. |
 | `--dry-run` | Say what would be written; write nothing. |
 | `--list` | List the runtime files. |
 
@@ -43,7 +43,12 @@ Line 1 of every copy is a header, in the file type's comment syntax:
 
 **Copy never clobbers work.** Over an existing file it writes only when that file is an untouched
 copy (its body still hashes to its header), which is how a game takes an upstream change.
-A copy changed here, or a file that is not a copy, needs `--force`. After writing, it names any
+A copy changed here needs `--force`. A file that is not a copy (the game's own code, or a
+copy from before these headers) needs `--force` **and** a path naming exactly that file:
+`umm-dev copy dev --force` overwrites changed copies in the folder but never the game's own
+files, and lists each one as refused. To adopt runtime code over files a game already has, copy
+them one at a time (`umm-dev copy dev/fuzzy.ts --force`), leaving out any file whose name the
+game uses for its own code (copy that one elsewhere with `--to`). After writing, it names any
 relative import that has no file beside it: copy that sibling too.
 
 File types: `.ts .tsx .js .mjs .cjs .glsl .wgsl` take `//`, `.css` takes `/* */`,
@@ -83,7 +88,10 @@ drift needs the file at the header's tag:
 1. `UMM_DEV_REPO`, if set, names a local clone: `git -C $UMM_DEV_REPO show <tag>:<path>`.
 2. Otherwise it fetches `https://raw.githubusercontent.com/unclemattmakes/ummgames-dev/<tag>/<path>`.
 
-Either way the text must hash to the header's hash, or it is not used. Offline, or with neither,
+Either way the text must hash to the header's hash, or it is not used. A header is data from
+the game, so drift trusts only a tag of the form `v1.2.3` and a path of plain segments under
+`runtime/` (no `.` or `..`). Every read stays inside the installed `runtime/`, and every
+fetch stays inside this repo's `runtime/` at that tag. Offline, or with neither,
 drift says why and diffs the copy against the installed file instead.
 
 **Exit codes:** drift is information, not an error.

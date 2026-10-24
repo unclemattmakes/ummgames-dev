@@ -20,12 +20,14 @@ import {
   filterPath,
   frameName,
   hasBin,
+  isSafeName,
   launchChromium,
   listFrames,
   MediaError,
   pageFn,
   readJson,
   rel,
+  removeInside,
 } from './util.mjs'
 
 /**
@@ -174,8 +176,10 @@ export function validateShots(shots) {
   const seen = new Set()
   shots.forEach((s, i) => {
     const at = `shot ${i}${s?.name ? ` (${s.name})` : ''}`
-    if (typeof s?.name !== 'string' || !/^[\w.@-]+$/.test(s.name))
-      errs.push(`${at}: "name" must be a folder-safe string`)
+    if (!isSafeName(s?.name))
+      errs.push(
+        `${at}: "name" must be a folder-safe string (letters, digits, . _ @ -; not only dots)`,
+      )
     else if (seen.has(s.name)) errs.push(`${at}: the name is used twice`)
     seen.add(s?.name)
     if (!(typeof s?.dur === 'number' && s.dur > 0)) errs.push(`${at}: "dur" must be seconds > 0`)
@@ -356,6 +360,10 @@ export function makeSheet(o) {
  */
 export async function captureShots(run) {
   const { cfg, shots } = run
+  if (run.tag != null && !isSafeName(run.tag))
+    throw new MediaError(
+      `--tag must be a folder-safe name (letters, digits, . _ @ -; not only dots), got "${run.tag}"`,
+    )
   const log = run.log ?? console.log
   if (!hasBin('ffmpeg')) throw new MediaError('capture needs ffmpeg on PATH to encode its shots')
   /** @type {typeof import('playwright')} */
@@ -395,7 +403,7 @@ export async function captureShots(run) {
   async function captureOne(shot) {
     const name = `${shot.name}${run.tag ? `@${run.tag}` : ''}`
     const dir = path.join(run.out, name)
-    fs.rmSync(dir, { recursive: true, force: true })
+    removeInside(dir, run.out)
     fs.mkdirSync(dir, { recursive: true })
     const fps = cfg.fps
     const from = shot.from ?? 0

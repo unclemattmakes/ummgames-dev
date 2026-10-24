@@ -15,7 +15,13 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import https from 'node:https'
 import path from 'node:path'
-import { bodyHash, commentStyleFor, parseCopy } from './header.mjs'
+import {
+  bodyHash,
+  commentStyleFor,
+  isSafeRuntimePath,
+  isSafeVersion,
+  parseCopy,
+} from './header.mjs'
 import { PACKAGE_ROOT, packageVersion, readRuntime, toPosix } from './source.mjs'
 
 export const RAW_BASE = 'https://raw.githubusercontent.com/unclemattmakes/ummgames-dev'
@@ -148,6 +154,22 @@ export function httpsGet(url, timeoutMs) {
 }
 
 /**
+ * The public repo's URL for a runtime file at a tag: each segment encoded, and the result checked
+ * to still sit under this repo's runtime/ at that tag. `null` when it would not.
+ * @param {string} version
+ * @param {string} runtimePath
+ */
+export function rawUrl(version, runtimePath) {
+  if (!isSafeVersion(version) || !isSafeRuntimePath(runtimePath)) return null
+  const url = `${RAW_BASE}/${[version, ...runtimePath.split('/')].map(encodeURIComponent).join('/')}`
+  const prefix = `${new URL(RAW_BASE).pathname}/${encodeURIComponent(version)}/runtime/`
+  const parsed = new URL(url)
+  return parsed.host === 'raw.githubusercontent.com' && parsed.pathname.startsWith(prefix)
+    ? url
+    : null
+}
+
+/**
  * The file as it was at `version`: from the clone `UMM_DEV_REPO` names, else from the public
  * repo. Checked against the header's hash, so a wrong tag or an edited clone never passes for
  * the original.
@@ -169,6 +191,8 @@ export async function fetchOriginal({
   fetch = httpsGet,
   timeoutMs = 8000,
 }) {
+  if (!isSafeVersion(version) || !isSafeRuntimePath(runtimePath))
+    return { text: null, why: `refusing an unsafe header: ${version} ${runtimePath}` }
   /** @type {string[]} */
   const tried = []
   const repo = env.UMM_DEV_REPO
@@ -184,7 +208,11 @@ export async function fetchOriginal({
       tried.push(`UMM_DEV_REPO has no ${version}:${runtimePath}`)
     }
   }
-  const url = `${RAW_BASE}/${version}/${runtimePath}`
+  const url = rawUrl(version, runtimePath)
+  if (url === null) {
+    tried.push(`refusing to fetch ${runtimePath} at ${version}`)
+    return { text: null, why: tried.join('; ') }
+  }
   try {
     const res = await fetch(url, timeoutMs)
     if (!res.ok) tried.push(`${url} answered ${res.status}`)

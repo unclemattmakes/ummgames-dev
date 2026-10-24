@@ -57,19 +57,15 @@ export function killTree(pid) {
     }
     return
   }
-  // The group outlives its leader, so signal it even when `pid` itself is gone.
+  // The group outlives its leader, so signal it even when `pid` itself is gone. Only the group:
+  // the command is always spawned detached, so it leads its own, and a bare pid could be reused.
   /** @param {NodeJS.Signals | 0} sig */
   const send = (sig) => {
     try {
       process.kill(-pid, sig)
       return true
     } catch {
-      try {
-        process.kill(pid, sig)
-        return true
-      } catch {
-        return false
-      }
+      return false
     }
   }
   if (!send('SIGTERM')) return

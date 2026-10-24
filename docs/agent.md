@@ -71,7 +71,9 @@ move it, for the same reason.
   the `umm-dev` process dies while its lease is still held, the watchdog kills the command's
   whole tree and releases the lease. On Windows that takes finding the tree: Node puts a child in
   a job that dies with Node, but lets the child's own children (a browser, say) break away, so the
-  watchdog asks Windows once for every live process descended from the child and kills each.
+  watchdog asks Windows once for the live processes whose parent was the child and kills each
+  tree. It never kills by the child's pid alone: Windows reuses pids, so a process holding it
+  that started after the command did is left alone.
 - **Stale.** A lock is stale only when every process its holder names is provably gone (the
   `umm-dev` process and the command it ran). The head of the queue then reclaims it, after
   `gpu.staleGraceSeconds` (10) with nothing changing, and logs `RECLAIM`. A holder that names no
@@ -160,9 +162,13 @@ checkout's is used.
 junction (and some tools follow a symlink) and delete the TARGET's contents: removing a hydrated
 worktree that way empties the main checkout and breaks every worktree at once. It:
 
-1. refuses the main checkout, a path git does not list as a worktree, and the worktree the
-   current directory is in;
-2. refuses a tree with uncommitted changes unless `--force`;
+1. refuses the main checkout, a path git does not list as a worktree, the worktree the current
+   directory is in, and a worktree that contains the main checkout or another registered
+   worktree (deleting it would delete that one too);
+2. without `--force`, refuses a tree with uncommitted changes, untracked files included (whatever
+   `status.showUntrackedFiles` says), and a detached HEAD on a commit no branch or tag contains,
+   which would otherwise be left dangling. **Ignored files are never checked**: they are deleted
+   with the folder, so keep nothing in a worktree's ignored paths that exists nowhere else;
 3. collects every link (symlink, junction, any reparse point) without descending into any, and
    counts the entries of every target outside the worktree;
 4. unlinks them (the link only), checks none is left, and re-counts every outside target: one
@@ -170,7 +176,8 @@ worktree that way empties the main checkout and breaks every worktree at once. I
 5. unlocks the worktree, deletes the folder, prunes git's list, and prints the branch so it can
    be deleted if merged.
 
-`--dry-run` lists the links and targets and changes nothing.
+`--dry-run` lists the links and targets and changes nothing, git's worktree list included (no
+prune).
 
 ### Config: `worktree`
 

@@ -3,7 +3,7 @@ import path from 'node:path'
 import { loadConfig } from '../config.mjs'
 import { CAPTURE_DEFAULTS, captureShots, loadShots } from '../media/capture.mjs'
 import { compareCaptures } from '../media/compare.mjs'
-import { guard, MediaError, parse, rel, UsageError } from '../media/util.mjs'
+import { guard, isSafeName, MediaError, parse, rel, UsageError } from '../media/util.mjs'
 
 export const describe = 'record shots of the game in virtual time, frame-exact (docs/media.md)'
 
@@ -80,6 +80,10 @@ export async function run(argv, ctx) {
             throw new MediaError(`no shot "${n}" in ${rel(cfg.root, file)} (--list shows them)`)
           return s
         })
+    if (o.tag != null && !isSafeName(o.tag))
+      throw new UsageError(
+        `--tag must be a folder-safe name (letters, digits, . _ @ -; not only dots), got "${o.tag}"`,
+      )
     const every = o.every == null ? 0.1 : Number(o.every)
     if (!(every > 0)) throw new UsageError('--every must be seconds > 0')
     if (o.crop != null && !/^\d+:\d+:\d+:\d+$/.test(o.crop))

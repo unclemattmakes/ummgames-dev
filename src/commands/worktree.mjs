@@ -25,7 +25,9 @@ const HELP = `usage: umm-dev worktree hydrate [<path>] [--main <path>] [--skip-i
             kept its entries, then delete the folder and prune git's list. <name> is a folder
             under worktree.dir (.claude/worktrees), or a path.
     --dry-run         list the links and their targets, change nothing
-    --force           remove even with uncommitted changes (they are lost)
+    --force           remove even with uncommitted changes, or a detached HEAD on a commit no
+                      ref contains (both are lost)
+            Ignored files are never checked: they are deleted with the folder.
 
 exit: 0 ok; 1 a check failed or something was refused; 64 usage`
 

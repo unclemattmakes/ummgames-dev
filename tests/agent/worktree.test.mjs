@@ -108,3 +108,63 @@ describe('umm-dev worktree', () => {
     expect(findLinks(main)).toEqual([])
   })
 })
+
+describe('umm-dev worktree remove refuses to lose work', () => {
+  /** @param {string} name @param {string[]} [extra] */
+  const add = (name, extra = ['-b', name]) => {
+    const p = path.join(main, '.claude', 'worktrees', name)
+    git(['worktree', 'add', '-q', ...extra, p], main)
+    return p
+  }
+  const listed = () => git(['worktree', 'list', '--porcelain'], main)
+
+  it('refuses a worktree that holds another registered worktree', () => {
+    const a = add('nest-a')
+    // b lives inside a, in a folder a's .gitignore ignores, so a looks clean.
+    const b = path.join(a, '.claude', 'worktrees', 'nest-b')
+    git(['worktree', 'add', '-q', '-b', 'nest-b', b], main)
+    fs.writeFileSync(path.join(b, 'work.md'), 'staged work')
+    git(['add', 'work.md'], b)
+    const r = umm(['worktree', 'remove', 'nest-a'], main)
+    expect(r.status).toBe(1)
+    expect(r.stdout).toContain('other checkout(s) git knows about')
+    expect(fs.existsSync(path.join(b, 'work.md'))).toBe(true)
+    expect(listed()).toContain('nest-b')
+  })
+
+  it('refuses a detached HEAD on a commit no ref contains, unless --force', () => {
+    const c = add('detached', ['--detach'])
+    fs.writeFileSync(path.join(c, 'only-here.md'), 'x')
+    git(['add', '.'], c)
+    git(['commit', '-q', '-m', 'reachable from nothing else'], c)
+    const r = umm(['worktree', 'remove', 'detached'], main)
+    expect(r.status).toBe(1)
+    expect(r.stdout).toContain('detached HEAD')
+    expect(fs.existsSync(c)).toBe(true)
+    expect(umm(['worktree', 'remove', 'detached', '--force'], main).status).toBe(0)
+    expect(fs.existsSync(c)).toBe(false)
+  })
+
+  it('sees untracked files even when status.showUntrackedFiles is no', () => {
+    const d = add('hidden-new')
+    git(['config', 'status.showUntrackedFiles', 'no'], main)
+    try {
+      fs.writeFileSync(path.join(d, 'new-file.md'), 'not committed')
+      const r = umm(['worktree', 'remove', 'hidden-new'], main)
+      expect(r.status).toBe(1)
+      expect(r.stdout).toContain('uncommitted change')
+      expect(fs.existsSync(path.join(d, 'new-file.md'))).toBe(true)
+    } finally {
+      git(['config', '--unset', 'status.showUntrackedFiles'], main)
+    }
+  })
+
+  it('changes nothing on --dry-run, git worktree list included', () => {
+    const e = add('gone-folder')
+    fs.rmSync(e, { recursive: true, force: true })
+    expect(umm(['worktree', 'remove', 'gone-folder', '--dry-run'], main).status).toBe(0)
+    expect(listed()).toContain('gone-folder')
+    expect(umm(['worktree', 'remove', 'gone-folder'], main).status).toBe(0)
+    expect(listed()).not.toContain('gone-folder')
+  })
+})

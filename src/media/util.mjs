@@ -228,3 +228,29 @@ export async function launchChromium(pw, opts, log = console.log) {
     `could not start Chromium: ${first}\nrun \`pnpm exec playwright install chromium\`, or set capture.browser.channel`,
   )
 }
+
+/**
+ * A name that is safe as one folder: word characters, `.`, `@` and `-`, and not made only of
+ * dots (`.` and `..` would name the folder itself or its parent).
+ * @param {unknown} s
+ * @returns {s is string}
+ */
+export function isSafeName(s) {
+  return typeof s === 'string' && /^[\w.@-]+$/.test(s) && !/^\.+$/.test(s)
+}
+
+/**
+ * `rm -rf dir`, but only when `dir` is strictly inside `parent`: never `parent` itself, never
+ * anything outside it. Every recursive delete in the media chain goes through here, so a
+ * hostile name or path cannot reach the game root.
+ * @param {string} dir
+ * @param {string} parent
+ */
+export function removeInside(dir, parent) {
+  const d = path.resolve(dir)
+  const p = path.resolve(parent)
+  const r = path.relative(p, d)
+  if (!r || r === '..' || r.startsWith(`..${path.sep}`) || path.isAbsolute(r))
+    throw new MediaError(`refusing to delete ${d}: it is not inside ${p}`)
+  fs.rmSync(d, { recursive: true, force: true })
+}

@@ -83,6 +83,7 @@ export function copyRuntime({
   if (files.length === 0) throw new Error(`no runtime file or folder "${spec}"`)
   const version = packageVersion(pkgRoot)
   const dests = plan({ files, spec, root, into, to })
+  const namedOne = files.length === 1 && files[0] === normalizeSpec(spec)
   /** @type {CopyResult[]} */
   const results = []
   for (const [runtimePath, dest] of dests) {
@@ -108,6 +109,17 @@ export function copyRuntime({
       }
       const copy = parseCopy(existing)
       const clean = copy !== null && bodyHash(copy.body) === copy.hash
+      // --force overwrites a file that is not a copy only when the spec named exactly that file:
+      // a folder copy must never replace the game's own code.
+      if (copy === null && force && !namedOne) {
+        results.push({
+          runtimePath,
+          file,
+          outcome: 'refused',
+          reason: `exists and is not a copy; a folder copy never overwrites it, even with --force (name the file: umm-dev copy ${runtimePath.slice('runtime/'.length)} --force)`,
+        })
+        continue
+      }
       if (!clean && !force) {
         results.push({
           runtimePath,

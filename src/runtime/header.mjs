@@ -48,8 +48,29 @@ export const COMMENT_STYLES = /** @type {Record<string, CommentStyle>} */ ({
   '.toml': HASH,
 })
 
+// Only a release tag and plain path segments (no `.` or `..`): a game file's header must never
+// steer a read or a fetch outside runtime/.
 const HEADER_RE =
-  /Copied from ummgames-dev (v[0-9A-Za-z.+-]+) (runtime\/\S+) \(sha256 ([0-9a-f]{16})\)/
+  /Copied from ummgames-dev (v\d+\.\d+\.\d+(?:-[\w.]+)?) (runtime(?:\/[\w-][\w.-]*)+) \(sha256 ([0-9a-f]{16})\)/
+
+/**
+ * A release tag: `v1.2.3` or `v1.2.3-rc.1`.
+ * @param {string} v
+ */
+export const isSafeVersion = (v) => /^v\d+\.\d+\.\d+(-[\w.]+)?$/.test(v)
+
+/**
+ * A posix path under runtime/ of plain segments: no `.`, `..`, empty or odd segments.
+ * @param {string} p
+ */
+export function isSafeRuntimePath(p) {
+  const parts = p.split('/')
+  return (
+    parts.length > 1 &&
+    parts[0] === 'runtime' &&
+    parts.slice(1).every((s) => /^[\w-][\w.-]*$/.test(s) && s !== '.' && s !== '..')
+  )
+}
 
 /**
  * @param {string} file
@@ -92,7 +113,7 @@ export function parseCopy(text) {
   const nl = text.indexOf('\n')
   const first = (nl === -1 ? text : text.slice(0, nl)).replace(/\r$/, '')
   const m = HEADER_RE.exec(first)
-  if (!m) return null
+  if (!m || !isSafeRuntimePath(/** @type {string} */ (m[2]))) return null
   return {
     version: /** @type {string} */ (m[1]),
     runtimePath: /** @type {string} */ (m[2]),

@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
 import { leaseDir, parseHolder, parseTicket } from '../../src/agent/lease.mjs'
 import { findBash } from '../../src/agent/msys.mjs'
+import { pidAlive } from '../../src/agent/proc.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const BIN = path.join(ROOT, 'bin/umm-dev.mjs')
@@ -70,13 +71,14 @@ async function until(cond, ms = 8000) {
   }
 }
 
-/** @param {string} log @returns {Record<string, { start: number, end: number }>} */
+/** @param {string} log @returns {Record<string, { start: number, end: number, pid: number }>} */
 function events(log) {
-  /** @type {Record<string, { start: number, end: number }>} */
+  /** @type {Record<string, { start: number, end: number, pid: number }>} */
   const out = {}
   for (const line of fs.readFileSync(log, 'utf8').split('\n').filter(Boolean)) {
-    const [tag = '', what, t] = line.split(' ')
-    out[tag] ??= { start: 0, end: 0 }
+    const [tag = '', what, t, pid] = line.split(' ')
+    out[tag] ??= { start: 0, end: 0, pid: 0 }
+    if (pid) out[tag].pid = Number(pid)
     out[tag][/** @type {'start' | 'end'} */ (what)] = Number(t)
   }
   return out
@@ -212,8 +214,8 @@ describe('umm-dev gpu', () => {
     const g = setup()
     // A grandchild behind a non-Node parent: on Windows it escapes the job Node puts children in.
     const tree = WIN
-      ? [path.join(ROOT, 'tests/agent/fixtures/hold-tree.cmd'), g.log, 'a', '3000']
-      : ['sh', '-c', `"${process.execPath}" "${HOLD}" "${g.log}" a 3000; :`]
+      ? [path.join(ROOT, 'tests/agent/fixtures/hold-tree.cmd'), g.log, 'a', '8000']
+      : ['sh', '-c', `"${process.execPath}" "${HOLD}" "${g.log}" a 8000; :`]
     const a = start(g, ['run', 'a', '5', '--', ...tree])
     await until(() => fs.existsSync(g.log))
     a.proc.kill('SIGKILL') // umm-dev only: no handler runs
@@ -221,9 +223,11 @@ describe('umm-dev gpu', () => {
     const b = await start(g, ['run', 'b', '5', '--', process.execPath, HOLD, g.log, 'b', '50']).done
     expect(b.code).toBe(0)
     const e = events(g.log)
-    expect(e.b?.start).toBeLessThan((e.a?.start ?? 0) + 3000)
-    await new Promise((r) => setTimeout(r, Math.max(0, (e.a?.start ?? 0) + 3300 - Date.now())))
-    expect(events(g.log).a?.end).toBe(0)
+    // The held command was killed (so its end line never comes), and b ran only after that.
+    expect(e.a?.pid).toBeGreaterThan(0)
+    expect(pidAlive(e.a?.pid)).toBe(false)
+    expect(e.a?.end).toBe(0)
+    expect(e.b?.start).toBeLessThan((e.a?.start ?? 0) + 8000)
     expect(fs.readFileSync(path.join(g.lease, 'gpu-lease.log'), 'utf8')).toContain('umm-dev died')
   })
 

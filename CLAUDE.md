@@ -9,7 +9,8 @@ game as a devDependency pinned to a tag. Read README.md for what is here and how
    repository's name, an unannounced game, a host, a bucket, an account id, a key, a home-directory
    path or a plan into any tracked file. Game-specific values live in each game's
    `umm-dev.config.mjs`, never here. `tests/public-names.test.mjs` fails on any name listed in the
-   untracked `.private-names` file; keep that file current and never commit it.
+   untracked `.private-names` file; keep that file current and never commit it. Commits use the
+   GitHub noreply identity set in this repo's local git config, never a personal address.
 2. **One package, no internal packages.** Everything ships as `@ummgames/dev`. pnpm cannot resolve
    `workspace:*` links when a game installs from git, so a second package here breaks every install.
 3. **Linked code is JavaScript.** Everything under `bin/`, `src/` and `config/` is ESM `.mjs`, with

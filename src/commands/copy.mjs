@@ -20,7 +20,8 @@ const HELP = `usage: umm-dev copy <runtime path> [--to <path in game>] [--force]
   <runtime path>  a file or folder under runtime/ (dev/fuzzy.ts, runtime/dev, input)
   --to <path>     where it goes, from the game root: a file, or a folder (trailing /)
                   default: <runtime.into>/<path under runtime/>, runtime.into = "src"
-  --force         overwrite a copy changed here, or a file that is not a copy
+  --force         overwrite a copy changed here; a file that is not a copy only
+                  when <runtime path> names that one file
   --dry-run       say what would be written, write nothing
   --list          list the runtime files this version ships
 
