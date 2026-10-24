@@ -1,0 +1,15 @@
+{
+  "name": "Tiny Portal",
+  "assets": {
+    "cover-wide": { "kind": "image", "size": [320, 180], "formats": ["png"], "required": true },
+    "preview": {
+      "kind": "video",
+      "size": [320, 180],
+      "seconds": [0.9, 1.1],
+      "audio": false,
+      "maxMB": 5,
+      "codecs": ["h264"]
+    }
+  },
+  "rules": ["The cover shows the square."]
+}

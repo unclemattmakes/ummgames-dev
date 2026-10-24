@@ -1,0 +1,147 @@
+/* The developer splash's styles, for the markup dev-splash.ts describes: cream paper, walnut
+   ink, ember amber. Inline these in the page's <head> so the splash is up from the first paint,
+   before any module runs. The face is Bitter, falling back to Georgia. */
+#dev-splash {
+  --paper: #f2e9d8;
+  --walnut: #2a1d12;
+  --ember: #e8923a;
+  --rh: 1.2em;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--paper);
+  color: var(--walnut);
+  color-scheme: light;
+}
+.dev-splash__lockup {
+  display: flex;
+  align-items: center;
+  gap: 0.42em;
+  max-width: 100%;
+  font:
+    700 clamp(30px, 6.2vw, 84px) / 1.05 Bitter,
+    Georgia,
+    "Times New Roman",
+    serif;
+  letter-spacing: -0.02em;
+  opacity: 0;
+}
+#dev-splash.is-faced .dev-splash__lockup {
+  animation: dev-splash-in 450ms ease forwards;
+}
+.dev-splash__portrait {
+  flex: none;
+  width: 2.35em;
+  height: 2.35em;
+  border-radius: 50%;
+  border: 3px solid rgba(42, 29, 18, 0.28);
+  background: #ece1cb;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.dev-splash__portrait.is-loaded {
+  opacity: 1;
+}
+.dev-splash__mark {
+  margin: 0;
+  font: inherit;
+  text-align: left;
+}
+/* Every word in one grid cell, invisible, so the slot is as wide as the widest and the
+   underline never moves; the typed line over them. */
+.dev-splash__blank {
+  display: grid;
+  width: fit-content;
+  height: var(--rh);
+  margin-top: 0.08em;
+  line-height: var(--rh);
+  border-bottom: 0.09em solid var(--ember);
+}
+.dev-splash__blank > * {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+}
+.dev-splash__sizer {
+  visibility: hidden;
+}
+.dev-splash__line {
+  color: var(--ember);
+}
+.dev-splash__caret {
+  display: inline-block;
+  width: 0.07em;
+  height: 0.9em;
+  margin-left: 0.05em;
+  margin-right: -0.12em;
+  vertical-align: -0.1em;
+  background: var(--ember);
+  animation: dev-splash-caret 1s steps(2, jump-none) infinite;
+}
+@keyframes dev-splash-caret {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes dev-splash-in {
+  to {
+    opacity: 1;
+  }
+}
+.dev-splash__bar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(44px + env(safe-area-inset-bottom, 0px));
+  width: min(480px, calc(100% - 64px));
+  height: 4px;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  background: rgba(42, 29, 18, 0.12);
+  overflow: hidden;
+}
+.dev-splash__fill {
+  height: 100%;
+  background: var(--ember);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+/* Optional: the label's URL under the bar. A portal build that bans cross-promotion drops it. */
+.dev-splash__url {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  margin: 0;
+  font:
+    700 15px / 1 Bitter,
+    Georgia,
+    "Times New Roman",
+    serif;
+  letter-spacing: 0.06em;
+  text-align: center;
+  color: rgba(42, 29, 18, 0.62);
+}
+.dev-splash__url span {
+  color: var(--ember);
+}
+#dev-splash .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  #dev-splash.is-faced .dev-splash__lockup {
+    animation: none;
+    opacity: 1;
+  }
+  .dev-splash__caret {
+    animation: none;
+  }
+}

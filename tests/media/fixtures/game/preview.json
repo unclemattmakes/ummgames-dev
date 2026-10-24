@@ -1,0 +1,8 @@
+{
+  "size": [320, 180],
+  "cover": { "file": "dist-store/cover-wide-320x180.png", "hold": 0.4 },
+  "shots": [
+    { "clip": "move", "in": 0, "dur": 0.5, "dissolve": 0.2, "beat": "the square starts left" },
+    { "clip": "move", "in": 0.2, "dur": 0.3, "beat": "the square turns red" }
+  ]
+}

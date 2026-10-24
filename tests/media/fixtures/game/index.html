@@ -1,0 +1,36 @@
+<!doctype html>
+<!--
+  A fixture game for the media tests: a square crossing a 2D canvas at 120 px per second of
+  performance.now, a dot placed by Math.random, and Space turning the square red. Under the
+  virtual clock every frame of it is exact, so two captures match byte for byte.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+      }
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      #hud {
+        position: fixed;
+        left: 4px;
+        top: 4px;
+        color: #fff;
+        font: 12px monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas></canvas>
+    <div id="hud">HUD</div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

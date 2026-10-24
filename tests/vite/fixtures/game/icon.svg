@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <title>Fixture icon</title>
+  <!-- The ground, then a red triangle over the top half and a white bar. -->
+  <rect width="100" height="100" fill="#123456"/>
+  <path d="M10 10 L90 10 L50 50 Z" fill="#ff0000"/>
+  <path d="M10 80 h80 v10 H10 z" fill="#ffffff"/>
+</svg>

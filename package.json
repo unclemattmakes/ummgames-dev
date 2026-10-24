@@ -29,6 +29,14 @@
       "types": "./src/testing/index.d.ts",
       "default": "./src/testing/index.mjs"
     },
+    "./media": {
+      "types": "./src/media/index.d.ts",
+      "default": "./src/media/index.mjs"
+    },
+    "./audio": {
+      "types": "./src/audio/index.d.ts",
+      "default": "./src/audio/index.mjs"
+    },
     "./biome": "./config/biome.preset.json",
     "./tsconfig": "./config/tsconfig.json",
     "./vitest": {

@@ -1,0 +1,11 @@
+[
+  {
+    "name": "move",
+    "from": 0.1,
+    "dur": 0.5,
+    "keys": [[0.3, "Space", 0.1]],
+    "hide": ["#hud"],
+    "expect": "debug.color === 'red'",
+    "why": "Space at 0.3 s turns the square red before the last frame"
+  }
+]

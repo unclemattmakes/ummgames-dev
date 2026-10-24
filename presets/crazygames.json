@@ -1,0 +1,52 @@
+{
+  "$comment": "A web portal's store assets, as data for `umm-dev store`. Another portal is another file shaped like this one: assets keyed by id, each an image or a video with the checks it must pass. docs/media.md has the schema.",
+  "name": "CrazyGames",
+  "sources": [
+    "https://docs.crazygames.com/requirements/game-covers/",
+    "https://docs.crazygames.com/requirements/quality/"
+  ],
+  "checked": "2026-10-20",
+  "assets": {
+    "cover-landscape": {
+      "kind": "image",
+      "size": [1920, 1080],
+      "formats": ["png", "jpg"],
+      "required": true
+    },
+    "cover-portrait": {
+      "kind": "image",
+      "size": [800, 1200],
+      "formats": ["png", "jpg"],
+      "required": true
+    },
+    "cover-square": {
+      "kind": "image",
+      "size": [800, 800],
+      "formats": ["png", "jpg"],
+      "required": true
+    },
+    "preview-landscape": {
+      "kind": "video",
+      "size": [1920, 1080],
+      "seconds": [15, 20],
+      "audio": false,
+      "maxMB": 50,
+      "codecs": ["h264"],
+      "required": false
+    },
+    "preview-portrait": {
+      "kind": "video",
+      "size": [1080, 1620],
+      "seconds": [15, 20],
+      "audio": false,
+      "maxMB": 50,
+      "codecs": ["h264"],
+      "required": false
+    }
+  },
+  "rules": [
+    "Covers: no border, no text but the title, no icons or store logos, nothing blurry; the three alike.",
+    "Videos: open on the static cover, no black or logo transitions, no black bars, no cursor, no fast-forward, no text such as Play now.",
+    "Leave the landscape cover's top corner clear: the portal may lay a badge there."
+  ]
+}
