@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.2 (2026-10-25)
+
+**`cut` joins a dissolve that follows a hard cut.** An edit list with a hard cut (no `dissolve`)
+and any `dissolve` after it failed in the final pass with `First input link main timebase
+(1/1000000) do not match the corresponding second input link xfade timebase`: the hard cut's
+`concat` changes the stream's timebase, and `xfade` needs both inputs on one. Such a join now puts
+every segment on ffmpeg's default timebase first. Joins without that mix build the same commands
+as before.
+
+- **What a game may change:** nothing is required. An edit list that turned its hard cuts into
+  short dissolves to get round this can use hard cuts again.
+- The README and `docs/upgrading.md` install lines name the current tag again (0.2.1 left them
+  on `v0.2.0`).
+
 ## 0.2.1 (2026-10-25)
 
 **capture and store draw on the GPU by default.** With no `capture.browser.channel`, the browser

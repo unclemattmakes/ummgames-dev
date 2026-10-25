@@ -79,18 +79,26 @@ const round = (n) => Math.round(n * 1e6) / 1e6
  */
 export function joinGraph(segs) {
   const parts = []
-  let prev = '[0:v]'
+  // concat outputs the 1/1000000 timebase, and xfade refuses two inputs whose timebases differ,
+  // so a dissolve anywhere after a hard cut failed ("First input link main timebase ... do not
+  // match"). Then every segment is put on that timebase first; other joins are left as they are.
+  const firstCut = segs.findIndex((s, i) => i > 0 && !((s.dissolve ?? 0) > 0))
+  const settb = firstCut > 0 && segs.some((s, i) => i > firstCut && (s.dissolve ?? 0) > 0)
+  /** @param {number} i */
+  const input = (i) => (settb ? `[t${i}]` : `[${i}:v]`)
+  if (settb) for (let i = 0; i < segs.length; i++) parts.push(`[${i}:v]settb=AVTB[t${i}]`)
+  let prev = input(0)
   let total = segs[0].dur
   for (let i = 1; i < segs.length; i++) {
     const d = segs[i].dissolve ?? 0
     const label = `[c${i}]`
     if (d > 0) {
       parts.push(
-        `${prev}[${i}:v]xfade=transition=fade:duration=${d}:offset=${round(total - d)}${label}`,
+        `${prev}${input(i)}xfade=transition=fade:duration=${d}:offset=${round(total - d)}${label}`,
       )
       total += segs[i].dur - d
     } else {
-      parts.push(`${prev}[${i}:v]concat=n=2:v=1:a=0${label}`)
+      parts.push(`${prev}${input(i)}concat=n=2:v=1:a=0${label}`)
       total += segs[i].dur
     }
     prev = label

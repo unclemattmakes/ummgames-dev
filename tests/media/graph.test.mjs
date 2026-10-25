@@ -50,6 +50,18 @@ describe('filter pieces', () => {
     expect(j.total).toBe(5.5)
   })
 
+  it('puts every segment on one timebase when a dissolve follows a hard cut', () => {
+    const j = joinGraph([{ dur: 2 }, { dur: 3 }, { dur: 1, dissolve: 0.5 }])
+    expect(j.parts).toEqual([
+      '[0:v]settb=AVTB[t0]',
+      '[1:v]settb=AVTB[t1]',
+      '[2:v]settb=AVTB[t2]',
+      '[t0][t1]concat=n=2:v=1:a=0[c1]',
+      '[c1][t2]xfade=transition=fade:duration=0.5:offset=4.5[c2]',
+    ])
+    expect(j.total).toBe(5.5)
+  })
+
   it('escapes a card’s text and turns expansion off', () => {
     const f = cardFilter({ text: "It's 100%: go", at: 1, to: 3 }, 'C:\\fonts\\ui.ttf')
     expect(f).toContain("fontfile='C\\:/fonts/ui.ttf'")

@@ -135,6 +135,24 @@ describe.sequential('capture, cut, loop, store', () => {
     expect(printed.text.match(/^ffmpeg /gm)).toHaveLength(5)
   })
 
+  it('cuts a dissolve that follows a hard cut', async () => {
+    const edl = {
+      clips: cap,
+      size: [320, 180],
+      out: path.join(tmp, 'out', 'cut-then-dissolve.mp4'),
+      shots: [
+        { clip: 'move', in: 0, dur: 0.25 },
+        { clip: 'move', in: 0.1, dur: 0.25 },
+        { clip: 'move', in: 0, dur: 0.25, dissolve: 0.1 },
+      ],
+    }
+    const file = path.join(tmp, 'edl-cut-then-dissolve.json')
+    fs.writeFileSync(file, JSON.stringify(edl))
+    const r = await umm(cut, [file])
+    expect(r.code, r.text).toBe(0)
+    expect(probe(edl.out).duration).toBeCloseTo(0.65, 2)
+  })
+
   it('makes a silent faststart loop and a poster, never upscaled', async () => {
     const r = await umm(loop, [path.join(tmp, 'out', 'cut.mp4'), '--out', path.join(tmp, 'site')])
     expect(r.code, r.text).toBe(0)

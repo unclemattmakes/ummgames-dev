@@ -38,7 +38,7 @@ the working directory.
 Install the kit, Vite and Playwright in the game:
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.2.1 vite playwright
+pnpm add -D github:unclemattmakes/ummgames-dev#v0.2.2 vite playwright
 pnpm exec playwright install chromium
 ```
 
@@ -829,6 +829,10 @@ Each shot is cut to its own near-lossless segment (CRF 10), exactly `dur` s at `
 `.segs-<out stem>/` folder beside the output. One final pass joins the segments, adds the
 overlays, cards, fades and music, and encodes with `+faststart`. The segment folder is deleted
 afterwards, also when a command fails.
+
+A hard cut joins with ffmpeg's `concat` and a dissolve with `xfade`. `concat` changes the stream's
+timebase and `xfade` needs both its inputs on one, so when a dissolve comes after a hard cut, the
+join first puts every segment on ffmpeg's default timebase (`settb=AVTB`).
 
 ## Troubleshooting
 
