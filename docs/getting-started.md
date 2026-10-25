@@ -12,13 +12,13 @@ It covers replacing them without losing your changes.
 **Pin a tag.** pnpm (10 or 11):
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.1.0
+pnpm add -D github:unclemattmakes/ummgames-dev#v0.1.1
 ```
 
 npm (tested on 11):
 
 ```sh
-npm i -D github:unclemattmakes/ummgames-dev#v0.1.0
+npm i -D github:unclemattmakes/ummgames-dev#v0.1.1
 ```
 
 Your lockfile records the exact commit behind the tag, so every checkout and every worktree gets

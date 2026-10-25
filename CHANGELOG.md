@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 (2026-10-24)
 
 **A full documentation pass,** for people and for AI agents.
 - **One layout for every area page:**
