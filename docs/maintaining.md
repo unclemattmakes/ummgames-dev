@@ -106,15 +106,16 @@ a workaround. When you fix one, delete its line and say so in the changelog.
 3. Run `pnpm check`, `pnpm test:slow` and the public-names test, all green.
 4. Commit, then tag `v<version>`:
    ```sh
-   git tag -a v0.1.1 -m v0.1.1 && git push origin main v0.1.1
+   git tag -a v<version> -m v<version> && git push origin main v<version>
    ```
-5. Check that it installs from GitHub in a scratch project:
+5. Check that it installs from GitHub in a scratch project, with pnpm and with npm:
    ```sh
-   pnpm add -D github:unclemattmakes/ummgames-dev#v0.1.1
+   pnpm add -D github:unclemattmakes/ummgames-dev#v<version>
    ```
-   Also check the raw URL drift uses:
-   `https://raw.githubusercontent.com/unclemattmakes/ummgames-dev/v0.1.1/runtime/portal/portal-sdk.ts`
-   answers 200.
+   Also check that the raw URL drift uses answers 200:
+   `https://raw.githubusercontent.com/unclemattmakes/ummgames-dev/v<version>/runtime/portal/portal-sdk.ts`.
+6. Bump the install lines in README.md and the docs to the new tag, in the release commit, so
+   copy-pasted instructions install the latest.
 
 **Patch or minor:** a patch is fixes and docs only; a minor adds tools or options. While the major
 version is 0, a minor may also rename or remove, and the changelog must say what to change.

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.2 (2026-10-24)
 
 - **The paste block in `docs/agents.md` keeps every `@` inside backticks.** Claude Code reads a
   bare `@path` in a CLAUDE.md as a file import, and the block had three bare
