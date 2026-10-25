@@ -6,14 +6,14 @@ is there for the next. It covers:
 - **Capture:** record a game in virtual time.
 - **Video:** cut trailers and store previews from an edit list.
 - **Store art:** make covers and icons.
-- **Portals:** build for web game portals.
+- **Site builds:** headers, a 404 page, licences and the app icon for a game's own site.
 - **Agent sessions:** share one GPU between parallel sessions.
 - **Configs:** start every game from one set of lint, type and test configs.
 
 ## Install
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.1.2     # or: npm i -D github:unclemattmakes/ummgames-dev#v0.1.2
+pnpm add -D github:unclemattmakes/ummgames-dev#v0.2.0     # or: npm i -D github:unclemattmakes/ummgames-dev#v0.2.0
 pnpm exec umm-dev help                                     # or: npx umm-dev help
 ```
 
@@ -42,8 +42,8 @@ public, so installing needs no credentials.
 
 - **Linked tools.** Commands, Vite plugins, test helpers and config presets run from
   `node_modules`. None of them ships in a game's build, and nobody edits them in a game.
-- **Copied runtime code.** Code that ships inside a game lives in `runtime/`: the portal SDK
-  adapter, the splash, the dev palette and perf HUD, the gamepad profiles.
+- **Copied runtime code.** Code that ships inside a game lives in `runtime/`: the splash, the dev
+  palette and perf HUD, the gamepad profiles.
   - `umm-dev copy <path>` writes one of those files into the game. Line 1 is a header naming this
     repo, the version and the path, plus a hash of the body. From then on the game owns its copy.
   - `umm-dev drift` shows, for each copy, whether the game changed it and whether the installed
@@ -57,7 +57,7 @@ Run `pnpm exec umm-dev help` for the list, and `umm-dev <command> --help` for a 
 |---|---|---|
 | `umm-dev capture` | Record shots of the game in virtual time: every frame exact, an mp4 per shot, contact sheets, `expect` checks | [media](docs/media.md) |
 | `umm-dev cut` | Cut a video from an edit list: dissolves, wipes, speed, reverse, reframing, overlays, cards, music. `--print` works without ffmpeg | [media](docs/media.md) |
-| `umm-dev store` | Make a portal store kit: capture, covers and icons from the game's own templates, preview cuts, a review sheet, preset checks | [media](docs/media.md) |
+| `umm-dev store` | Make a store kit: capture, covers and icons from the game's own templates, preview cuts, a review sheet, checks against a storefront's preset | [media](docs/media.md) |
 | `umm-dev loop` | Make a site loop: a silent 720p faststart mp4 and a poster, from a cut or a store preview | [media](docs/media.md) |
 | `umm-dev loudness` | Meter audio: integrated LUFS, true peak, momentary max, checked against a target | [audio](docs/audio.md) |
 | `umm-dev copy` | Copy a `runtime/` file or folder into the game, stamped with its version and hash | [runtime](docs/runtime.md) |
@@ -104,37 +104,22 @@ level deep.
 ```js
 // vite.config.mjs
 import { defineConfig } from 'vite'
-import { PORTAL_MODE, headers, notFoundPage, portalPrune, portalSdk, portalSiteOnly } from '@ummgames/dev/vite'
+import { headers, notFoundPage } from '@ummgames/dev/vite'
 
-export default defineConfig(({ mode }) => {
-  const portal = mode === PORTAL_MODE
-  return {
-    base: portal ? './' : '/',
-    build: { outDir: portal ? 'dist-portal' : 'dist' },
-    plugins: portal
-      ? [portalSdk(), portalPrune(), portalSiteOnly()]
-      : [headers({ immutableAssets: true }), notFoundPage()],
-  }
+export default defineConfig({
+  plugins: [headers({ immutableAssets: true }), notFoundPage()],
 })
 ```
 
-**Framing.** The site build's headers refuse framing. A portal build that the game hosts itself
-takes `headers({ target: 'portal' })`, which allows the portal's origins and nobody else.
+**Framing.** The headers refuse framing by any other origin. They are for the game's own site.
 
-**More plugins.** Licences, the app icon and a share card are plugins too. See
-[docs/build.md](docs/build.md).
+**More plugins.** Licences, the app icon and a share card are plugins too.
 
-`@ummgames/dev/testing` runs a game's portal build inside a fake portal, which records every
-call the game makes:
+`@ummgames/dev/testing` has `headersFor(dist, pathname)`, which reads the headers Cloudflare
+Pages would send from a build's `_headers`. See [docs/build.md](docs/build.md).
 
-```js
-const portal = await fakePortal(page)
-await portal.open()
-await expect.poll(portal.calls).toContain('gameplayStart')
-```
-
-The portal SDK adapter itself is runtime code: `umm-dev copy runtime/portal`. See
-[docs/portal.md](docs/portal.md).
+**Web portals are not covered.** Since 0.2.0 the kit has no portal build plugins, SDK adapter
+or fake portal. A game that ships to a portal keeps that code itself.
 
 ## Presets
 

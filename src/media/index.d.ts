@@ -311,9 +311,9 @@ export interface AssetSpec {
   required?: boolean
 }
 
-/** A portal's asset rules as data: `presets/<portal>.json`, or a game's own file. */
+/** A storefront's asset rules as data: `presets/<store>.json`, or a game's own file. */
 export interface Preset {
-  /** The portal's name. */
+  /** The storefront's name. */
   name: string
   /** Where the rules come from. */
   sources?: string[]

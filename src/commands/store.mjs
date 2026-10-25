@@ -5,7 +5,7 @@ import { runStore, STEPS, STORE_DEFAULTS } from '../media/store.mjs'
 import { guard, parse, UsageError } from '../media/util.mjs'
 
 export const describe =
-  'make a portal store kit: covers, icons, preview videos, spec checks (docs/media.md)'
+  'make a store kit: covers, icons, preview videos, spec checks (docs/media.md)'
 
 const USAGE = `usage: umm-dev store [--steps <list>] [--no-capture] [--only <shots>] [--draft] [--igpu]
 

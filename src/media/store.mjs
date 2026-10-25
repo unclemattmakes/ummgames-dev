@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * `umm-dev store`: a portal's store kit from the game itself, end to end:
+ * `umm-dev store`: a storefront's store kit from the game itself, end to end:
  *
  *   1. preflight  ffmpeg, the templates, the edit lists and shots are there and valid, and the
  *                 game's own `preflight` hook (its assets pulled, say) passes
@@ -10,7 +10,7 @@
  *   4. cut        each video's edit list (cut.mjs)
  *   5. review     `<out>/review/<video>-beats.jpg`: each shot's in-point frame, captioned with
  *                 its `beat`, to check the in-points still land after content changes
- *   6. check      every output against the preset (`presets/<portal>.json`), and what is missing
+ *   6. check      every output against the preset (`presets/<store>.json`), and what is missing
  *
  * The recipe is the game's: its shots, templates and edit lists, named in `umm-dev.config.mjs`.
  */

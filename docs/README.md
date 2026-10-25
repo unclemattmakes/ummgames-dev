@@ -17,8 +17,7 @@
 | Area | Page | Linked or copied |
 |---|---|---|
 | Capture, trailers, store art, site loops | [media.md](media.md) | linked: `umm-dev capture`, `cut`, `store`, `loop`; `@ummgames/dev/media` |
-| Portal builds, the SDK adapter, the fake portal | [portal.md](portal.md) | linked plugins and test helper; copied adapter (`runtime/portal/`) |
-| Headers, 404, licences, app icon | [build.md](build.md) | linked: `@ummgames/dev/vite` |
+| Headers, 404, licences, app icon | [build.md](build.md) | linked: `@ummgames/dev/vite`, `@ummgames/dev/testing` |
 | GPU lease, worktrees, merge drivers | [agent.md](agent.md) | linked: `umm-dev gpu`, `worktree`, `merge` |
 | Repo guards and git hooks | [guard.md](guard.md) | linked: `umm-dev guard` |
 | Runtime copies and drift; the dev palette, splash, pad profiles | [runtime.md](runtime.md) | copied: `umm-dev copy`, `drift`; `runtime/` |

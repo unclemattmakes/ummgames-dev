@@ -1,7 +1,7 @@
 # Adopting the kit in a game that has its own copies
 
 **Use this page when a game already carries its own versions of these tools:** a trailer
-script, a portal adapter, a GPU lease script, configs copied from another game. The aim is to
+script, a perf HUD, a GPU lease script, configs copied from another game. The aim is to
 end with one copy of each tool, the kit's, and no lost local changes.
 
 For a game that has none of them, [getting-started.md](getting-started.md) is shorter.
@@ -28,7 +28,7 @@ game's full check after each one.**
 ### 1. Install and add the config file
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.1.2
+pnpm add -D github:unclemattmakes/ummgames-dev#v0.2.0
 ```
 
 Then create `umm-dev.config.mjs`: [getting-started.md, step 2](getting-started.md#2-add-the-config-file).
@@ -52,9 +52,7 @@ For each tool, there are three steps:
 | The game has its own | Replace with | Config section |
 |---|---|---|
 | Capture, trailer or store scripts | `umm-dev capture`, `cut`, `store`, `loop` | `capture`, `store`, `loop` ([media.md](media.md)) |
-| Portal Vite plugins (SDK injection, prune, site-only) | `portalSdk`, `portalPrune`, `portalSiteOnly` | plugin options ([portal.md](portal.md)) |
 | `_headers`, 404, licences or icon plugins | `headers`, `notFoundPage`, `licences`, `appIcon` | plugin options ([build.md](build.md)) |
-| A fake portal for e2e tests | `fakePortal` from `@ummgames/dev/testing` | spec options ([portal.md](portal.md)) |
 | A GPU lease script | `umm-dev gpu run` | `gpu` ([agent.md](agent.md)) |
 | Worktree setup and removal scripts | `umm-dev worktree hydrate` / `remove` | `worktree` ([agent.md](agent.md)) |
 | Markdown merge resolvers | `umm-dev merge driver` | `.gitattributes` ([agent.md](agent.md)) |
@@ -74,8 +72,7 @@ overwrite them unless each one is named. **Take them one file at a time, with `-
 where the game keeps it:**
 
 ```sh
-pnpm exec umm-dev copy runtime/portal/portal-sdk.ts   --to src/boot/portal-sdk.ts   --force
-pnpm exec umm-dev copy runtime/portal/build-target.ts --to src/boot/build-target.ts --force
+pnpm exec umm-dev copy runtime/boot/dev-splash.ts --to src/boot/splash.ts --force
 pnpm exec umm-dev copy runtime/dev/perf-hud.ts --force    # already at the default, src/dev/
 ```
 
@@ -94,15 +91,14 @@ pnpm exec umm-dev copy runtime/dev/perf-hud.ts --force    # already at the defau
 ### 5. Check
 
 - The game's full check passes.
-- The site and portal builds both build.
-- The portal e2e spec passes on the fake portal.
+- The site build builds, and its e2e specs pass.
 - `umm-dev drift --strict` exits 0, or reports only the copies you deliberately changed.
 
 ## Things that commonly go wrong
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| A second `portal-sdk.ts` appeared in `src/portal/` | `copy` without `--to` | Delete the new one, then re-run with `--to <the game's path> --force` |
+| A second `splash.ts` appeared as `src/boot/dev-splash.ts` | `copy` without `--to` | Delete the new one, then re-run with `--to <the game's path> --force` |
 | `copy runtime/dev` printed `refused` for several files | Those are the game's own files, not stamped copies | Copy each one by name with `--force`, or leave it if it is game-specific |
 | `guard install-hooks` refuses to write | `core.hooksPath` points at the game's own hooks folder | `git config --unset core.hooksPath`, remove the old installer script, then re-run |
 | Biome reports "nested root configuration" | A second `biome.json` somewhere under the root | Give the nested file `"root": false` (and `"extends": "//"` to inherit the game's), or delete it |

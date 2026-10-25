@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.2.0 (2026-10-25)
+
+**The web portal tools are removed.** The kit now covers a game's own site build only. A game
+that ships to a portal keeps that code itself, or stays on 0.1.x.
+
+- **Gone from `@ummgames/dev/vite`:** `portalSdk`, `portalPrune`, `portalSiteOnly`,
+  `portalAssets`, `stripSiteOnly`, `orphanChunks`, `overLimits`, `PORTAL_MODE`,
+  `CRAZYGAMES_SDK_URL`, `CRAZYGAMES_ORIGINS` and `CRAZYGAMES_LIMITS`.
+- **Gone from `@ummgames/dev/testing`:** `fakePortal`, `fakeSdkScript`, `PORTAL_HOST` and
+  `CRAZYGAMES_SDK_URL`. `headersFor` stays, now documented in `docs/build.md`.
+- **Gone from `runtime/`:** `runtime/portal/` (`portal-sdk.ts`, `build-target.ts`). A game's
+  copies keep working; `umm-dev drift` reports them as `no longer shipped`.
+- **`headers()` is for the site build only.** `target` and `frameAncestors` are removed, and
+  `securityHeaders()` takes no options. Passing either option throws when the config loads, so
+  an old portal config fails instead of shipping headers that refuse the portal's frame.
+- `docs/portal.md` is removed.
+- **The store kit stays.** `umm-dev store` and `presets/crazygames.json` are unchanged; their
+  docs say "storefront" where they said "portal".
+
+**What a game must change:**
+- Any import of the names above: move that code into the game, or keep the game on `v0.1.2`.
+- `headers({ target: 'portal' })`: drop `headers()` from that build and write its `_headers`
+  yourself. The site build's `headers()` is unchanged.
+- Copies of `runtime/portal/` fail `umm-dev drift --strict`, which counts `no longer shipped` as
+  drift. Delete each copy's line 1 header: the file is the game's own from then on.
+- Nothing for a game that uses only the site build plugins, the media chain, the agent tools,
+  guards or presets.
+
+**Dependencies:** this repo's own Vite moves to 8.3.5 and Vitest to 4.1.12, clearing the audit
+advisories against 8.2.1 and 4.1.10. The `vite` peer range games see is unchanged (`>=7`).
+Two GPU lease tests no longer depend on how fast the machine starts processes.
+
 ## 0.1.2 (2026-10-24)
 
 - **The paste block in `docs/agents.md` keeps every `@` inside backticks.** Claude Code reads a

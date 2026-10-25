@@ -1,5 +1,5 @@
 {
-  "$comment": "A web portal's store assets, as data for `umm-dev store`. Another portal is another file shaped like this one: assets keyed by id, each an image or a video with the checks it must pass. docs/media.md has the schema.",
+  "$comment": "A web portal's store assets, as data for `umm-dev store`. Another storefront is another file shaped like this one: assets keyed by id, each an image or a video with the checks it must pass. docs/media.md has the schema.",
   "name": "CrazyGames",
   "sources": [
     "https://docs.crazygames.com/requirements/game-covers/",

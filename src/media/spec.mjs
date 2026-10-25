@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Portal specs: `presets/<portal>.json` (or any file of that shape), and the checks a store
+ * Storefront specs: `presets/<store>.json` (or any file of that shape), and the checks a store
  * asset must pass against its entry. The checks are pure functions of an ffprobe result
  * (util.probe), so they are tested without media.
  */
@@ -22,7 +22,7 @@ export const PRESETS = path.resolve(path.dirname(fileURLToPath(import.meta.url))
  * @property {number} [maxMB]
  * @property {string[]} [codecs]              video: ffprobe codec names (h264, vp9, av1)
  * @property {number} [fps]                   video: frames per second, to 0.01
- * @property {boolean} [required]             the portal needs it
+ * @property {boolean} [required]             the storefront needs it
  */
 
 /**
@@ -35,7 +35,7 @@ export const PRESETS = path.resolve(path.dirname(fileURLToPath(import.meta.url))
  */
 
 /**
- * A preset by name (`crazygames`) or path (`store/my-portal.json`, relative to `root`).
+ * A preset by name (`crazygames`) or path (`store/my-store.json`, relative to `root`).
  * @param {string} nameOrPath
  * @param {string} [root]
  * @returns {Preset}
@@ -72,7 +72,7 @@ const pair = (v) =>
 export function validatePreset(p) {
   /** @type {string[]} */
   const errs = []
-  if (typeof p?.name !== 'string') errs.push('"name" must be the portal\'s name')
+  if (typeof p?.name !== 'string') errs.push('"name" must be the storefront\'s name')
   if (typeof p?.assets !== 'object' || p.assets === null) {
     errs.push('"assets" must map asset ids to specs')
     return errs

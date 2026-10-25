@@ -2,14 +2,15 @@
 
 The media chain makes a game's footage, trailers, store art and site loops from the game itself,
 so they can be re-made whenever the game changes. Reach for it when a game needs a clip of real
-play, a trailer, a portal's covers and preview videos, or the short loop a site shows on a card.
+play, a trailer, a storefront's covers and preview videos, or the short loop a site shows on a
+card.
 Each command feeds the next:
 
 | Command | Reads | Writes |
 |---|---|---|
 | `umm-dev capture` | a shots file | frames, an mp4 and a contact sheet per shot |
 | `umm-dev cut` | an edit list over captured clips | one mp4 |
-| `umm-dev store` | the game's store recipe and a portal preset | covers, icons, preview videos, a review sheet, a spec report |
+| `umm-dev store` | the game's store recipe and a storefront preset | covers, icons, preview videos, a review sheet, a spec report |
 | `umm-dev loop` | a cut or a store preview | a silent 720p faststart mp4 and its poster |
 
 **Linked.** All four commands and `@ummgames/dev/media` run from `node_modules`. Nothing here
@@ -37,7 +38,7 @@ the working directory.
 Install the kit, Vite and Playwright in the game:
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.1.2 vite playwright
+pnpm add -D github:unclemattmakes/ummgames-dev#v0.2.0 vite playwright
 pnpm exec playwright install chromium
 ```
 
@@ -246,7 +247,7 @@ umm-dev store [--steps <list>] [--no-capture] [--only <shots>] [--draft] [--igpu
 ```
 
 Runs the game's store recipe end to end, in six steps. The recipe is the `store` section of
-`umm-dev.config.mjs`, the shots, templates and edit lists it names, and a portal preset.
+`umm-dev.config.mjs`, the shots, templates and edit lists it names, and a storefront preset.
 
 1. **preflight.** ffmpeg and ffprobe are on `PATH`. The section names a still or a video. The
    shots file, templates, edit lists and preset are there and valid. The game's own `preflight`
@@ -274,7 +275,7 @@ Runs the game's store recipe end to end, in six steps. The recipe is the `store`
 kit stops at preflight, capture, stills or cut. 2 on a usage mistake.
 
 **Two steps answer two different questions:**
-- **What does this portal need?** Run `umm-dev store --steps check` before you build anything.
+- **What does this storefront need?** Run `umm-dev store --steps check` before you build anything.
   With nothing made yet, it lists every required asset as `MISSING`, with its size and format.
   For CrazyGames, that is three covers (1920x1080, 800x1200 and 800x800, png or jpg). The
   preview videos are optional, but checked when made: 1920x1080 and 1080x1620, 15 to 20 s,
@@ -401,7 +402,7 @@ it('trailer.json is valid', () => {
 ```
 
 ```js
-// a cover checked against a portal's spec
+// a cover checked against a storefront's spec
 const preset = loadPreset('crazygames')
 checkAsset(probe('dist-store/cover-square-800x800.png'), preset.assets['cover-landscape'])
 // [ 'is 800x800, must be 1920x1080' ]
@@ -748,12 +749,13 @@ tool supplies the plates, tokens, render scale, sizes and checks around it.
 
 ### Preset
 
-A portal's asset rules as data. `presets/crazygames.json` is one. A game can point
+A storefront's asset rules as data. `presets/crazygames.json`, for the CrazyGames portal, is
+one. A game can point
 `store.preset` at its own file of the same shape.
 
 | Field | Type | Default | What it does |
 |---|---|---|---|
-| `name` | `string` | required | The portal's name, printed above the rules. |
+| `name` | `string` | required | The storefront's name, printed above the rules. |
 | `sources` | `string[]` | none | Where the rules come from. |
 | `checked` | `string` | none | When someone last read them. |
 | `assets` | `Record<string, AssetSpec>` | required | Asset id to its checks (below). |
@@ -776,8 +778,8 @@ A portal's asset rules as data. `presets/crazygames.json` is one. A game can poi
 
 ```json
 {
-  "name": "A Portal",
-  "sources": ["https://portal.example/docs/assets"],
+  "name": "A Store",
+  "sources": ["https://store.example/docs/assets"],
   "checked": "2026-10-20",
   "assets": {
     "cover-landscape": { "kind": "image", "size": [1920, 1080], "formats": ["png", "jpg"], "required": true },

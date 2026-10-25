@@ -17,7 +17,7 @@ game as a devDependency pinned to a tag. Read README.md for what is here and how
    `// @ts-check`, JSDoc types and hand-written `.d.ts` beside any public entry point. Node refuses
    to strip TypeScript inside `node_modules`, so a `.ts` file here fails in every game.
 4. **Runtime code is copied, not linked.** `runtime/` holds the TypeScript that ships inside a game
-   (portal SDK, splash, perf HUD, gamepad profiles). A game takes a file with
+   (splash, perf HUD, dev palette, gamepad profiles). A game takes a file with
    `umm-dev copy <runtime path>`, which stamps a header naming this repo, the path and the commit;
    `umm-dev drift` reports how far each copy has moved. Files in `runtime/` import nothing outside
    their own folder.
@@ -46,7 +46,7 @@ Chromium) · `node bin/umm-dev.mjs help`.
 ## Layout
 
 `bin/umm-dev.mjs` dispatcher · `src/commands/` one file per subcommand · `src/<area>/` the code
-behind them · `src/vite/` Vite plugins (`@ummgames/dev/vite`) · `src/testing/` Playwright helpers
+behind them · `src/vite/` Vite plugins (`@ummgames/dev/vite`) · `src/testing/` test helpers
 (`@ummgames/dev/testing`) · `config/` Biome, tsconfig, Vitest and Playwright presets · `presets/`
 platform specs as data · `runtime/` TypeScript to copy into a game · `docs/` one page per area ·
 `tests/` Vitest; `*.slow.test.mjs` needs ffmpeg or a browser.

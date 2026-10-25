@@ -43,7 +43,6 @@ export async function buildFixture(options = {}) {
     base: options.base ?? '/',
     publicDir: options.publicDir ?? 'public',
     plugins: options.plugins ?? [],
-    resolve: { alias: { '@runtime': path.join(REPO, 'runtime') } },
     build: { outDir: out, emptyOutDir: true, minify: false, target: 'es2022' },
   })
   const files = fs

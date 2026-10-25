@@ -22,7 +22,7 @@ public-names test skips instead of guarding.
 |---|---|---|
 | A command | `src/commands/<name>.mjs`, exporting `describe` and `run(argv, ctx)`; the code behind it in `src/<area>/` | README's command table; the area's page in `docs/`; `--help` |
 | A config section | `loadConfig('<section>', DEFAULTS)` in the command; a `<Name>Config` type in the area's `.d.ts` | `UmmDevConfig` in `src/index.d.ts`; a "Config" table in the area's page |
-| A Vite plugin or test helper | `src/vite/` or `src/testing/`, exported from its `index.mjs` and `index.d.ts` | docs/build.md, docs/portal.md |
+| A Vite plugin or test helper | `src/vite/` or `src/testing/`, exported from its `index.mjs` and `index.d.ts` | docs/build.md |
 | A library entry point | `src/<area>/index.mjs` and `index.d.ts`, plus an entry in `exports` in package.json | README "Libraries" |
 | A preset | `config/`. Never call a file `biome.json` there: Biome treats any such file as a second root config | docs/presets.md |
 | Runtime code a game copies | `runtime/<folder>/`, TypeScript that imports nothing outside its folder | docs/runtime.md, or the area page |
@@ -113,7 +113,7 @@ a workaround. When you fix one, delete its line and say so in the changelog.
    pnpm add -D github:unclemattmakes/ummgames-dev#v<version>
    ```
    Also check that the raw URL drift uses answers 200:
-   `https://raw.githubusercontent.com/unclemattmakes/ummgames-dev/v<version>/runtime/portal/portal-sdk.ts`.
+   `https://raw.githubusercontent.com/unclemattmakes/ummgames-dev/v<version>/runtime/dev/perf-hud.ts`.
 6. Bump the install lines in README.md and the docs to the new tag, in the release commit, so
    copy-pasted instructions install the latest.
 

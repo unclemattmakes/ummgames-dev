@@ -1,7 +1,6 @@
 // @ts-check
 import { afterAll, describe, expect, it } from 'vitest'
 import {
-  CRAZYGAMES_ORIGINS,
   hashedAsset,
   headers,
   headersFile,
@@ -19,54 +18,12 @@ const header = (/** @type {string} */ text, /** @type {string} */ name) =>
   new RegExp(`^/\\*\\n(?:  .*\\n)*?  ${name}: (.*)$`, 'm').exec(text)?.[1]
 
 describe('the header policy', () => {
-  it('locks the site build to its own origin', () => {
+  it('locks the build to its own origin', () => {
     const h = securityHeaders()
     expect(h['X-Frame-Options']).toBe('SAMEORIGIN')
     expect(h['Content-Security-Policy']).toBe("frame-ancestors 'self'")
     expect(h['Strict-Transport-Security']).toBe('max-age=31536000')
     expect(h['Permissions-Policy']).toContain('camera=()')
-    expect(securityHeaders({ target: 'site' })).toEqual(h)
-  })
-
-  it('lets the portal frame the portal build, and sends no X-Frame-Options', () => {
-    const h = securityHeaders({ target: 'portal' })
-    expect(h['X-Frame-Options']).toBeUndefined()
-    expect(h['Content-Security-Policy']).toBe(
-      `frame-ancestors 'self' ${CRAZYGAMES_ORIGINS.join(' ')}`,
-    )
-    expect(h['Content-Security-Policy']).toContain('https://*.crazygames.com')
-    expect(h['Strict-Transport-Security']).toBeDefined()
-    expect(h['Permissions-Policy']).toBeDefined()
-  })
-
-  it('takes the portal origins as given', () => {
-    const h = securityHeaders({
-      target: 'portal',
-      frameAncestors: ['https://games.example.org', 'https://*.example.net:8443', "'self'"],
-    })
-    expect(h['Content-Security-Policy']).toBe(
-      "frame-ancestors 'self' https://games.example.org https://*.example.net:8443",
-    )
-  })
-
-  it('refuses what would weaken the site or break the header', () => {
-    expect(() =>
-      securityHeaders({ target: 'site', frameAncestors: ['https://a.example'] }),
-    ).toThrow(/portal build/)
-    expect(() => securityHeaders({ target: 'portal', frameAncestors: [] })).toThrow(/at least one/)
-    for (const bad of [
-      '*',
-      'https://a.example/path',
-      "'none'",
-      'https://a.example\n  X: y',
-      'a.example',
-    ]) {
-      expect(() => securityHeaders({ target: 'portal', frameAncestors: [bad] })).toThrow(
-        /frame-ancestors source/,
-      )
-    }
-    // @ts-expect-error: not a target
-    expect(() => securityHeaders({ target: 'mobile' })).toThrow(/unknown build target/)
   })
 })
 
@@ -122,21 +79,10 @@ describe('the headers plugin', () => {
     ).rejects.toThrow(/no content hash: .*assets\/hero\.txt/)
   })
 
-  it('emits the portal build its own frame policy', async () => {
-    const { read } = await buildFixture({
-      mode: 'portal',
-      base: './',
-      publicDir: false,
-      plugins: [headers({ target: 'portal' })],
-    })
-    const text = read('_headers')
-    expect(header(text, 'X-Frame-Options')).toBeUndefined()
-    expect(header(text, 'Content-Security-Policy')).toBe(
-      "frame-ancestors 'self' https://crazygames.com https://*.crazygames.com",
-    )
-  })
-
-  it('rejects bad options when the config is made, not after a build', () => {
-    expect(() => headers({ target: 'portal', frameAncestors: ['nope'] })).toThrow()
+  it('rejects the removed portal options when the config is made, not after a build', () => {
+    // @ts-expect-error: removed in 0.2.0
+    expect(() => headers({ target: 'portal' })).toThrow(/target was removed in 0\.2\.0/)
+    // @ts-expect-error: removed in 0.2.0
+    expect(() => headers({ frameAncestors: ['https://a.example'] })).toThrow(/frameAncestors/)
   })
 })

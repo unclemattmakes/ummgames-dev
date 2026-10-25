@@ -1,80 +1,6 @@
 import type { Plugin } from 'vite'
 
-// ── The portal build (docs/portal.md) ────────────────────────────────────────
-
-/** The Vite mode the runtime's `build-target.ts` reads as the portal build: `'portal'`. */
-export declare const PORTAL_MODE: 'portal'
-/** CrazyGames' HTML5 SDK v3 script: `https://sdk.crazygames.com/crazygames-sdk-v3.js`. */
-export declare const CRAZYGAMES_SDK_URL: string
-/** The origins CrazyGames frames a game from, as CSP `frame-ancestors` sources. */
-export declare const CRAZYGAMES_ORIGINS: readonly string[]
-/** CrazyGames' upload limits: 1,500 files and 50 MiB (`52428800` bytes). */
-export declare const CRAZYGAMES_LIMITS: Readonly<{ files: number; bytes: number }>
-
-export interface PortalSdkPluginOptions {
-  /** The SDK script's `src`. Default `CRAZYGAMES_SDK_URL`. */
-  url?: string
-}
-/** Add the portal SDK's `<script>` as the first element of `<head>`. Build only. */
-export declare function portalSdk(options?: PortalSdkPluginOptions): Plugin
-
-/** One file of a build, as `orphanChunks` reads it. */
-export interface EmittedFile {
-  /** The file's path in the build output. */
-  fileName: string
-  /** A chunk's code or a text asset's source; null for binaries. */
-  text: string | null
-  /** An entry chunk, always kept. */
-  entry: boolean
-  /** A JS chunk, as opposed to an asset. Only chunks are dropped. */
-  isChunk: boolean
-}
-/** File names of the non-entry chunks no other emitted file mentions, chains included. */
-export declare function orphanChunks(files: readonly EmittedFile[]): string[]
-
-export interface PortalPruneOptions {
-  /** Print one line per dropped chunk. Default true. */
-  log?: boolean
-}
-/** Drop the chunks nothing in the build loads. Nothing drops while source maps are on. Build only. */
-export declare function portalPrune(options?: PortalPruneOptions): Plugin
-
-/** `html` without the elements carrying `attribute` (default `data-site-only`). */
-export declare function stripSiteOnly(html: string, attribute?: string): string
-
-export interface PortalSiteOnlyOptions {
-  /** The marker attribute: letters, digits and `-`. Default `data-site-only`. */
-  attribute?: string
-}
-/** Strip the elements marked `data-site-only` (or `attribute`) from index.html. Build only. */
-export declare function portalSiteOnly(options?: PortalSiteOnlyOptions): Plugin
-
-/** What breaks a limit, in the words of the build error; empty when the build fits. */
-export declare function overLimits(
-  sizes: readonly number[],
-  limits?: { files: number; bytes: number },
-): string[]
-
-export interface PortalAssetsOptions {
-  /** Files under `publicDir` the portal build needs, relative to it; or a function of the root. */
-  paths?: readonly string[] | ((root: string) => readonly string[] | Promise<readonly string[]>)
-  /** Where `paths` are read from, relative to the root. Default `public`. */
-  publicDir?: string
-  /** Added to the error naming a missing file. Default none. */
-  missingHint?: string
-  /** Default `CRAZYGAMES_LIMITS`; `false` checks none. Counts the bundle, not `publicDir` copies. */
-  limits?: { files: number; bytes: number } | false
-}
-/**
- * Copy the listed `public/` files into the build, and fail it over the portal's limits. The
- * check runs after the files are written and prints nothing when the build fits. Build only.
- */
-export declare function portalAssets(options?: PortalAssetsOptions): Plugin
-
 // ── Cloudflare Pages files (docs/build.md) ───────────────────────────────────
-
-/** Which framing policy `_headers` carries. */
-export type BuildTarget = 'site' | 'portal'
 
 /** `'_headers'`, the file Cloudflare Pages reads. */
 export declare const HEADERS_FILE: '_headers'
@@ -86,22 +12,12 @@ export declare const IMMUTABLE_CACHE: string
 export declare const PERMISSIONS_POLICY: string
 
 /**
- * Header name to value for every path of one build. The site build is framed by itself only;
- * the portal build by itself and `frameAncestors` (default CrazyGames' origins), with no
- * `X-Frame-Options`. Throws on a bad target or origin.
+ * Header name to value for every path of the build: HSTS, framing by its own origin only
+ * (`X-Frame-Options: SAMEORIGIN`, `frame-ancestors 'self'`) and the Permissions-Policy.
  */
-export declare function securityHeaders(options?: {
-  /** Default `site`. */
-  target?: BuildTarget
-  /** The portal's origins, portal target only. Default `CRAZYGAMES_ORIGINS`. */
-  frameAncestors?: readonly string[]
-}): Record<string, string>
+export declare function securityHeaders(): Record<string, string>
 
 export interface HeadersOptions {
-  /** Which framing policy to write. Default `site`. */
-  target?: BuildTarget
-  /** The portal's origins, portal target only. Default `CRAZYGAMES_ORIGINS`. */
-  frameAncestors?: readonly string[]
   /** Cache `assetsDir` for a year; fails the build on an unhashed file there. Default false. */
   immutableAssets?: boolean
   /** Default `assets`. The plugin takes Vite's `build.assetsDir`. */
@@ -109,7 +25,10 @@ export interface HeadersOptions {
   /** More rules after the built-in ones: path pattern to headers. Default none. */
   rules?: Readonly<Record<string, Readonly<Record<string, string>>>>
 }
-/** The text of `_headers`. Throws on a bad option or a newline in a rule. */
+/**
+ * The text of `_headers`. Throws on a newline in a rule, and on `target` or `frameAncestors`
+ * (removed in 0.2.0).
+ */
 export declare function headersFile(options?: HeadersOptions): string
 /** A file name under `assetsDir` ending in an 8-character content hash. */
 export declare function hashedAsset(assetsDir?: string): RegExp

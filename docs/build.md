@@ -4,8 +4,7 @@
 Cloudflare Pages reads, a real `404.html`, the third-party licence notices, and the home-screen
 icon and share card drawn from the game's SVG. Reach for them when a game's site is served by
 Cloudflare Pages, or when it ships dependencies whose licences it must show. Each plugin is
-configured by its options and reads nothing else from the game. The portal build's plugins are in
-[portal.md](portal.md).
+configured by its options and reads nothing else from the game.
 
 **Linked.** These plugins run from `node_modules` at build time; only their output ships.
 
@@ -80,8 +79,6 @@ of `<head>`.
 
 ```ts
 headers(options?: {
-  target?: 'site' | 'portal'
-  frameAncestors?: readonly string[]
   immutableAssets?: boolean
   rules?: Record<string, Record<string, string>>
 }): Plugin
@@ -92,8 +89,6 @@ that matches. Pages alone sends only `nosniff` and a referrer policy.
 
 | Option | Type | Default | What it does |
 |---|---|---|---|
-| `target` | `'site' \| 'portal'` | `'site'` | Which framing policy to write (below). |
-| `frameAncestors` | `string[]` | `CRAZYGAMES_ORIGINS` | The origins that may frame the portal build. Portal target only. |
 | `immutableAssets` | `boolean` | `false` | Adds a year-long immutable cache rule for `/<build.assetsDir>/*`, and fails the build on an unhashed file there. |
 | `rules` | `Record<string, Record<string, string>>` | `{}` | More path rules, written after the built-in ones. |
 
@@ -101,26 +96,15 @@ The assets folder is Vite's `build.assetsDir` (default `assets`), read from the 
 
 **The security headers,** on `/*`:
 - `Strict-Transport-Security: max-age=31536000`, with no `includeSubDomains` and no `preload`.
-- The framing policy.
+- Framing by the site's own origin only: `X-Frame-Options: SAMEORIGIN` and
+  `Content-Security-Policy: frame-ancestors 'self'`.
 - `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`. Gamepads,
   fullscreen and the clipboard stay at the browser's default.
 
-**The framing policy:**
-
-| `target` | `X-Frame-Options` | `Content-Security-Policy` |
-|---|---|---|
-| `'site'` | `SAMEORIGIN` | `frame-ancestors 'self'` |
-| `'portal'` | none | `frame-ancestors 'self' <frameAncestors>` |
-
-- **Why the portal build drops `X-Frame-Options`.** The header cannot name another origin. A
-  browser that read it would block the portal's iframe.
-- **`frameAncestors` is checked when the config loads,** not after a build. Each entry is an
-  origin (`https://host`, `https://*.host`, `http://` too, with an optional port) or `'self'`.
-  A path, `*`, `'none'`, a newline, an empty list, or `frameAncestors` with the site target
-  throws.
-- **When the portal build needs `_headers`.** Only when you host it yourself, for a portal that
-  frames your URL. A build uploaded to CrazyGames is served by CrazyGames, which ignores
-  `_headers`.
+**For the site build only.** A build another origin frames, such as one a web portal shows in an
+iframe, needs its own `_headers`, and this plugin does not write one. Until 0.2.0 that was
+`target: 'portal'` and `frameAncestors`; both now throw when the config loads, so an old config
+fails rather than ships headers that refuse the frame.
 
 **The cache rule.** `immutableAssets: true` adds
 `/assets/* Cache-Control: public, max-age=31536000, immutable`. The build fails if any file under
@@ -128,8 +112,8 @@ The assets folder is Vite's `build.assetsDir` (default `assets`), read from the 
 - the bundle's own files, including those emitted by plugins that run before `headers()`;
 - the files `public/assets/` would copy in, when `publicDir` is on.
 
-**Put `headers()` last in `plugins`.** A plugin listed after it, such as `portalAssets`, adds its
-files after the check has run, so an unhashed file there is cached for a year unchecked.
+**Put `headers()` last in `plugins`.** A plugin listed after it that writes into `assets/` adds
+its files after the check has run, so an unhashed file there is cached for a year unchecked.
 
 **Left out on purpose:**
 - **COOP and COEP.** They break cross-origin assets unless every host opts in.
@@ -137,7 +121,6 @@ files after the check has run, so an unhashed file there is cached for a year un
   first.
 
 ```js
-// The site build.
 plugins: [headers({ immutableAssets: true, rules: { '/levels/*': { 'Cache-Control': 'no-cache' } } })]
 ```
 
@@ -151,18 +134,6 @@ plugins: [headers({ immutableAssets: true, rules: { '/levels/*': { 'Cache-Contro
   Cache-Control: public, max-age=31536000, immutable
 /levels/*
   Cache-Control: no-cache
-```
-
-```js
-// A portal build the game hosts itself, framed by CrazyGames.
-plugins: [portalSdk(), portalPrune(), portalSiteOnly(), headers({ target: 'portal' })]
-```
-
-```
-/*
-  Strict-Transport-Security: max-age=31536000
-  Content-Security-Policy: frame-ancestors 'self' https://crazygames.com https://*.crazygames.com
-  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
 ```
 
 ## `notFoundPage(options)`: `404.html`
@@ -301,7 +272,7 @@ Each plugin's logic is exported for tests and scripts.
 
 | Export | What it is |
 |---|---|
-| `securityHeaders({ target?, frameAncestors? })` | The `/*` headers, as name to value. |
+| `securityHeaders()` | The `/*` headers, as name to value. |
 | `headersFile(options?)` | The text of `_headers`. Takes `assetsDir` too. |
 | `hashedAsset(assetsDir?)` | The `RegExp` a hashed file name under `assetsDir` matches. |
 | `unhashedUnderAssets(fileNames, assetsDir?)` | The names the immutable check fails on. |
@@ -315,6 +286,18 @@ Each plugin's logic is exported for tests and scripts.
 | `appleTouchIconPng(svg, size?)`, `shareCardPng(svg, size?)` | The PNGs as `Buffer`s. |
 | `encodePng(img, { level? })` | A minimal PNG encoder: 8-bit, no interlace. |
 | `APPLE_TOUCH_ICON`, `APPLE_TOUCH_SIZE`, `SHARE_CARD`, `SHARE_CARD_SIZE` | `'apple-touch-icon.png'`, `180`, `'share-card.png'`, `{ width: 1200, height: 630, mark: 420 }`. |
+
+**Testing the built headers.** `headersFor(dist, pathname)` from `@ummgames/dev/testing` gives the
+headers Cloudflare Pages would send for `pathname` from `dist/_headers`: every matching rule, in
+order, with names lower-cased. It reads splats only, not placeholders, and gives `{}` when the
+build has no `_headers`.
+
+```js
+import { headersFor } from '@ummgames/dev/testing'
+
+expect(headersFor('dist', '/')['x-frame-options']).toBe('SAMEORIGIN')
+expect(headersFor('dist', '/assets/index-CGx80H_5.js')['cache-control']).toContain('immutable')
+```
 
 ## How it works
 
@@ -334,12 +317,8 @@ Each plugin's logic is exported for tests and scripts.
 |---|---|---|
 | `/assets/* is cached immutable but these have no content hash: assets/hero.glb` | `immutableAssets` is on and a file under `assets/` has a stable name, often from `public/assets/`. | Move the file out of `public/assets/` (`public/models/`), or import it so the bundler hashes it. |
 | An unhashed file under `assets/` ships with the immutable rule | A plugin after `headers()` emitted it. | Put `headers()` last in `plugins`. |
-| `frameAncestors is for the portal build; the site build is framed by itself` | `frameAncestors` with the site target. | Add `target: 'portal'`, or drop `frameAncestors`. |
-| `not a frame-ancestors source: "*"` | An entry is not an origin or `'self'`: a path, `*`, `'none'`. | Give origins only: `https://host` or `https://*.host`. |
-| `the portal build needs at least one frame ancestor` | `frameAncestors: []`. | Name the portal's origins, or leave the default. |
-| `unknown build target <name>` | `target` is not `'site'` or `'portal'`. | Use one of the two. |
+| `headers: target was removed in 0.2.0; _headers is for the site build only` (or `frameAncestors`) | A config from before 0.2.0, for a build another origin frames. | Drop `headers()` from that build and write its `_headers` yourself. Keep `headers()` in the site build. |
 | `bad _headers text: "<text>"` | A rule's path, name or value is empty or holds a newline. | Fix the `rules` entry. |
-| The portal shows a blank frame when the game hosts its portal build | The build has the site's framing headers. | Build it with `headers({ target: 'portal' })`. |
 | `<name> ships no licence file or no "license": add licences/<name>.LICENSE` | A dependency has no notice file, or no `license` field. | Add the fallback file. If the `license` field is what is missing, `exclude` it and list its notice yourself. |
 | `ENOENT: no such file or directory, open '...node_modules/<name>/package.json'` | An `include` entry is not installed at `node_modules/<name>`, as with a transitive dependency under pnpm. | Make it a direct dependency, or leave it out. |
 | `Cannot find module 'virtual:licences'` in `tsc` | The module has no declaration. | Add the `declare module` block above. |

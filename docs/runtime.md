@@ -1,7 +1,7 @@
 # Runtime code: copy and drift
 
 Code that ships inside a game's build lives in `runtime/`, as TypeScript: the perf HUD, the dev
-command bar, the gamepad profiles, the loading splash, the portal SDK adapter. It is **copied**,
+command bar, the gamepad profiles, the loading splash. It is **copied**,
 not linked. `umm-dev copy` writes a file into the game with a header on line 1, and from then on
 the copy is the game's to change. `umm-dev drift` reports how far each copy has moved from the
 version it came from, and how far the installed version has moved since. Reach for it when a game
@@ -28,15 +28,15 @@ written  src/dev/perf-recorder.ts  (from dev/perf-recorder.ts)
 ```
 
 **Where a copy lands.** Without `--to`, a file goes to `<runtime.into>/<its path under runtime/>`,
-and `runtime.into` is `src`. So `runtime/portal/portal-sdk.ts` lands at
-`src/portal/portal-sdk.ts`. A game that keeps the file somewhere else (an adapter at
-`src/boot/portal-sdk.ts`, say) must name that path:
+and `runtime.into` is `src`. So `runtime/dev/perf-hud.ts` lands at `src/dev/perf-hud.ts`. A
+game that keeps the file somewhere else (a HUD at `src/debug/perf-hud.ts`, say) must name that
+path:
 
 ```sh
-pnpm exec umm-dev copy portal/portal-sdk.ts --to src/boot/portal-sdk.ts
+pnpm exec umm-dev copy dev/perf-hud.ts --to src/debug/perf-hud.ts
 ```
 
-Without `--to`, copy finds nothing at `src/portal/portal-sdk.ts`, writes a second copy there,
+Without `--to`, copy finds nothing at `src/dev/perf-hud.ts`, writes a second copy there,
 says `written`, and exits 0. Run with `--dry-run` first whenever the game already has the file.
 
 ## `umm-dev copy`
@@ -64,7 +64,7 @@ umm-dev copy --list
 | `copy dev/fuzzy.ts` | `src/dev/fuzzy.ts` |
 | `copy dev` | `src/dev/<each file>` |
 | `copy boot/dev-splash.ts --to src/boot/splash.ts` | `src/boot/splash.ts` |
-| `copy portal --to src/boot/` | `src/boot/build-target.ts`, `src/boot/portal-sdk.ts` |
+| `copy input --to src/boot/` | `src/boot/pad-profiles.ts` |
 | `copy dev --to src/tools/dev/` | `src/tools/dev/<each file>` |
 
 **Outcomes.** One line per file:
@@ -102,14 +102,14 @@ A game that wrote its own version of a runtime file (or copied one by hand befor
 adopts the kit's version one file at a time:
 
 ```sh
-pnpm exec umm-dev copy portal/portal-sdk.ts --to src/boot/portal-sdk.ts --dry-run
-pnpm exec umm-dev copy portal/portal-sdk.ts --to src/boot/portal-sdk.ts --force
+pnpm exec umm-dev copy dev/perf-hud.ts --to src/debug/perf-hud.ts --dry-run
+pnpm exec umm-dev copy dev/perf-hud.ts --to src/debug/perf-hud.ts --force
 ```
 
 ```
-refused  src/boot/portal-sdk.ts: exists and is not a copy; --force overwrites
-updated  src/boot/portal-sdk.ts  (from portal/portal-sdk.ts)
-         imports ./build-target, which is not beside it: copy that too
+refused  src/debug/perf-hud.ts: exists and is not a copy; --force overwrites
+updated  src/debug/perf-hud.ts  (from dev/perf-hud.ts)
+         imports ./perf-recorder, which is not beside it: copy that too
 ```
 
 1. Name the game's file with `--to`, even when it sits at the default path.
@@ -130,10 +130,10 @@ pnpm exec umm-dev drift
 ```
 
 ```
-  src/boot/portal-sdk.ts  v0.1.0   changed upstream
-                                   take it: umm-dev copy portal/portal-sdk.ts --to src/boot/portal-sdk.ts
-  src/dev/perf-hud.ts     v0.1.0   changed here and upstream
-                                   merge by hand: umm-dev drift --diff
+  src/debug/perf-hud.ts  v0.1.0   changed upstream
+                                  take it: umm-dev copy dev/perf-hud.ts --to src/debug/perf-hud.ts
+  src/dev/fuzzy.ts       v0.1.0   changed here and upstream
+                                  merge by hand: umm-dev drift --diff
 ```
 
 - **`changed upstream`:** run the line drift prints. The copy is untouched, so it updates in
@@ -468,18 +468,6 @@ With `prefers-reduced-motion`, it shows the last word at once.
 | `padSkip` | `true` | Whether a pad's A (button 0) skips. |
 | `now` | `performance.now` | The clock, for tests. |
 
-## `runtime/portal/`
-
-`build-target.ts` (`PORTAL`, `PORTAL_MODE`) and `portal-sdk.ts` (`createPortalSdk`, `NO_PORTAL`
-and the `PortalSdk` interface): the web portal SDK adapter, a stub everywhere but the portal
-build. `portal-sdk.ts` imports `./build-target`, so copy both into one folder:
-
-```sh
-pnpm exec umm-dev copy portal --to src/boot/   # or wherever the game keeps its boot code
-```
-
-How a game wires it in, and its options: [portal.md](portal.md).
-
 ## Config: `runtime`
 
 In the game's `umm-dev.config.mjs`. `umm-dev copy` reads it; `umm-dev drift` reads no config.
@@ -555,6 +543,7 @@ and `runtime/env.d.ts` are the folder's own tooling and are never listed.
 | `(the original at <tag> is not available: UMM_DEV_REPO has no <tag>:<path>; ...)` | The clone lacks that tag. | `git -C $UMM_DEV_REPO fetch --tags`. |
 | `no runtime copies in <root>`, though there are copies. | Their line 1 was edited, or git ignores them. | Restore the header (take the file again with `--to <file> --force`), or stop ignoring the folder. |
 | A merged copy still says `changed here and upstream`. | Its header still names the old tag and hash. | Take the new version with `--to <file> --force`, then apply the game's changes again. |
+| `portal-sdk.ts` or `build-target.ts` says `no longer shipped`. | 0.2.0 removed `runtime/portal/`. | Nothing: the copy is the game's now. Delete its line 1 header if drift should stop listing it. |
 
 ## For agents
 
@@ -565,8 +554,7 @@ and `runtime/env.d.ts` are the folder's own tooling and are never listed.
 - **Never edit `node_modules/@ummgames/dev`.** A change there is lost on the next install and
   never reaches other games. Fix the game's copy, and report the kit bug upstream.
 - **Take files one at a time, with `--to <the game's path>`.** The default destination is
-  `<runtime.into>/<path under runtime/>`: `src/portal/portal-sdk.ts` for
-  `portal/portal-sdk.ts`. A game that keeps the file anywhere else gets a second copy. Run
+  `<runtime.into>/<path under runtime/>`: `src/dev/perf-hud.ts` for `dev/perf-hud.ts`. A game that keeps the file anywhere else gets a second copy. Run
   `--dry-run` first and check every path it prints.
 - **Never pass `--force` to a folder copy.** It overwrites every changed copy in the folder.
 - **Upgrade with drift's own lines.** After a bump, run each `take it:` line as printed. Treat

@@ -3,7 +3,6 @@
 These are the errors most likely to come up in any game, with what causes each and the fix. Each
 area page has its own Troubleshooting table for the rest:
 - [media](media.md#troubleshooting)
-- [portal](portal.md#troubleshooting)
 - [build](build.md#troubleshooting)
 - [agent](agent.md#troubleshooting)
 - [guard](guard.md#troubleshooting)
@@ -65,13 +64,13 @@ current bugs with workarounds.
 | drift says `changed here and upstream` | Both the game and a newer kit changed the file | [upgrading.md](upgrading.md#steps), "When both changed" |
 | `drift --diff` says it is offline and compares with the installed file | It could not fetch the original from the public repo | Set `UMM_DEV_REPO` to a local clone of the kit, and it reads the tag there |
 
-## Builds and portals
+## Builds
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `dist-portal has no index.html: build the portal target first` | The fake portal reads `dist-portal/` by default, and it is missing or empty | `vite build --mode portal` with `build.outDir: 'dist-portal'` |
 | `/assets/* is cached immutable but these have no content hash: <file>` | `headers({ immutableAssets: true })` found a file under `assets/` without a hash | Give it a hashed name, move it out of `assets/`, or list `headers()` after the plugin that writes it |
-| The site and portal builds overwrite each other | Both build into `dist/` | Set `build.outDir` per mode ([getting-started.md](getting-started.md#4-build-for-a-portal)) |
+| `headers: target was removed in 0.2.0; _headers is for the site build only` | A portal build's config from before 0.2.0 | Drop `headers()` from that build and write its `_headers` yourself ([build.md](build.md#troubleshooting)) |
+| `does not provide an export named 'portalSdk'` (or `fakePortal`, `PORTAL_MODE`) | 0.2.0 removed the portal tools | Keep the game on 0.1.x, or move the portal code into the game ([CHANGELOG.md](../CHANGELOG.md), 0.2.0) |
 
 ## Agents, GPU and git
 

@@ -12,13 +12,13 @@ It covers replacing them without losing your changes.
 **Pin a tag.** pnpm (10 or 11):
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.1.2
+pnpm add -D github:unclemattmakes/ummgames-dev#v0.2.0
 ```
 
 npm (tested on 11):
 
 ```sh
-npm i -D github:unclemattmakes/ummgames-dev#v0.1.2
+npm i -D github:unclemattmakes/ummgames-dev#v0.2.0
 ```
 
 Your lockfile records the exact commit behind the tag, so every checkout and every worktree gets
@@ -68,7 +68,7 @@ yours: paths, aliases and the dev-server port.
 tested with these versions:
 
 ```sh
-pnpm add -D @biomejs/biome@2.5.9 typescript@6.0.3 vitest@4.1.10 @playwright/test@1.62.1
+pnpm add -D @biomejs/biome@2.5.9 typescript@6.0.3 vitest@4.1.12 @playwright/test@1.62.1
 ```
 
 A newer Biome works, but prints a notice that the preset's schema version does not match. It
@@ -128,66 +128,22 @@ option and override is in [presets.md](presets.md).
 `noUncheckedIndexedAccess`, and an older codebase can show hundreds of errors from it alone.
 Turning it off in the game's `compilerOptions` while you work through them is fine.
 
-## 4. Build for a portal
+## 4. Add the site build plugins
 
-Add the plugins to `vite.config`. A plain build is the site build; `--mode portal` is the
-CrazyGames build.
+Add the plugins to `vite.config`:
 
 ```js
 // vite.config.mjs
-import {
-  headers,
-  notFoundPage,
-  PORTAL_MODE,
-  portalPrune,
-  portalSdk,
-  portalSiteOnly,
-} from '@ummgames/dev/vite'
+import { headers, notFoundPage } from '@ummgames/dev/vite'
 import { defineConfig } from 'vite'
 
-export default defineConfig(({ mode }) => {
-  const portal = mode === PORTAL_MODE
-  return {
-    base: portal ? './' : '/',
-    publicDir: portal ? false : 'public',
-    build: { outDir: portal ? 'dist-portal' : 'dist' },
-    plugins: portal
-      ? [portalSdk(), portalPrune(), portalSiteOnly()]
-      : [headers({ immutableAssets: true }), notFoundPage()],
-  }
+export default defineConfig({
+  plugins: [headers({ immutableAssets: true }), notFoundPage()],
 })
 ```
 
-**Keep the two builds in separate folders.** The fake portal reads `dist-portal/` by default.
-With one shared `dist/`, each build overwrites the other.
-
-**The portal build turns `publicDir` off.** The size check counts only what the bundle imports, so
-a whole `public/` copied in would go uncounted. Files the portal build needs from `public/` come
-back through `portalAssets` ([portal.md](portal.md)).
-
-**The fake-portal spec gets its own Playwright config.** It serves `dist-portal/` itself, so it
-needs no dev server: make a `playwright.portal.config.ts` with `webServer` off, as portal.md
-shows. Keep the dev-server config above for every other spec.
-
-Then take the adapter the game calls at runtime. It is copied in rather than linked, because it
-ships inside your build:
-
-```sh
-pnpm exec umm-dev copy runtime/portal
-```
-
-That writes `src/portal/portal-sdk.ts` and `src/portal/build-target.ts`, each stamped with
-line 1, which names its source and version.
-
-**If your game keeps its boot code somewhere else,** pass `--to` (for example
-`--to src/boot/`). Never leave two adapters in the tree.
-
-**Check it worked:**
-- `vite build` writes `dist/_headers` and `dist/404.html`.
-- `vite build --mode portal` writes `dist-portal/index.html`, which loads the CrazyGames SDK.
-
-Wiring the adapter into your boot code, and the fake portal for tests, are in
-[portal.md](portal.md).
+**Check it worked:** `vite build` writes `dist/_headers` and `dist/404.html`. The licences page,
+the app icon and the share card are plugins too, in [build.md](build.md).
 
 ## 5. Make store art (optional)
 
