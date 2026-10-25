@@ -113,7 +113,11 @@ export interface CaptureConfig {
   out?: string
   /** Font file for the contact sheets' labels (default null: fontconfig's default). */
   font?: string | null
-  /** Chromium's launch; merged over `{ headless: true, channel: undefined, args: [] }`. */
+  /**
+   * Chromium's launch; merged over `{ headless: true, channel: undefined, args: [] }`. No
+   * `channel`: the installed Chrome, then Edge, then Playwright's Chromium, which draws WebGL in
+   * software when headless.
+   */
   browser?: { headless?: boolean; channel?: string; args?: string[] }
   /** Seconds to wait for the game to become ready (default 180). */
   bootTimeout?: number

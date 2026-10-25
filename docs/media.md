@@ -38,7 +38,7 @@ the working directory.
 Install the kit, Vite and Playwright in the game:
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.2.0 vite playwright
+pnpm add -D github:unclemattmakes/ummgames-dev#v0.2.1 vite playwright
 pnpm exec playwright install chromium
 ```
 
@@ -444,7 +444,7 @@ cutEdl({ ...edl, out: 'dist-video/from-code.mp4' }, { root: process.cwd() })
 | `shots` | `string` | `'shots.json'` | The shots file. |
 | `out` | `string` | `'test-results/capture'` | The output folder. **Playwright empties `test-results/` on every e2e run:** a game that runs Playwright sets this to a folder of its own. |
 | `font` | `string \| null` | `null` | Font file for the sheets' labels. `null`: fontconfig's default. |
-| `browser` | `{ headless?: boolean, channel?: string, args?: string[] }` | `{ headless: true, channel: undefined, args: [] }` | Chromium's launch. A WebGPU game usually wants `headless: false`, `channel: 'chrome'` and `args: ['--enable-unsafe-webgpu']`. |
+| `browser` | `{ headless?: boolean, channel?: string, args?: string[] }` | `{ headless: true, channel: undefined, args: [] }` | Chromium's launch. No `channel`: the installed Chrome, then Edge, then Playwright's Chromium. The installed browsers draw on the GPU even headless; Playwright's headless shell draws WebGL in software, about 20x slower for a 3D game. A WebGPU game usually also wants `args: ['--enable-unsafe-webgpu']`, and `headless: false` if its adapter is refused headless. |
 | `bootTimeout` | `number` | `180` | Seconds to wait for the game to become ready. |
 
 **Merging.** A plain-object value merges over its default one level deep, so `browser: { args }`
@@ -834,8 +834,10 @@ afterwards, also when a command fails.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `(Playwright's Chromium is not installed: using the installed chrome)` | The game's Playwright wants a Chromium revision that is not downloaded, often after a Playwright upgrade. Capture falls back to the installed Chrome, then Edge. | Harmless if the capture passes. Run `pnpm exec playwright install chromium` in the game for its own build, or set `capture.browser.channel: 'chrome'` to use Chrome on purpose. |
-| `could not start Chromium: ...` | No Chromium, Chrome or Edge would start. | `pnpm exec playwright install chromium`, or set `capture.browser.channel`. |
+| `(no installed Chrome or Edge: using Playwright's Chromium, which draws in software when headless)` | Neither Chrome nor Edge would start, so capture fell back to Playwright's build. | Install Chrome. A 2D game may not notice; a 3D one runs many times slower. |
+| `warning: WebGL draws in software here (<renderer>) ...` | The browser capture launched has no GPU: SwiftShader, llvmpipe or WARP. Capture checks once per run, on the first shot. | Install Chrome, or set `capture.browser.channel` to a browser that uses the GPU. On a machine with no GPU, expect it and give shots time. |
+| A 3D capture takes minutes per second of footage | WebGL is drawing in software (see the warning above). | The same. |
+| `could not start Chromium: ...` | No Chrome, Edge or Playwright Chromium would start. | Install Chrome, or `pnpm exec playwright install chromium`, or set `capture.browser.channel`. |
 | `capture drives Chromium through Playwright: add playwright to the devDependencies ...` | `playwright` is not installed in the game. | `pnpm add -D playwright`. |
 | `capture starts the game with Vite: add vite to the devDependencies` | `vite` is not installed, and `capture.url` is unset. | `pnpm add -D vite`, or set `capture.url` to a running server. |
 | `port 5440 is in use: another capture is probably running on this machine.` | Another capture or server holds the port. | Wait for it, or set `CAPTURE_PORT=<n>` or `capture.port`. |

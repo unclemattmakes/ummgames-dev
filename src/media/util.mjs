@@ -204,29 +204,62 @@ export function readJson(file) {
 export const rel = (root, p) => path.relative(root, p).replace(/\\/g, '/') || '.'
 
 /**
- * Launch Chromium: Playwright's own build, or when that is not installed (and no channel was
- * asked for), the machine's Chrome, then Edge. Throws a MediaError saying how to install one.
+ * Launch Chromium. With no channel asked for: the machine's Chrome, then Edge, then Playwright's
+ * own build. The installed browsers draw WebGL and WebGPU on the GPU even headless; Playwright's
+ * headless shell draws in software, about 20x slower for a 3D game. Throws a MediaError saying
+ * how to install one.
  * @param {typeof import('playwright')} pw
  * @param {import('playwright').LaunchOptions} opts
  * @param {(line: string) => void} [log]
  */
 export async function launchChromium(pw, opts, log = console.log) {
   const tries =
-    opts.channel || opts.executablePath ? [opts.channel] : [undefined, 'chrome', 'msedge']
+    opts.channel || opts.executablePath ? [opts.channel] : ['chrome', 'msedge', undefined]
   let first = ''
   for (const channel of tries) {
     try {
       const b = await pw.chromium.launch({ ...opts, channel })
-      if (channel && channel !== opts.channel)
-        log(`(Playwright's Chromium is not installed: using the installed ${channel})`)
+      if (!channel && !opts.channel && !opts.executablePath)
+        log(
+          "(no installed Chrome or Edge: using Playwright's Chromium, which draws in software when headless)",
+        )
       return b
     } catch (e) {
       first ||= e instanceof Error ? e.message.split('\n')[0] : String(e)
     }
   }
   throw new MediaError(
-    `could not start Chromium: ${first}\nrun \`pnpm exec playwright install chromium\`, or set capture.browser.channel`,
+    `could not start Chromium: ${first}\ninstall Chrome, or run \`pnpm exec playwright install chromium\`, or set capture.browser.channel`,
   )
+}
+
+/**
+ * True when a WebGL renderer string names a software rasteriser (SwiftShader, llvmpipe, WARP).
+ * @param {string | null | undefined} renderer
+ */
+export function isSoftwareRenderer(renderer) {
+  return /swiftshader|llvmpipe|softpipe|basic render|software/i.test(renderer ?? '')
+}
+
+/**
+ * The page's WebGL renderer, unmasked where the browser allows it. Null when WebGL is off.
+ * @param {import('playwright').Page} page
+ * @returns {Promise<string | null>}
+ */
+/* c8 ignore next 12 */
+export function webglRenderer(page) {
+  return page
+    .evaluate(() => {
+      const gl =
+        document.createElement('canvas').getContext('webgl2') ??
+        document.createElement('canvas').getContext('webgl')
+      if (!gl) return null
+      const ext = gl.getExtension('WEBGL_debug_renderer_info')
+      const r = gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER)
+      gl.getExtension('WEBGL_lose_context')?.loseContext()
+      return String(r)
+    })
+    .catch(() => null)
 }
 
 /**

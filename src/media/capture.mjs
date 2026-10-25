@@ -21,6 +21,7 @@ import {
   frameName,
   hasBin,
   isSafeName,
+  isSoftwareRenderer,
   launchChromium,
   listFrames,
   MediaError,
@@ -28,6 +29,7 @@ import {
   readJson,
   rel,
   removeInside,
+  webglRenderer,
 } from './util.mjs'
 
 /**
@@ -90,7 +92,8 @@ export const CAPTURE_DEFAULTS = {
   out: 'test-results/capture',
   /** Font file for the contact sheets' labels. Unset: fontconfig's default. */
   font: /** @type {string | null} */ (null),
-  /** Chromium launch: headless, channel (`chrome` for the installed Chrome), extra args. */
+  /** Chromium launch: headless, channel, extra args. No channel: the installed Chrome, then
+   *  Edge, then Playwright's Chromium (which draws in software when headless). */
   browser: { headless: true, channel: /** @type {string | undefined} */ (undefined), args: [] },
   /** Seconds to wait for the game to be ready. */
   bootTimeout: 180,
@@ -391,6 +394,7 @@ export async function captureShots(run) {
     throw e
   }
   const results = []
+  let checkedGpu = false
   try {
     for (const shot of shots) results.push(await captureOne(shot))
   } finally {
@@ -465,6 +469,14 @@ export async function captureShots(run) {
     const url = `${server.origin}${shotUrl(shot, cfg)}`
     log(`[${name}] ${url}`)
     await page.goto(url)
+    if (!checkedGpu) {
+      checkedGpu = true
+      const renderer = await webglRenderer(page)
+      if (isSoftwareRenderer(renderer))
+        log(
+          `warning: WebGL draws in software here (${renderer}), so capture will be slow. Install Chrome, or set capture.browser.channel to a browser that uses the GPU.`,
+        )
+    }
     const clock = () =>
       page.evaluate(() => {
         const v = /** @type {any} */ (window).__ummClock

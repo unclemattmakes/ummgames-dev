@@ -48,9 +48,10 @@ current bugs with workarounds.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `(Playwright's Chromium is not installed: using the installed chrome)` | The game's Playwright wants a Chromium revision that has not been downloaded | Harmless. `pnpm exec playwright install chromium` silences it; or set the browser `channel: 'chrome'` |
+| `(no installed Chrome or Edge: using Playwright's Chromium, which draws in software when headless)` | capture or store found no Chrome or Edge | Install Chrome; Playwright's headless shell draws WebGL in software, many times slower |
+| `warning: WebGL draws in software here (…)`, or a 3D capture that crawls | The capture browser has no GPU | Install Chrome, or set `capture.browser.channel` to a browser that uses the GPU |
 | `browserType.launch: Executable doesn't exist at …chromium_headless_shell-<rev>…` in an e2e run | The same mismatch, in the game's own Playwright tests | `E2E_CHANNEL=chrome`, or `pnpm exec playwright install chromium` |
-| `could not start Chromium: …` | No Playwright Chromium, no Chrome and no Edge, or a sandbox blocking the launch | Install one of them; check the rest of the message |
+| `could not start Chromium: …` | No Chrome, no Edge and no Playwright Chromium, or a sandbox blocking the launch | Install one of them; check the rest of the message |
 | `could not run ffmpeg (…): put it on PATH`, or `spawn ffprobe ENOENT` | ffmpeg or ffprobe is missing | Install ffmpeg, so that both `ffmpeg` and `ffprobe` run in a new terminal |
 | `Failed to load resource … 404` in capture output | Usually `/favicon.ico` | Harmless; add a favicon to silence it |
 

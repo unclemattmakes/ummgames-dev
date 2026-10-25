@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.1 (2026-10-25)
+
+**capture and store draw on the GPU by default.** With no `capture.browser.channel`, the browser
+is now the installed Chrome, then Edge, then Playwright's Chromium (it was Playwright's Chromium
+first). Playwright's headless shell draws WebGL in software (SwiftShader), which made a 3D
+game's capture about 20x slower; the installed Chrome uses the GPU while still headless. Each
+game had been finding this out for itself and setting `channel: 'chrome'`.
+
+- Capture checks the WebGL renderer once per run and warns when it is a software one
+  (SwiftShader, llvmpipe, WARP), with the fix.
+- Falling back to Playwright's Chromium is logged, since it means software drawing.
+- **What a game may change:** nothing is required. `browser: { channel: 'chrome' }` in
+  `umm-dev.config.mjs` is now the default and can go. A game that wants Playwright's own build
+  sets `channel: 'chromium'`. Footage from Chrome can differ by a few pixels from the headless
+  shell's, so a game comparing against old captures should re-capture its reference once.
+
 ## 0.2.0 (2026-10-25)
 
 **The web portal tools are removed.** The kit now covers a game's own site build only. A game

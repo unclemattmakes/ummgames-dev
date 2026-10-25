@@ -19,7 +19,14 @@ import { clockScript } from '../../src/media/clock.mjs'
 import { LOOP_DEFAULTS, loopScale, posterScore } from '../../src/media/loop.mjs'
 import { stillHtml } from '../../src/media/stills.mjs'
 import { STORE_DEFAULTS } from '../../src/media/store.mjs'
-import { isSafeName, MediaError, pageFn, removeInside } from '../../src/media/util.mjs'
+import {
+  isSafeName,
+  isSoftwareRenderer,
+  launchChromium,
+  MediaError,
+  pageFn,
+  removeInside,
+} from '../../src/media/util.mjs'
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'umm-dev-media-'))
 afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }))
@@ -303,5 +310,61 @@ describe('commands', () => {
     } finally {
       q.done()
     }
+  })
+})
+
+describe('the capture browser draws on the GPU', () => {
+  /** A Playwright stand-in: `installed` lists the channels that start (`''` is Playwright's own). */
+  const fakePw = (/** @type {string[]} */ installed) => {
+    /** @type {string[]} */
+    const tried = []
+    const pw = {
+      chromium: {
+        launch: async (/** @type {{ channel?: string }} */ o) => {
+          tried.push(o.channel ?? '')
+          if (!installed.includes(o.channel ?? ''))
+            throw new Error(`no ${o.channel ?? 'chromium'}\nmore`)
+          return { channel: o.channel ?? '' }
+        },
+      },
+    }
+    return { pw: /** @type {any} */ (pw), tried }
+  }
+
+  it("prefers the installed Chrome, then Edge, then Playwright's Chromium, and says so", async () => {
+    const lines = /** @type {string[]} */ ([])
+    const a = fakePw(['chrome', 'msedge', ''])
+    expect(await launchChromium(a.pw, {}, (l) => lines.push(l))).toEqual({ channel: 'chrome' })
+    expect(a.tried).toEqual(['chrome'])
+    const b = fakePw(['msedge', ''])
+    expect(await launchChromium(b.pw, {}, (l) => lines.push(l))).toEqual({ channel: 'msedge' })
+    expect(lines).toEqual([])
+    const c = fakePw([''])
+    expect(await launchChromium(c.pw, {}, (l) => lines.push(l))).toEqual({ channel: '' })
+    expect(c.tried).toEqual(['chrome', 'msedge', ''])
+    expect(lines).toEqual([expect.stringContaining('draws in software')])
+  })
+
+  it('launches only the channel asked for, and says how to fix a failure', async () => {
+    const a = fakePw(['chrome'])
+    await expect(launchChromium(a.pw, { channel: 'msedge' }, () => {})).rejects.toThrow(
+      /could not start Chromium: no msedge\ninstall Chrome/,
+    )
+    expect(a.tried).toEqual(['msedge'])
+  })
+
+  it('knows a software renderer by name', () => {
+    for (const r of [
+      'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)',
+      'llvmpipe (LLVM 15.0.7, 256 bits)',
+      'ANGLE (Microsoft, Microsoft Basic Render Driver Direct3D11 vs_5_0 ps_5_0, D3D11)',
+    ])
+      expect(isSoftwareRenderer(r)).toBe(true)
+    for (const r of [
+      'ANGLE (NVIDIA, NVIDIA GeForce RTX 4080 Direct3D11 vs_5_0 ps_5_0, D3D11)',
+      'Apple M2',
+      null,
+    ])
+      expect(isSoftwareRenderer(r)).toBe(false)
   })
 })
