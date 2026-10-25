@@ -131,10 +131,13 @@ describe('lease format', () => {
   })
 })
 
-describe('umm-dev gpu', () => {
+// Each test starts and kills real process trees, which Windows sometimes takes seconds to do.
+describe('umm-dev gpu', { timeout: 15_000 }, () => {
   it('runs two holders one after the other, and waiters in the order they asked', async () => {
     const g = setup()
-    const a = start(g, ['run', 'a', '5', '--', process.execPath, HOLD, g.log, 'a', '600'])
+    // a holds until the queue is checked, however slowly this machine starts processes.
+    const release = path.join(g.dir, 'release-a')
+    const a = start(g, ['run', 'a', '5', '--', process.execPath, HOLD, g.log, 'a', release])
     await until(() => a.out().includes('ACQUIRED'))
     const b = start(g, ['run', 'b', '5', '--', process.execPath, HOLD, g.log, 'b', '200'])
     await until(() => ticketCount(g.lease) === 1)
@@ -146,6 +149,7 @@ describe('umm-dev gpu', () => {
       env: { ...process.env, GPU_LEASE_DIR: g.lease },
       encoding: 'utf8',
     })
+    fs.writeFileSync(release, '')
     const s = JSON.parse(status.stdout)
     expect(s.holder.who).toBe('a')
     expect(s.queue.map((/** @type {{ who: string }} */ q) => q.who)).toEqual(['b', 'c'])
@@ -284,7 +288,8 @@ const haveBash = Boolean(bash && spawnSync(bash, ['-c', 'exit 0']).status === 0)
 describe.skipIf(!haveBash)('sharing a lock with a bash-era lease script', () => {
   it('excludes it, and keeps its place in the line ahead of it', async () => {
     const g = setup()
-    const a = start(g, ['run', 'a', '5', '--', process.execPath, HOLD, g.log, 'a', '700'])
+    const release = path.join(g.dir, 'release-a')
+    const a = start(g, ['run', 'a', '5', '--', process.execPath, HOLD, g.log, 'a', release])
     await until(() => a.out().includes('ACQUIRED'))
     const b = start(g, ['run', 'b', '5', '--', process.execPath, HOLD, g.log, 'b', '200'])
     await until(() => ticketCount(g.lease) === 1)
@@ -295,6 +300,7 @@ describe.skipIf(!haveBash)('sharing a lock with a bash-era lease script', () => 
     )
     const legacyDone = new Promise((r) => legacy.on('exit', (code) => r(code)))
     await until(() => ticketCount(g.lease) === 2)
+    fs.writeFileSync(release, '')
     const [ra, rb, rl] = await Promise.all([a.done, b.done, legacyDone])
     expect([ra.code, rb.code, rl]).toEqual([0, 0, 0])
     const e = events(g.log)
