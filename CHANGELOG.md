@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **The paste block in `docs/agents.md` keeps every `@` inside backticks.** Claude Code reads a
+  bare `@path` in a CLAUDE.md as a file import, and the block had three bare
+  `@ummgames/dev` mentions. A docs test now holds the block, and this repo's CLAUDE.md, to that
+  rule. A game that pasted the v0.1.1 block can wrap those three mentions by hand.
+
 ## 0.1.1 (2026-10-24)
 
 **A full documentation pass,** for people and for AI agents.

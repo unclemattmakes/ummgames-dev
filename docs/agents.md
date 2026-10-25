@@ -9,16 +9,20 @@ details. This page is the short version, plus a block to paste into the game's `
 Before pasting, set the first line of the block's list to this game's package manager. Leave it
 as it is for pnpm, or change the run line to `npx umm-dev` for npm.
 
+**Keep every `@` in the block inside backticks.** Claude Code reads `@path` in a CLAUDE.md as an
+instruction to import that file, and skips only what sits in a code span or a code block. The
+block below is written that way; keep it so if you edit it.
+
 ```md
-## The shared kit (@ummgames/dev)
+## The shared kit (`@ummgames/dev`)
 
 Dev tools come from `@ummgames/dev`, pinned to a tag in package.json. Runtime code that ships in
 the game is copied from the kit's `runtime/` with `umm-dev copy`, and `umm-dev drift` says how far
-each copy has moved. Docs: node_modules/@ummgames/dev/docs/README.md.
+each copy has moved. Docs: `node_modules/@ummgames/dev/docs/README.md`.
 
 - Run the kit with this game's package manager: `pnpm exec umm-dev <command>`. Never run pnpm in
   an npm game, or npm in a pnpm game: it rewrites node_modules. Below, `umm-dev` means that.
-- Never edit anything under node_modules/@ummgames/dev. Kit bugs go upstream, to
+- Never edit anything under `node_modules/@ummgames/dev`. Kit bugs go upstream, to
   github.com/unclemattmakes/ummgames-dev, not into a local patch.
 - Settings live in umm-dev.config.mjs at the root. Run `umm-dev <command> --help` before guessing
   an option.

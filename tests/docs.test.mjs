@@ -93,4 +93,26 @@ describe('docs', () => {
     const all = docs.map(read).join('\n')
     for (const s of sections) expect(all, s).toContain(`## Config: \`${s}\``)
   })
+
+  it('text that lands in a CLAUDE.md keeps every @ in a code span, so it is never read as an import', () => {
+    /** Lines with an `@` outside backticks and outside code fences. */
+    const bare = (/** @type {string} */ text) => {
+      const out = []
+      let fenced = false
+      for (const [i, line] of text.split(/\r?\n/).entries()) {
+        if (/^\s*(```|~~~)/.test(line)) {
+          fenced = !fenced
+          continue
+        }
+        if (!fenced && /(^|[^\w])@[\w./-]/.test(line.replace(/`[^`]*`/g, ''))) out.push(i + 1)
+      }
+      return out
+    }
+    // The paste block in docs/agents.md: the ```md fence after "Paste this into".
+    const agents = read('docs/agents.md')
+    const block = /## Paste this into[\s\S]*?```md\r?\n([\s\S]*?)\r?\n```/.exec(agents)?.[1]
+    expect(block, 'the paste block in docs/agents.md').toBeTruthy()
+    expect(bare(block ?? ''), 'docs/agents.md paste block, lines within it').toEqual([])
+    expect(bare(read('CLAUDE.md')), 'CLAUDE.md').toEqual([])
+  })
 })
