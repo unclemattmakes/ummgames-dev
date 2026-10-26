@@ -5,7 +5,7 @@
  *   f00000.jpg ...  the frames, exactly fps per second of game time, none missing
  *   <name>.mp4      libx264 at fps (shots of more than two frames)
  *   sheet.jpg       with `sheet`: a contact sheet, each tile labelled with its game frame
- *   meta.json       the shot, its URL, the frame count and the tick it held at
+ *   meta.json       the shot, its URL, the frame count, the tick it held at and when it ran
  *   states.jsonl    with a `state` hook: what it returned on every frame (see compare.mjs)
  *
  * A shot's times (`from`, `dur`, event `at`) are seconds of game time from tick 0, the frame
@@ -590,7 +590,7 @@ export async function captureShots(run) {
       if (hooks.state) fs.writeFileSync(path.join(dir, 'states.jsonl'), `${states.join('\n')}\n`)
       fs.writeFileSync(
         path.join(dir, 'meta.json'),
-        `${JSON.stringify({ shot, url, fps, size: [cw, ch], frames, expected: count, missing: missing.length, written, heldAtBootFrame: held, seed: cfg.seed }, null, 2)}\n`,
+        `${JSON.stringify({ shot, url, fps, size: [cw, ch], frames, expected: count, missing: missing.length, written, heldAtBootFrame: held, seed: cfg.seed, capturedAt: new Date().toISOString() }, null, 2)}\n`,
       )
       log(`[${name}] ${frames} frames, ${missing.length} missing`)
       if (!missing.length && frames > 2)

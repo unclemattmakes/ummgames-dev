@@ -2,6 +2,8 @@
 /**
  * `umm-dev store`: a storefront's store kit from the game itself, end to end:
  *
+ *   0. archive    opt-in: the previous kit (all of `<out>` but its captures) zipped to
+ *                 `<archiveDir>/<out>-<capture date>.zip` before anything overwrites it
  *   1. preflight  ffmpeg, the templates, the edit lists and shots are there and valid, and the
  *                 game's own `preflight` hook (its assets pulled, say) passes
  *   2. capture    every shot in `store.shots` to `<out>/capture`, contact sheets every 0.5 s;
@@ -31,6 +33,7 @@ import {
   rel,
   removeInside,
 } from './util.mjs'
+import { writeZip } from './zip.mjs'
 
 export const STORE_DEFAULTS = {
   /** A preset in presets/ by name, or a path to one (relative to the game root). */
@@ -45,6 +48,10 @@ export const STORE_DEFAULTS = {
   stills: /** @type {import('./stills.mjs').Still[]} */ ([]),
   /** Videos: an edit list each, and the preset asset id it is checked as (default: its stem). */
   videos: /** @type {{ edl: string, spec?: string | false }[]} */ ([]),
+  /** Run the archive step on every run, not only with `--archive` or `--steps archive`. */
+  archive: false,
+  /** Where the archive step writes its zips, relative to the game root. */
+  archiveDir: 'store-archive',
   /** Node function `async ({ root, store }) => string[] | void`: problems that stop the kit. */
   preflight:
     /** @type {((ctx: { root: string, store: Record<string, any> }) => Promise<string[] | undefined> | string[] | undefined) | null} */ (
@@ -55,6 +62,7 @@ export const STORE_DEFAULTS = {
 /** @typedef {typeof STORE_DEFAULTS & { root: string }} StoreConfig */
 
 export const STEPS = /** @type {const} */ ([
+  'archive',
   'preflight',
   'capture',
   'stills',
@@ -63,6 +71,9 @@ export const STEPS = /** @type {const} */ ([
   'check',
 ])
 /** @typedef {typeof STEPS[number]} Step */
+
+/** The steps a plain `umm-dev store` runs: all but archive, which is opt-in. */
+export const DEFAULT_STEPS = STEPS.filter((s) => s !== 'archive')
 
 /** @param {StoreConfig} store */
 const captureDir = (store) => path.resolve(store.root, store.out, 'capture')
@@ -84,6 +95,78 @@ export function kitEdl(store, v) {
 
 /** @param {{ edl: string, spec?: string | false }} v */
 const videoId = (v) => (v.spec === false ? null : (v.spec ?? path.basename(v.edl, '.json')))
+
+/** Every file under `dir`, depth first, sorted, skipping the folders in `skip`. @param {string} dir @param {string[]} skip */
+function listFiles(dir, skip) {
+  /** @type {string[]} */
+  const out = []
+  if (!fs.existsSync(dir)) return out
+  for (const e of fs
+    .readdirSync(dir, { withFileTypes: true })
+    .sort((a, b) => (a.name < b.name ? -1 : 1))) {
+    const p = path.join(dir, e.name)
+    if (e.isDirectory()) {
+      if (!skip.includes(path.resolve(p))) out.push(...listFiles(p, skip))
+    } else if (e.isFile()) out.push(p)
+  }
+  return out
+}
+
+/** A date as local `YYYY-MM-DD`. @param {Date} d */
+const ymd = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+/**
+ * When the kit's captures were made: the newest `capturedAt` in `<out>/capture/<shot>/meta.json`,
+ * else the newest meta.json's mtime (captures from before 0.3.0). Null with no captures.
+ * @param {StoreConfig} store
+ */
+export function captureDate(store) {
+  const dir = captureDir(store)
+  if (!fs.existsSync(dir)) return null
+  let newest = 0
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!e.isDirectory()) continue
+    const meta = path.join(dir, e.name, 'meta.json')
+    if (!fs.existsSync(meta)) continue
+    let t = Number.NaN
+    try {
+      t = Date.parse(JSON.parse(fs.readFileSync(meta, 'utf8')).capturedAt)
+    } catch {}
+    if (Number.isNaN(t)) t = fs.statSync(meta).mtimeMs
+    newest = Math.max(newest, t)
+  }
+  return newest ? new Date(newest) : null
+}
+
+/**
+ * Zip the previous kit, all of `<out>` but its captures, to `<archiveDir>/<out>-<date>.zip`,
+ * where the date is the captures' (`captureDate`), or the newest file's without captures. A
+ * second archive of the same date gets `-2`, `-3`, ... Null when there is nothing to archive.
+ * @param {StoreConfig} store @param {(l: string) => void} [log]
+ * @returns {{ file: string, files: number, bytes: number, date: string } | null}
+ */
+export function archiveKit(store, log = () => {}) {
+  const outDir = path.resolve(store.root, store.out)
+  const archiveDir = path.resolve(store.root, store.archiveDir)
+  if (archiveDir === outDir) throw new MediaError('store.archiveDir must not be store.out')
+  const files = listFiles(outDir, [captureDir(store), archiveDir])
+  if (!files.length) return null
+  const captured = captureDate(store)
+  const when = captured ?? new Date(files.reduce((t, f) => Math.max(t, fs.statSync(f).mtimeMs), 0))
+  const date = ymd(when)
+  const stem = `${path.basename(outDir)}-${date}`
+  let file = path.join(archiveDir, `${stem}.zip`)
+  for (let n = 2; fs.existsSync(file); n++) file = path.join(archiveDir, `${stem}-${n}.zip`)
+  const { bytes } = writeZip(
+    file,
+    files.map((f) => ({ name: rel(outDir, f), file: f })),
+  )
+  log(
+    `  ${rel(store.root, file)}: ${files.length} files, ${(bytes / 1e6).toFixed(1)} MB, ${captured ? 'captured' : 'made'} ${date}`,
+  )
+  return { file, files: files.length, bytes, date }
+}
 
 /**
  * Problems that would stop the kit partway, found before anything runs.
@@ -199,6 +282,11 @@ export async function runStore(o) {
   const has = (/** @type {Step} */ s) => o.steps.includes(s)
   /** @type {Record<string, import('./util.mjs').Probe | null>} */
   const made = {}
+
+  if (has('archive')) {
+    log('== archive')
+    if (!archiveKit(store, log)) log(`  nothing to archive in ${store.out}/`)
+  }
 
   if (has('preflight')) {
     log('== preflight')

@@ -94,6 +94,9 @@ each copy has moved. Docs: `node_modules/@ummgames/dev/docs/README.md`.
 - Media output (`test-results/`, `dist-store/`) is generated. It is safe to delete and re-make,
   and should not be committed unless the game says so. Check it by exit code, by the `wrote` and
   `ok` lines it prints, and by looking at the images it made.
+- Store archives (`store-archive/`, or the game's `store.archiveDir`) are not generated: each zip
+  is the only copy of an old kit. Never delete one. Run `umm-dev store --archive` before a re-run
+  that replaces a kit someone may want back.
 
 ## Reporting a kit bug
 

@@ -38,7 +38,7 @@ the working directory.
 Install the kit, Vite and Playwright in the game:
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.2.2 vite playwright
+pnpm add -D github:unclemattmakes/ummgames-dev#v0.3.0 vite playwright
 pnpm exec playwright install chromium
 ```
 
@@ -181,7 +181,7 @@ different footage). 2 on a usage mistake.
 - the frames, `f00000.jpg` on (`.png` with the shot's `png`);
 - `<name>.mp4`, x264 at `capture.crf`, when no frame is missing and there are more than 2;
 - `meta.json`: the shot, its URL, `fps`, `size`, `frames`, `expected`, `missing`, `written`,
-  `heldAtBootFrame` and `seed`;
+  `heldAtBootFrame`, `seed` and `capturedAt` (an ISO time);
 - `sheet.jpg`, with `--sheet`. Pick in-points from its labels, not by reasoning about speed;
 - `states.jsonl`, one line per frame, when `capture.state` is set.
 
@@ -243,11 +243,20 @@ pnpm exec umm-dev cut trailer.json --print     # the ffmpeg commands, to run els
 ## `umm-dev store`
 
 ```
-umm-dev store [--steps <list>] [--no-capture] [--only <shots>] [--draft] [--igpu]
+umm-dev store [--steps <list>] [--archive] [--no-capture] [--only <shots>] [--draft] [--igpu]
 ```
 
 Runs the game's store recipe end to end, in six steps. The recipe is the `store` section of
-`umm-dev.config.mjs`, the shots, templates and edit lists it names, and a storefront preset.
+`umm-dev.config.mjs`, the shots, templates and edit lists it names, and a storefront preset. An
+opt-in archive step can run before them.
+
+0. **archive** (opt-in). The previous kit, all of `<out>` but `<out>/capture`, is zipped to
+   `<archiveDir>/<out>-<YYYY-MM-DD>.zip` before anything overwrites it. The date is when the
+   kit's captures were made: the newest `capturedAt` in `<out>/capture/<shot>/meta.json`, or the
+   newest `meta.json`'s file time for captures made before 0.3.0. With no captures, it is the
+   newest file's time. A second archive of the same date gets `-2`, `-3` and on. With nothing in
+   `<out>`, the step says so and the run goes on. It runs with `--archive`, `--steps archive`, or
+   on every run with `store.archive: true`.
 
 1. **preflight.** ffmpeg and ffprobe are on `PATH`. The section names a still or a video. The
    shots file, templates, edit lists and preset are there and valid. The game's own `preflight`
@@ -264,7 +273,8 @@ Runs the game's store recipe end to end, in six steps. The recipe is the `store`
 
 | Option | Value | Default | What it does |
 |---|---|---|---|
-| `--steps` | comma-separated steps | all six | Run only these steps. They always run in the order above. |
+| `--steps` | comma-separated steps | all six (and `archive` with `store.archive`) | Run only these steps. They always run in the order above. `--steps archive` archives and does nothing else. |
+| `--archive` | flag | off | Run the archive step first, as well as the chosen steps. |
 | `--no-capture` | flag | off | Drop the capture step: rebuild from the captures already made. |
 | `--only` | comma-separated shot names | all | Capture only these shots. The other steps still run. |
 | `--draft` | flag | off | Fast video encodes, written as `<out stem>-draft.mp4`. The check step still checks the full-quality file, not the draft. |
@@ -300,6 +310,15 @@ pnpm exec umm-dev store --steps preflight      # is the recipe valid?
 pnpm exec umm-dev store --no-capture           # rebuild from the captures already made
 pnpm exec umm-dev store --only cover-shot      # re-capture that shot alone, then rebuild the rest
 pnpm exec umm-dev store --steps check          # only the spec report
+pnpm exec umm-dev store --archive              # zip the last kit, then make a new one
+pnpm exec umm-dev store --steps archive        # zip the last kit, nothing else
+```
+
+Archiving prints one line:
+
+```
+== archive
+  store-archive/dist-store-2026-10-25.zip: 14 files, 38.2 MB, captured 2026-10-25
 ```
 
 A passing run ends:
@@ -387,6 +406,9 @@ Relative paths resolve from the working directory, except where a function takes
 | `checkKit(preset, made)` | The store's check lines for a set of probed files. |
 | `probe(file)` | ffprobe a file: size, duration, video stream, audio streams. |
 | `runStore(o)` | Run store steps. Resolves to `{ ok, report }`. |
+| `archiveKit(store, log?)` | Zip the previous kit, as the archive step does. Returns `{ file, files, bytes, date }`, or null with nothing to archive. |
+| `captureDate(store)` | When the kit's captures were made, as a `Date`, or null with none. |
+| `writeZip(file, entries)` | Write a zip of `{ name, file }` entries. Images and videos are stored, the rest deflated. No zip64: under 4 GB and 65535 files. |
 
 **Errors.** A function that fails throws an `Error` whose message says what to fix.
 
@@ -518,6 +540,8 @@ check it there. `shotUrl` returns the path and query only; capture puts the orig
 | `stills` | `Still[]` | `[]` | The stills to render (below). |
 | `videos` | `{ edl: string, spec?: string \| false }[]` | `[]` | An edit list each, and the preset asset id it is checked as. `spec` defaults to the edit list's stem; `false` checks nothing. |
 | `preflight` | `((ctx: { root, store }) => string[] \| undefined \| Promise<string[] \| undefined>) \| null` | `null` | Node function run at preflight. Each string it returns is a problem that stops the kit. |
+| `archive` | `boolean` | `false` | Run the archive step on every run, not only with `--archive` or `--steps archive`. |
+| `archiveDir` | `string` | `'store-archive'` | Where the archive step writes its zips. It must not be `out`. Keep it out of git, or commit it on purpose. |
 
 The capture step uses the `capture` section, with `store.shots` and `<out>/capture`. The stills
 step renders headless, with `capture.browser.channel`.
@@ -879,6 +903,8 @@ join first puts every segment on ffmpeg's default timebase (`settb=AVTB`).
 | `FAIL ... has an audio track, must be silent: drop "music" from the edit list` | The preset wants a silent video. | Drop `music` from that edit list. |
 | `MISSING  <id> (required)` | No still or video is checked as that id. | Add one, with `name` or `spec` set to the id. |
 | `??       <id>: the preset has no spec of that id` | A still or video is checked under an id the preset lacks. | Set its `spec` to a preset id, or `spec: false`. |
+| `store.archiveDir must not be store.out` | The archive would be written inside the kit it archives. | Set `archiveDir` to another folder. |
+| `<file> takes the zip past 4 GB: archive less at once` | The kit is over the zip limit without zip64. | Move old drafts or large files out of `<out>`, then archive again. |
 | `the loop would overwrite its source <file>: set --out or --name` | The input and the output are the same file. | Pass `--out` or `--name`. |
 | `<file> has no video to loop: pass an mp4 (a cut or a store preview)` | The input has no video stream. | Pass an mp4. |
 
@@ -905,6 +931,9 @@ join first puts every segment on ffmpeg's default timebase (`settb=AVTB`).
   - `store` ends `store done:`, with no `FAIL` or `MISSING` line;
   - look at each `sheet.jpg` and `<out>/review/<edl stem>-beats.jpg`: each frame must show its
     `beat`.
+- **Archives are history.** Never delete or rewrite a zip in `store.archiveDir` (default
+  `store-archive/`): it is the only copy of an old kit. Archive before a re-run that replaces a
+  kit someone may want back: `umm-dev store --archive`.
 - **Safe to delete and re-make:** `test-results/capture/`, `dist-store/`, `dist-video/`,
   `dist-site/`, any `<name>@<tag>/` capture folder and any `.segs-*` folder. Do not commit them
   unless the game says so.

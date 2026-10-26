@@ -254,6 +254,10 @@ export interface StoreConfig {
   stills?: Still[]
   /** An edit list each, and the preset asset id it is checked as (default: its stem; false for none). */
   videos?: { edl: string; spec?: string | false }[]
+  /** Run the archive step on every run, not only with `--archive` or `--steps archive` (default false). */
+  archive?: boolean
+  /** Where the archive step writes `<out>-<capture date>.zip`, from the game root (default `'store-archive'`). */
+  archiveDir?: string
   /** Node function run at preflight; each string it returns is a problem that stops the kit (default null). */
   preflight?:
     | ((ctx: {
@@ -453,11 +457,29 @@ export declare function checkKit(
 /** ffprobe a file; throws when it is missing or unreadable. */
 export declare function probe(file: string): Probe
 
+/**
+ * Zip the previous kit, all of `<out>` but `<out>/capture`, to
+ * `<archiveDir>/<out>-<YYYY-MM-DD>.zip`. The date is when the kit's captures were made (the newest
+ * `capturedAt` in their `meta.json`), or the newest file's without captures; a second archive of
+ * one date gets `-2`, `-3`, ... Returns null when there is nothing to archive.
+ */
+export declare function archiveKit(
+  store: Required<StoreConfig> & { root: string },
+  log?: (l: string) => void,
+): { file: string; files: number; bytes: number; date: string } | null
+/** When the kit's captures were made, or null with no captures in `<out>/capture`. */
+export declare function captureDate(store: Required<StoreConfig> & { root: string }): Date | null
+/** Write a zip of `entries` (`name` is the path inside it, with `/`); no zip64, so under 4 GB. */
+export declare function writeZip(
+  file: string,
+  entries: { name: string; file: string }[],
+): { files: number; bytes: number }
+
 /** Run store steps in order; resolves `ok` false on a FAIL or a required MISSING, throws on a stop. */
 export declare function runStore(o: {
   store: Required<StoreConfig> & { root: string }
   capture: Required<CaptureConfig> & { root: string }
-  steps: ('preflight' | 'capture' | 'stills' | 'cut' | 'review' | 'check')[]
+  steps: ('archive' | 'preflight' | 'capture' | 'stills' | 'cut' | 'review' | 'check')[]
   only?: string[] | null
   igpu?: boolean
   draft?: boolean

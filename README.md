@@ -13,7 +13,7 @@ is there for the next. It covers:
 ## Install
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.2.2     # or: npm i -D github:unclemattmakes/ummgames-dev#v0.2.2
+pnpm add -D github:unclemattmakes/ummgames-dev#v0.3.0     # or: npm i -D github:unclemattmakes/ummgames-dev#v0.3.0
 pnpm exec umm-dev help                                     # or: npx umm-dev help
 ```
 
@@ -57,7 +57,7 @@ Run `pnpm exec umm-dev help` for the list, and `umm-dev <command> --help` for a 
 |---|---|---|
 | `umm-dev capture` | Record shots of the game in virtual time: every frame exact, an mp4 per shot, contact sheets, `expect` checks | [media](docs/media.md) |
 | `umm-dev cut` | Cut a video from an edit list: dissolves, wipes, speed, reverse, reframing, overlays, cards, music. `--print` works without ffmpeg | [media](docs/media.md) |
-| `umm-dev store` | Make a store kit: capture, covers and icons from the game's own templates, preview cuts, a review sheet, checks against a storefront's preset | [media](docs/media.md) |
+| `umm-dev store` | Make a store kit: capture, covers and icons from the game's own templates, preview cuts, a review sheet, checks against a storefront's preset, and a dated zip of the last kit | [media](docs/media.md) |
 | `umm-dev loop` | Make a site loop: a silent 720p faststart mp4 and a poster, from a cut or a store preview | [media](docs/media.md) |
 | `umm-dev loudness` | Meter audio: integrated LUFS, true peak, momentary max, checked against a target | [audio](docs/audio.md) |
 | `umm-dev copy` | Copy a `runtime/` file or folder into the game, stamped with its version and hash | [runtime](docs/runtime.md) |

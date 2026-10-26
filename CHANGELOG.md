@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0 (2026-10-25)
+
+**`store` can archive the previous kit.** A new opt-in `archive` step, run first, zips the last
+kit (all of `<out>` but `<out>/capture`) to `<archiveDir>/<out>-<YYYY-MM-DD>.zip` before
+anything overwrites it. The date is when the kit's captures were made; a second archive of one
+date gets `-2`, `-3` and on. Run it with `umm-dev store --archive`, alone with
+`--steps archive`, or on every run with `store.archive: true`.
+
+- New `store` keys: `archive` (default `false`) and `archiveDir` (default `'store-archive'`).
+- Capture's `meta.json` now records `capturedAt`, an ISO time. For captures made before this,
+  the archive step uses the `meta.json` file's time.
+- `@ummgames/dev/media` exports `archiveKit`, `captureDate` and `writeZip` (a dependency-free zip
+  writer; no zip64, so under 4 GB).
+- **What a game may change:** nothing is required. A game that wants a dated history of its
+  store kits adds `store-archive/` to `.gitignore` (or commits it on purpose) and runs
+  `umm-dev store --archive`, or sets `archive: true`.
+
 ## 0.2.2 (2026-10-25)
 
 **`cut` joins a dissolve that follows a hard cut.** An edit list with a hard cut (no `dissolve`)

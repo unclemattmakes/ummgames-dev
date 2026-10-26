@@ -28,7 +28,7 @@ game's full check after each one.**
 ### 1. Install and add the config file
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.2.2
+pnpm add -D github:unclemattmakes/ummgames-dev#v0.3.0
 ```
 
 Then create `umm-dev.config.mjs`: [getting-started.md, step 2](getting-started.md#2-add-the-config-file).
