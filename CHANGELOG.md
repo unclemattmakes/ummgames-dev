@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.0 (2026-10-29)
+
+**A hung command can no longer hold the GPU lease for hours.** Under the default
+`gpu.overrun: 'warn'`, a run still warns at the end of its booking, and now stops its own
+command once it is `gpu.overrunGraceMinutes` (default 30) past it, exiting 124. Before, a live
+holder was never stopped: on one machine a capture that hung on its third shot held the lease
+for 12.5 hours, with every other session queued behind it, until someone released it by hand.
+No waiter takes the lease from a live holder; the holder's own `gpu run` stops itself.
+
+- New `gpu` key: `overrunGraceMinutes` (default `30`). `0` stops at the booking, as `'kill'` does.
+- The end-of-booking warning names when the run will be stopped, and a waiter behind a
+  `umm-dev` holder past its booking is told the holder stops itself.
+- **What a game may change:** nothing is required. A run that is genuinely longer than its
+  booking plus 30 minutes is now stopped: book what it takes (`--long` over 45m), or raise
+  `overrunGraceMinutes`. A game on `overrun: 'kill'` sees no change.
+
 ## 0.3.0 (2026-10-25)
 
 **`store` can archive the previous kit.** A new opt-in `archive` step, run first, zips the last

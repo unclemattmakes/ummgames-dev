@@ -263,6 +263,29 @@ describe('umm-dev gpu', { timeout: 15_000 }, () => {
     expect(fs.readFileSync(path.join(g.lease, 'gpu-lease.log'), 'utf8')).toContain('OVERRUN slow')
   })
 
+  it('warns at the end of a booking, and stops a hung command gpu.overrunGraceMinutes later', async () => {
+    const g = setup({ overrunGraceMinutes: 2 })
+    const t0 = Date.now()
+    const r = await start(
+      g,
+      ['run', 'hung', '1', '--', process.execPath, HOLD, g.log, 'hung', '8000'],
+      {
+        UMM_DEV_GPU_MINUTE_MS: '300',
+      },
+    ).done
+    expect(r.code).toBe(124)
+    // Not at the booking (300 ms) but after the grace (900 ms), and long before the command's 8 s.
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(900)
+    expect(Date.now() - t0).toBeLessThan(5000)
+    expect(r.out).toContain('is past its 1m booking')
+    expect(r.out).toContain('still running 2m past its 1m booking')
+    expect(events(g.log).hung?.end).toBe(0)
+    expect(fs.existsSync(path.join(g.lease, 'gpu.lock'))).toBe(false)
+    const log = fs.readFileSync(path.join(g.lease, 'gpu-lease.log'), 'utf8')
+    expect(log).toContain('OVERRUN hung: past its 1m booking')
+    expect(log).toContain('OVERRUN hung: killed 2m past its 1m booking')
+  })
+
   it('wait returns once the lease is free, and release refuses another name', async () => {
     const g = setup()
     const a = start(g, ['run', 'a', '5', '--', process.execPath, HOLD, g.log, 'a', '400'])

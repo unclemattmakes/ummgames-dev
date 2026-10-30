@@ -19,6 +19,12 @@ export interface GpuConfig {
   staleGraceSeconds?: number
   /** At the end of a booking: `'warn'` prints and logs it; `'kill'` stops the command, which exits 124. Default `'warn'`. */
   overrun?: 'warn' | 'kill'
+  /**
+   * With `overrun: 'warn'`, minutes past the booking at which a run still going is stopped anyway
+   * (exit 124), so a hung command cannot hold the GPU for hours. `0` stops it at the booking, as
+   * `'kill'` does. Default `30`.
+   */
+  overrunGraceMinutes?: number
   /** `'below'` runs the command below normal CPU priority; `'normal'` leaves it. `GPU_PRIORITY` overrides. Default `'below'`. */
   priority?: 'below' | 'normal'
 }

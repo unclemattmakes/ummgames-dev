@@ -21,7 +21,7 @@ Releases are git tags, `v<major>.<minor>.<patch>`. A tag never moves once it is 
    and for runtime files that changed.
 2. **Move the pin:**
    ```sh
-   pnpm add -D github:unclemattmakes/ummgames-dev#v0.3.0     # npm: npm i -D …
+   pnpm add -D github:unclemattmakes/ummgames-dev#v0.4.0     # npm: npm i -D …
    ```
 3. **Run the game's full check.** The linked tools have changed; fix anything the changelog said
    would break.

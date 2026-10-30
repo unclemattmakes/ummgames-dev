@@ -47,8 +47,12 @@ const HELP = `usage: umm-dev gpu run [<name> [<minutes>]] [options] -- <command.
   GPU_POLL_SECONDS (default 3), UMM_DEV_BASH (Windows: the bash for the bridge, or none).
   Never delete files in the lease dir by hand. Docs: docs/agent.md.
 
-exit: run: the command's own code; 2 gave up waiting; 124 stopped at the end of its booking
-      (gpu.overrun "kill"); 127 the command could not start; 130 interrupted; 64 usage
+  Past its booking, a run warns, and a run still going gpu.overrunGraceMinutes (30) after
+  that is stopped, so a hung command cannot hold the GPU for hours. gpu.overrun "kill"
+  stops it at the end of the booking instead.
+
+exit: run: the command's own code; 2 gave up waiting; 124 stopped for running past its
+      booking; 127 the command could not start; 130 interrupted; 64 usage
       status: 0; wait: 0 free, 2 still busy at the timeout; release: 0 released or nothing
       held, 1 refused (held under another name); 64 usage`
 
@@ -61,6 +65,7 @@ const DEFAULTS = {
   staleGraceSeconds: 10,
   /** @type {'warn' | 'kill'} */
   overrun: 'warn',
+  overrunGraceMinutes: 30,
   /** @type {'below' | 'normal'} */
   priority: 'below',
 }
@@ -219,6 +224,12 @@ async function runCmd(argv, cfg) {
   const onSignal = () => stop(130)
   for (const s of SIGNALS) process.on(s, onSignal)
 
+  // A booking is a promise, so a waiter never takes the lease from a live holder. The holder
+  // stops itself instead: a hung command (a capture stuck on one shot) would otherwise keep the
+  // GPU for as long as its process lives.
+  const grace = Math.max(0, Number(cfg.overrunGraceMinutes) || 0)
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let hardStop
   const overrun = setTimeout(() => {
     if (cfg.overrun === 'kill') {
       console.error(
@@ -226,12 +237,19 @@ async function runCmd(argv, cfg) {
       )
       L.log(`OVERRUN ${name}: killed at the end of its ${minutes}m booking`)
       stop(124)
-    } else {
-      console.error(
-        `GPU LEASE: '${name}' is past its ${minutes}m booking. Finish and hand the GPU back; book again for the next run.`,
-      )
-      L.log(`OVERRUN ${name}: past its ${minutes}m booking`)
+      return
     }
+    console.error(
+      `GPU LEASE: '${name}' is past its ${minutes}m booking. Finish and hand the GPU back; book again for the next run. It is stopped at ${minutes + grace}m.`,
+    )
+    L.log(`OVERRUN ${name}: past its ${minutes}m booking`)
+    hardStop = setTimeout(() => {
+      console.error(
+        `GPU LEASE: '${name}' is still running ${grace}m past its ${minutes}m booking; stopping the command (gpu.overrunGraceMinutes).`,
+      )
+      L.log(`OVERRUN ${name}: killed ${grace}m past its ${minutes}m booking`)
+      stop(124)
+    }, grace * minuteMs())
   }, minutes * minuteMs())
 
   const rc = await new Promise((resolve) => {
@@ -244,6 +262,7 @@ async function runCmd(argv, cfg) {
     )
   })
   clearTimeout(overrun)
+  clearTimeout(hardStop)
   for (const s of SIGNALS) process.off(s, onSignal)
   const code = forced ?? rc
   const released = L.releaseOwn(token)

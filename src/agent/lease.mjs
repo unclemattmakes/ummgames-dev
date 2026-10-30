@@ -27,7 +27,8 @@
  * Rules it keeps:
  * - Only the OLDEST live ticket may take the lock, so the order is the order of asking.
  * - A booking is a promise, not a timer: nothing takes the lock from a live holder, even one
- *   past its booking. A waiter says so and keeps waiting.
+ *   past its booking. A waiter says so and keeps waiting. The holder's own `gpu run` stops its
+ *   command once it is `gpu.overrunGraceMinutes` past the booking (src/commands/gpu.mjs).
  * - A lock is STALE only when every process it names is provably gone: the umm-dev process and
  *   the command it ran. Then the head of the queue reclaims it, after a grace period. A holder
  *   that names no checkable process (an old script's `acquire`) is never reclaimed: release it
@@ -502,6 +503,8 @@ async function report(L, mine, o) {
   )
   if (h?.asked != null && age > h.asked) {
     o.say('  !! the holder is past its booking. Do NOT steal it; tell whoever runs the fleet.')
+    if (h.node)
+      o.say('     (a umm-dev run stops its own command when it runs well past its booking)')
   }
   const st = await L.holderState(h)
   if (h?.node && !pidAlive(h.node.pid) && st === 'alive') {

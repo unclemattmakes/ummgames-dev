@@ -78,6 +78,7 @@ current bugs with workarounds.
 | Symptom | Cause | Fix |
 |---|---|---|
 | A `gpu run` waits until its wait limit, though nothing else runs | It is nested inside another `gpu run`, and is waiting on itself | Run one lease per command; never nest |
+| A `gpu run` exits 124 with `still running 30m past its 25m booking` | The command hung, or the booking was too short. The run stopped its own command so the GPU is free for the next | If it hung, find where (the last shot, the last test). If it is genuinely long, book what it takes, with `--long` over 45m |
 | After a merge, a conflicted markdown file holds only our side, and git printed `Cannot find module …/node_modules/@ummgames/dev/bin/umm-dev.mjs` | The merge driver could not start: the kit is not installed in that checkout | Install, then `git checkout -m -- <file>` to restore the conflict, and merge again |
 | `guard install-hooks` refuses a hook, exit 1 | The hook exists and was not written by umm-dev, or `core.hooksPath` points at the game's own hooks | Call `umm-dev guard hook <name>` from the existing hook, or unset `core.hooksPath` and re-run |
 | `worktree remove` refuses | It would lose uncommitted work, an unreachable commit, or a nested worktree | Read its reason. Commit, branch or remove the nested worktree first. `--force` discards that work |

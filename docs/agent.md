@@ -134,9 +134,12 @@ An unknown option is a usage error (exit 64). The name and the booking:
   `GPU LEASE: 60m is over the 45m cap. Booking 45m.`, unless `--long` or `GPU_LONG=1`.
 - **Past the booking.** A booking is a promise, not a timer. With `gpu.overrun: 'warn'` (the
   default) the holder prints `GPU LEASE: '<name>' is past its 20m booking. Finish and hand the GPU
-  back; book again for the next run.`, the log records it, and waiters see `!! the holder is past
-  its booking`. Nothing ever takes the lease from a live holder. With `gpu.overrun: 'kill'` the
-  holder stops its own command at the end of the booking and exits 124.
+  back; book again for the next run. It is stopped at 50m.`, the log records it, and waiters see
+  `!! the holder is past its booking`. No waiter ever takes the lease from a live holder. The
+  holder stops its own command instead, once it is `gpu.overrunGraceMinutes` (30) past the
+  booking, and exits 124: a hung command, such as a capture stuck on one shot, would otherwise
+  hold the GPU for as long as its process lives. With `gpu.overrun: 'kill'` the holder stops its
+  command at the end of the booking.
 - **Priority.** The command runs below normal CPU priority, so a person at the desk keeps the
   machine responsive. It changes who wins a contended core, not what the command does.
   `GPU_PRIORITY=normal` or `gpu.priority: 'normal'` opts out, for a measurement that must not
@@ -162,7 +165,7 @@ An unknown option is a usage error (exit 64). The name and the booking:
 | 0 | `status`, `wait`, `release` | Done; for `wait`, the lease is free with nobody waiting; for `release`, released or nothing was held |
 | 1 | `release` | Refused: held under another name |
 | 2 | `run`, `wait` | Gave up waiting (`--wait-limit`, `--timeout`). `run` did not run the command |
-| 124 | `run` | Stopped at the end of its booking (`gpu.overrun: 'kill'`) |
+| 124 | `run` | Stopped for running past its booking: `gpu.overrunGraceMinutes` after it, or at its end with `gpu.overrun: 'kill'` |
 | 127 | `run` | The command could not start. On Windows a missing command runs through `cmd.exe` and exits 1 instead |
 | 130 | `run` | Interrupted (Ctrl-C, SIGTERM, SIGHUP) while waiting or running. The ticket or lease goes with it |
 | 64 | any | Usage: a bad option, no `--`, minutes not a whole number, no name for `release` |
@@ -333,6 +336,7 @@ export default defineConfig({
 | `waitLimitMinutes` | number | `240` | Minutes `run` waits in the queue before giving up (exit 2); also `wait`'s timeout |
 | `staleGraceSeconds` | number | `10` | Seconds a dead holder must stay unchanged before the head of the queue reclaims its lock |
 | `overrun` | `'warn'` or `'kill'` | `'warn'` | At the end of a booking: print and log it, or stop the command (exit 124) |
+| `overrunGraceMinutes` | number | `30` | With `'warn'`: minutes past the booking at which a run still going is stopped anyway (exit 124). `0` acts as `'kill'` |
 | `priority` | `'below'` or `'normal'` | `'below'` | Run the command below normal CPU priority, or leave it. `GPU_PRIORITY` overrides |
 
 The type is `GpuConfig` in `src/agent/config.d.ts`. The config is read from the checkout that
