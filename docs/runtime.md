@@ -1,8 +1,8 @@
 # Runtime code: copy and drift
 
 Code that ships inside a game's build lives in `runtime/`, as TypeScript: the perf HUD, the dev
-command bar, the gamepad profiles, the loading splash. It is **copied**,
-not linked. `umm-dev copy` writes a file into the game with a header on line 1, and from then on
+command bar, the gamepad profiles, the loading splash, the pitch and step-clock helpers for a
+Web Audio sequencer. It is **copied**, not linked. `umm-dev copy` writes a file into the game with a header on line 1, and from then on
 the copy is the game's to change. `umm-dev drift` reports how far each copy has moved from the
 version it came from, and how far the installed version has moved since. Reach for it when a game
 wants one of these files, and when the game bumps the kit's tag.
@@ -467,6 +467,77 @@ With `prefers-reduced-motion`, it shows the last word at once.
 | `skipKeys` | `['Enter', ' ']` | `KeyboardEvent.key` values that skip. |
 | `padSkip` | `true` | Whether a pad's A (button 0) skips. |
 | `now` | `performance.now` | The clock, for tests. |
+
+## `runtime/audio/`
+
+Two small pieces of a Web Audio step sequencer: the pitch arithmetic, and the look-ahead clock
+that decides when each step is queued. The sequencer itself (its instruments, its patterns, its
+`queue(step, at)`) stays the game's own. Neither file imports anything, so either can be copied
+alone (`umm-dev copy audio`, or one file by name).
+
+| File | Imports |
+|---|---|
+| `pitch.ts`, `step-clock.ts` | nothing |
+
+### `pitch.ts`
+
+**Exports:** `note(semi)`, `dbToGain(db)`, `degree(scale, d)`, and the scales `MINOR`,
+`HARMONIC_MINOR`, `PHRYGIAN`, `DORIAN`, `MAJOR` and `PENTATONIC_MINOR`.
+
+| Export | What it does |
+|---|---|
+| `note(semi)` | The frequency in Hz of the note `semi` semitones from A4, in equal temperament: `440 * 2 ** (semi / 12)`. `note(3)` is C5, 523.25 Hz. |
+| `dbToGain(db)` | A gain factor from decibels: `10 ** (db / 20)`. |
+| `degree(scale, d)` | Scale degree `d` as semitones above the tonic. `d` is any integer: 0 is the tonic, and degrees past the end or below 0 wrap into the next octave up or down. With `MINOR`, degree 7 is 12 and degree -1 is -2. |
+| `MINOR` and the other scales | Semitone offsets from the tonic, one octave, as `readonly number[]`. |
+
+```ts
+import { MINOR, degree, note } from './audio/pitch'
+
+const root = -9 // C4, 9 semitones under A4
+const hz = note(root + degree(MINOR, 4)) // the fifth: G4
+```
+
+### `step-clock.ts`
+
+**Exports:** `advanceSteps(cursor, now, stepLen, lookahead, onStep, stallSkip?)`,
+`createTicker(fn, ms)`, and the types `StepCursor`, `Ticker`.
+
+A timer wakes every few tens of milliseconds and calls `advanceSteps`. It calls
+`onStep(step, at)` for every step that starts before `now + lookahead`, with `at` the step's
+exact audio time, and moves the cursor past them. The sequencer schedules its notes at `at`, so
+the timing comes from the audio clock and the timer's jitter does not reach the music. It
+returns how many steps it queued.
+
+**After a stall it skips.** When the cursor has fallen more than `stallSkip` behind `now` (a tab
+in the background throttles timers to once a second; a long frame stalls them), it jumps forward
+to the first step on the grid at or after `now` and plays from there. The missed steps are never
+queued, so there is no burst of late notes. `cursor.step` still counts them, so bar and phrase
+positions stay where they would have been.
+
+```ts
+import { advanceSteps, createTicker, type StepCursor } from './audio/step-clock'
+
+const sixteenth = 60 / bpm / 4
+const cursor: StepCursor = { step: 0, next: ctx.currentTime + 0.05 }
+const ticker = createTicker(() => {
+  advanceSteps(cursor, ctx.currentTime, sixteenth, 0.12, (step, at) => queue(step, at))
+}, 25)
+ticker.start()
+// on pause: ticker.stop(); on resume: cursor.next = ctx.currentTime + 0.05, then ticker.start()
+```
+
+| Argument | Default | What it does |
+|---|---|---|
+| `cursor` | required | `{ step, next }`: the next step to queue and its start time. Changed in place. |
+| `now` | required | The current time on the audio clock, seconds: `ctx.currentTime`. |
+| `stepLen` | required | Seconds per step: `60 / bpm / 4` for sixteenths. Over 0, or it throws a `RangeError`. |
+| `lookahead` | required | How far ahead to queue, seconds. Longer than the timer's period, so no step falls between two ticks: about 0.1 for a 25 ms timer. |
+| `onStep` | required | Called as `onStep(step, at)` for each step, in order. |
+| `stallSkip` | `0.05` | How far behind `now`, seconds, the cursor may fall before it skips instead of playing late. |
+
+`createTicker(fn, ms)` wraps `setInterval(fn, ms)`. `start()` does nothing while it is running
+and `stop()` nothing while it is stopped, so neither needs a check first. `running` says which.
 
 ## Config: `runtime`
 
