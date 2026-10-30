@@ -7,6 +7,7 @@ is there for the next. It covers:
 - **Video:** cut trailers and store previews from an edit list.
 - **Store art:** make covers and icons.
 - **Site builds:** headers, a 404 page, licences and the app icon for a game's own site.
+- **3D assets:** shrink GLB files, and read meshopt-compressed ones.
 - **Agent sessions:** share one GPU between parallel sessions.
 - **Configs:** start every game from one set of lint, type and test configs.
 
@@ -25,6 +26,8 @@ public, so installing needs no credentials.
 - pnpm 10 or 11, or npm 11.
 - Node 22 or later.
 - The media commands need `ffmpeg` and `ffprobe` on `PATH`.
+- `umm-dev gltf` and `@ummgames/dev/gltf` need the glTF-Transform packages and meshoptimizer in
+  the game ([docs/gltf.md](docs/gltf.md)).
 - Capture and store art need a Chromium: Playwright's (`pnpm exec playwright install chromium`),
   or else an installed Chrome or Edge.
 
@@ -60,6 +63,7 @@ Run `pnpm exec umm-dev help` for the list, and `umm-dev <command> --help` for a 
 | `umm-dev store` | Make a store kit: capture, covers and icons from the game's own templates, preview cuts, a review sheet, checks against a storefront's preset, and a dated zip of the last kit | [media](docs/media.md) |
 | `umm-dev loop` | Make a site loop: a silent 720p faststart mp4 and a poster, from a cut or a store preview | [media](docs/media.md) |
 | `umm-dev loudness` | Meter audio: integrated LUFS, true peak, momentary max, checked against a target | [audio](docs/audio.md) |
+| `umm-dev gltf` | Shrink GLB files in place: dedup, weld, prune, meshopt. Never joins meshes, so node extras survive | [gltf](docs/gltf.md) |
 | `umm-dev copy` | Copy a `runtime/` file or folder into the game, stamped with its version and hash | [runtime](docs/runtime.md) |
 | `umm-dev drift` | Report how far each copy has moved, here and upstream (`--diff`, `--strict`) | [runtime](docs/runtime.md) |
 | `umm-dev gpu` | Share one GPU between parallel sessions on the machine: run, status, wait, release | [agent](docs/agent.md) |
@@ -151,7 +155,9 @@ export default defineConfig(playwrightConfig({ device: devices['Desktop Chrome']
 
 `@ummgames/dev/media` is the code behind the media commands: the capture clock, the edit-list
 validator and planner, the store checks. `@ummgames/dev/audio` is the loudness meter, for meters
-that run inside a game's own tools.
+that run inside a game's own tools. `@ummgames/dev/gltf` is a glTF-Transform `NodeIO` with both
+meshopt codecs, the shrink pass behind `umm-dev gltf`, and a decoder for KHR_meshopt_compression
+GLBs; its glTF packages are optional peers a game adds itself ([docs/gltf.md](docs/gltf.md)).
 
 ## For AI agents
 

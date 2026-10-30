@@ -23,6 +23,7 @@
 | Runtime copies and drift; the dev palette, splash, pad profiles | [runtime.md](runtime.md) | copied: `umm-dev copy`, `drift`; `runtime/` |
 | Biome, TypeScript, Vitest, Playwright | [presets.md](presets.md) | linked: `@ummgames/dev/biome`, `/tsconfig`, `/vitest`, `/playwright` |
 | Loudness | [audio.md](audio.md) | linked: `umm-dev loudness`; `@ummgames/dev/audio` |
+| GLB optimizing, meshopt decoding | [gltf.md](gltf.md) | linked: `umm-dev gltf`; `@ummgames/dev/gltf` |
 
 **Linked** code runs from `node_modules` and never ships in a game's build; nobody edits it in the
 game. **Copied** code ships inside the game, so it is copied in with a header and owned by the
