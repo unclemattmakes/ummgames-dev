@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.5.0 (2026-10-30)
+
+**A shared GLB shrink pass, and Web Audio sequencer helpers to copy.** Games that carried their
+own glTF optimize script, meshopt decoder or pitch helpers can use these instead.
+
+- New command `umm-dev gltf optimize <file...> [--level medium|high] [--no-keep-extras]
+  [--dry-run]`: dedup, weld, prune and meshopt compression, rewriting each GLB in place and
+  printing a size line per file. It never joins or flattens meshes, so node extras survive, and
+  it writes a file only when the result is smaller, so a second run leaves it alone.
+  See [docs/gltf.md](docs/gltf.md).
+- New entry point `@ummgames/dev/gltf`: `createGltfIO()` (a NodeIO with `ALL_EXTENSIONS` and
+  both meshopt codecs), `decodeMeshoptGlb(glb)` (a KHR_ or EXT_meshopt_compression GLB as a
+  plain one, since glTF-Transform 4.5 cannot read KHR) and `optimizeGlb(file, opts)`.
+- `@gltf-transform/core`, `/extensions`, `/functions` (4.5.1) and `meshoptimizer` (1.3.0) are
+  new optional peer dependencies. They are imported only when a glTF function runs, so a game
+  that never uses glTF installs nothing new, and `umm-dev` starts without them.
+- New runtime folder `runtime/audio/`: `pitch.ts` (`note`, `dbToGain`, `degree` and six scales)
+  and `step-clock.ts` (`advanceSteps`, a look-ahead step cursor that skips onto the grid after a
+  stall instead of playing a burst of late steps, and `createTicker`). Copy them with
+  `umm-dev copy audio`. See [docs/runtime.md](docs/runtime.md#runtimeaudio).
+- **What a game may change:** nothing is required. A game that wants `umm-dev gltf` adds the four
+  glTF packages (`pnpm add -D @gltf-transform/core@4.5.1 @gltf-transform/extensions@4.5.1
+  @gltf-transform/functions@4.5.1 meshoptimizer@1.3.0`); it may then replace its own optimize
+  script or meshopt decoder with the kit's.
+
 ## 0.4.0 (2026-10-29)
 
 **A hung command can no longer hold the GPU lease for hours.** Under the default
