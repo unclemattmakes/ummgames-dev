@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.6.1 (2026-10-31)
+
+A fix to `cut`. Nothing in a game must change.
+
 **An overlay or card that ends with the cut stays on to the last frame.** Before, every overlay
 and card faded out over its last `fade` seconds, so an end logo either faded away as the cut ended
 or had to come on with no fade at all
