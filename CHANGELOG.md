@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.6.0 (2026-10-30)
+
+A shared procedural music core and a shared leaderboard-server core. Nothing in a game must
+change.
+
 **A shared core for procedural music.** Five games each wrote their own step sequencer with the
 same pure parts: scale degrees, where a step falls in its bar and form, when a song or a layer
 may change, and the look-ahead clock. `runtime/audio/` now holds all four, with no Web Audio and
