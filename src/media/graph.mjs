@@ -107,13 +107,25 @@ export function joinGraph(segs) {
 }
 
 /**
- * A card: centred text fading in and out.
+ * Whether an overlay or card that ends at `to` holds to the cut's last frame. One that does
+ * fades in but never out, so it is still on screen when the cut ends; the cut's own `fadeOut`
+ * fades it with everything else.
+ * @param {number} to @param {number} len the cut's length
+ */
+export const holdsToEnd = (to, len) => to >= len - 1e-6
+
+/**
+ * A card: centred text fading in, and out unless it holds to the cut's end.
  * @param {{ text: string, at: number, to: number, y?: string | number, size?: number, color?: string, fade?: number }} c
  * @param {string} font
+ * @param {number} [len] the cut's length; a card ending there does not fade out
  */
-export function cardFilter(c, font) {
+export function cardFilter(c, font, len = Number.POSITIVE_INFINITY) {
   const f = c.fade ?? 0.4
-  const alpha = `if(lt(t,${c.at}),0,if(lt(t,${round(c.at + f)}),(t-${c.at})/${f},if(lt(t,${round(c.to - f)}),1,if(lt(t,${c.to}),(${c.to}-t)/${f},0))))`
+  const out = holdsToEnd(c.to, len)
+    ? '1'
+    : `if(lt(t,${round(c.to - f)}),1,if(lt(t,${c.to}),(${c.to}-t)/${f},0))`
+  const alpha = `if(lt(t,${c.at}),0,if(lt(t,${round(c.at + f)}),(t-${c.at})/${f},${out}))`
   const y = c.y ?? 'h*0.78-text_h/2'
   return `drawtext=fontfile='${filterPath(font)}':expansion=none:text='${drawtextEscape(c.text)}':fontsize=${c.size ?? 72}:fontcolor=${c.color ?? 'white'}:alpha='${alpha}':x=(w-text_w)/2:y=${y}:borderw=2:bordercolor=black@0.35:shadowcolor=black@0.55:shadowx=0:shadowy=3:enable='between(t,${c.at},${c.to})'`
 }
@@ -228,7 +240,8 @@ export function planCut(edl, ctx) {
   let prev = join.label
   const len = edl.length ?? cutLength(edl)
 
-  // Image overlays (a logo bug): looped stills, faded, placed in output pixels.
+  // Image overlays (a logo bug): looped stills, faded, placed in output pixels. One that holds
+  // to the cut's end fades in only.
   const overlays = edl.overlays ?? []
   const overlayInputs = overlays.flatMap((o) => [
     ...['-loop', '1', '-framerate', String(FPS), '-t', String(len)],
@@ -237,11 +250,11 @@ export function planCut(edl, ctx) {
   overlays.forEach((o, k) => {
     const f = o.fade ?? 0.5
     const idx = segs.length + k
-    const fades = f
-      ? `,fade=t=in:st=${o.at}:d=${f}:alpha=1,fade=t=out:st=${round(o.to - f)}:d=${f}:alpha=1`
-      : ''
+    const fadeIn = f ? `,fade=t=in:st=${o.at}:d=${f}:alpha=1` : ''
+    const fadeOut =
+      f && !holdsToEnd(o.to, len) ? `,fade=t=out:st=${round(o.to - f)}:d=${f}:alpha=1` : ''
     parts.push(
-      `[${idx}:v]format=rgba,scale=${o.w}:-1,colorchannelmixer=aa=${o.opacity ?? 1}${fades}[ov${k}]`,
+      `[${idx}:v]format=rgba,scale=${o.w}:-1,colorchannelmixer=aa=${o.opacity ?? 1}${fadeIn}${fadeOut}[ov${k}]`,
     )
     parts.push(
       `${prev}[ov${k}]overlay=x=${o.x}:y=${o.y}:enable='between(t,${o.at},${o.to})'[o${k}]`,
@@ -250,7 +263,7 @@ export function planCut(edl, ctx) {
   })
 
   const font = edl.font ? path.resolve(ctx.root, edl.font) : ctx.font
-  const cards = (edl.cards ?? []).map((c) => cardFilter(c, /** @type {string} */ (font)))
+  const cards = (edl.cards ?? []).map((c) => cardFilter(c, /** @type {string} */ (font), len))
   const fadeIn = edl.fadeIn ?? 0
   const fadeOut = edl.fadeOut ?? 0
   const post = [

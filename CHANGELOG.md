@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+**An overlay or card that ends with the cut stays on to the last frame.** Before, every overlay
+and card faded out over its last `fade` seconds, so an end logo either faded away as the cut ended
+or had to come on with no fade at all
+([#1](https://github.com/unclemattmakes/ummgames-dev/issues/1)). Now one whose `to` is the
+cut's length fades in only; the cut's own `fadeOut` still fades everything. One that ends earlier
+fades in and out as before.
+
+- **What a game may change:** nothing is required. An edit list that set `fade: 0` on an end
+  logo to keep it on screen can now give it a fade-in. One that relied on an end overlay fading
+  out before the last frame should end it a little earlier, or use the cut's `fadeOut`.
+
 ## 0.6.0 (2026-10-30)
 
 A shared procedural music core and a shared leaderboard-server core. Nothing in a game must

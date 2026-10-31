@@ -177,7 +177,7 @@ export interface Edl {
   cover?: { file: string; hold: number }
   /** The shots, in order. */
   shots: EdlShot[]
-  /** Images over the cut: `x` and `y` in output px or an overlay expression; `fade` 0.5 and `opacity` 1 by default. */
+  /** Images over the cut: `x` and `y` in output px or an overlay expression; `fade` 0.5 and `opacity` 1 by default. One whose `to` is the cut's end fades in only. */
   overlays?: {
     file: string
     at: number
@@ -188,7 +188,7 @@ export interface Edl {
     fade?: number
     opacity?: number
   }[]
-  /** Centred text, needing `font`: `y` `'h*0.78-text_h/2'`, `size` 72, `color` white, `fade` 0.4 by default. */
+  /** Centred text, needing `font`: `y` `'h*0.78-text_h/2'`, `size` 72, `color` white, `fade` 0.4 by default. One whose `to` is the cut's end fades in only. */
   cards?: {
     text: string
     at: number

@@ -69,6 +69,13 @@ describe('filter pieces', () => {
     expect(f).toContain("text='It\u2019s 100\\%\\: go'")
     expect(f).toContain("enable='between(t,1,3)'")
     expect(f).toContain('if(lt(t,1.4),(t-1)/0.4')
+    expect(f).toContain('(3-t)/0.4')
+  })
+
+  it('holds a card that ends with the cut: it fades in, never out', () => {
+    const f = cardFilter({ text: 'Fin', at: 1, to: 3 }, 'ui.ttf', 3)
+    expect(f).toContain("alpha='if(lt(t,1),0,if(lt(t,1.4),(t-1)/0.4,1))'")
+    expect(f).not.toContain('(3-t)')
   })
 
   it('splices music ranges with crossfades and fades the end', () => {
@@ -154,6 +161,21 @@ describe('planCut', () => {
     expect(join).toContain('-an')
     expect(join.join(' ')).toContain('-movflags +faststart')
     expect(join.join(' ')).toContain('-crf 18')
+  })
+
+  it('fades an overlay out before its end, but not one that ends with the cut', () => {
+    const fades = (/** @type {number} */ to) =>
+      filter(
+        planCut(
+          { ...edl, overlays: [{ ...edl.overlays[0], to }] },
+          { root, resolveClip },
+        ).commands.at(-1)?.args ?? [],
+      )
+    const mid = fades(1.5)
+    expect(mid).toContain('fade=t=in:st=0.2:d=0.5:alpha=1,fade=t=out:st=1:d=0.5:alpha=1[ov0]')
+    const end = fades(2.25)
+    expect(end).toContain('fade=t=in:st=0.2:d=0.5:alpha=1[ov0]')
+    expect(end).not.toContain('fade=t=out:st=1.75:d=0.5:alpha=1')
   })
 
   it('adds music as the last input, and a draft writes beside the output', () => {

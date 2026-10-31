@@ -699,10 +699,12 @@ so a wipe between two versions of a scene, such as two lighting setups, holds.
 
 **An overlay:** `file` (an image), `at` and `to` (seconds), `w` (width in output px), `x` and `y`
 (output px, or an ffmpeg overlay expression such as `W-w-40`), `fade` (default `0.5`, in and out),
-`opacity` (default `1`).
+`opacity` (default `1`). An overlay whose `to` is the cut's end fades in only and holds to the last
+frame; the cut's `fadeOut` fades it with the rest.
 
 **A card:** `text`, `at` and `to` (seconds), `y` (px or a drawtext expression, default
-`h*0.78-text_h/2`), `size` (default `72`), `color` (default `white`), `fade` (default `0.4`).
+`h*0.78-text_h/2`), `size` (default `72`), `color` (default `white`), `fade` (default `0.4`). Like an overlay, a card whose `to` is the cut's end
+fades in only.
 
 **Music:** `file`, `ranges` (`[[from, to], ...]` in source seconds, spliced in order with a 60 ms
 crossfade), `fadeOut` (default `3`), `gain` (default `1`). Encoded as AAC at 256 kb/s.
