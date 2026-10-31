@@ -35,3 +35,5 @@ export function headersFor(dist, pathname) {
   }
   return out
 }
+
+export { createD1, parameterCount } from './d1.mjs'

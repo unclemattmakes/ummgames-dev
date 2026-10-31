@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+**A shared leaderboard-server core to copy, and a D1 binding for tests.** Games that run their
+own board on a Cloudflare Worker over D1 can take the parts every board does the same way,
+instead of keeping drifting copies of each other's.
+
+- New runtime folder `runtime/board/`: capped body reads and JSON refusals (`http.ts`), SHA-256
+  owner-key and salted-sender hashes with IPv6 folded to its /64 (`digest.ts`), random ids
+  (`ids.ts`), the generated-handle word lists (`handles.ts`), fixed-window rate limits in a
+  `rate` table (`rate.ts`), the `rate`, `blocks` and `admin_log` schema with `schemaProblems`
+  (`schema.ts`), blocks and the admin log (`moderation.ts`), the bearer-token admin door with
+  block and log routes (`admin.ts`), and the front of a submit with a per-day stored cap
+  (`submit.ts`). The game keeps its runs table, validator, board keys and public routes, and
+  meets the core through `defineBoard(config)` (`board.ts`): its block kinds, its own sweep and
+  its refusal shape. Copy it with `umm-dev copy board`. See [docs/board.md](docs/board.md).
+- New in `@ummgames/dev/testing`: `createD1(options?)`, a D1 binding over `node:sqlite` with a
+  migrations folder applied, and `parameterCount(sql)`. It keeps D1's behaviours a test could
+  otherwise pass without: SQL compiled at run time, `D1_TYPE_ERROR` on `undefined`, a wrong
+  number of bindings refused, per-statement `changes`, blobs as number arrays, a batch rolled
+  back whole. Needs node 22.13 or later, and loads `node:sqlite` only when called.
+- **What a game may change:** nothing is required. A game with its own board can move onto the
+  core a piece at a time ([docs/board.md](docs/board.md#moving-a-games-own-board-onto-the-core)).
+  Its rate rows start again once if they counted hours rather than ms.
+
 ## 0.5.0 (2026-10-30)
 
 **A shared GLB shrink pass, and Web Audio sequencer helpers to copy.** Games that carried their
