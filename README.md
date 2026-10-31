@@ -46,8 +46,8 @@ public, so installing needs no credentials.
 - **Linked tools.** Commands, Vite plugins, test helpers and config presets run from
   `node_modules`. None of them ships in a game's build, and nobody edits them in a game.
 - **Copied runtime code.** Code that ships inside a game lives in `runtime/`: the splash, the dev
-  palette and perf HUD, the gamepad profiles, the pitch and step-clock helpers for a Web Audio
-  sequencer.
+  palette and perf HUD, the gamepad profiles, the pure core of a procedural music sequencer
+  (pitch, form, conductor, step clock).
   - `umm-dev copy <path>` writes one of those files into the game. Line 1 is a header naming this
     repo, the version and the path, plus a hash of the body. From then on the game owns its copy.
   - `umm-dev drift` shows, for each copy, whether the game changed it and whether the installed

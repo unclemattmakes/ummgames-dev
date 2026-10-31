@@ -9,8 +9,21 @@ const load = (rel) =>
   import(/* @vite-ignore */ new URL(`../../runtime/${rel}`, import.meta.url).href)
 
 describe('audio/pitch', async () => {
-  const { note, dbToGain, degree, MINOR, MAJOR, PENTATONIC_MINOR, DORIAN, HARMONIC_MINOR } =
-    await load('audio/pitch.ts')
+  const {
+    note,
+    dbToGain,
+    degree,
+    chordTones,
+    MINOR,
+    MAJOR,
+    PENTATONIC_MINOR,
+    DORIAN,
+    HARMONIC_MINOR,
+    LYDIAN,
+    MIXOLYDIAN,
+    PHRYGIAN,
+    PHRYGIAN_DOMINANT,
+  } = await load('audio/pitch.ts')
 
   it('tunes from A4 = 440 in equal temperament', () => {
     expect(note(0)).toBe(440)
@@ -37,10 +50,21 @@ describe('audio/pitch', async () => {
     expect(degree(PENTATONIC_MINOR, -1)).toBe(-2)
   })
 
-  it('has seven-note modes that differ from minor where they should', () => {
-    for (const s of [MINOR, MAJOR, DORIAN, HARMONIC_MINOR]) expect(s).toHaveLength(7)
+  it('has seven-note modes that differ from their parents where they should', () => {
+    for (const s of [MINOR, MAJOR, DORIAN, HARMONIC_MINOR, LYDIAN, MIXOLYDIAN, PHRYGIAN_DOMINANT])
+      expect(s).toHaveLength(7)
     expect(DORIAN[5]).toBe(MINOR[5] + 1)
     expect(HARMONIC_MINOR[6]).toBe(MINOR[6] + 1)
+    expect(LYDIAN[3]).toBe(MAJOR[3] + 1)
+    expect(MIXOLYDIAN[6]).toBe(MAJOR[6] - 1)
+    expect(PHRYGIAN_DOMINANT[2]).toBe(PHRYGIAN[2] + 1)
+  })
+
+  it('builds chords in thirds on any degree', () => {
+    expect(chordTones(MAJOR, 0)).toEqual([0, 4, 7])
+    expect(chordTones(MINOR, 5)).toEqual([8, 12, 15]) // VI in minor
+    expect(chordTones(MAJOR, 4, 4)).toEqual([7, 11, 14, 17]) // V7
+    expect(chordTones(MINOR, -1)).toEqual([-2, 2, 5]) // VII below the tonic
   })
 })
 
@@ -116,6 +140,48 @@ describe('audio/step-clock', async () => {
 
   it('refuses a step length that would never advance', () => {
     expect(() => advanceSteps({ step: 0, next: 0 }, 0, 0, LOOK, () => {})).toThrow(RangeError)
+    expect(() =>
+      advanceSteps(
+        { step: 0, next: 0 },
+        0,
+        () => 0,
+        LOOK,
+        () => {},
+      ),
+    ).toThrow(RangeError)
+  })
+
+  it('takes a step length per step, read after that step is queued', () => {
+    // Two bars: 0.125 s steps, then the tempo doubles on the bar line at step 16.
+    let fast = false
+    const cursor = { step: 0, next: 0 }
+    /** @type {[number, number][]} */
+    const played = []
+    const len = () => (fast ? 0.0625 : 0.125)
+    advanceSteps(cursor, 0, len, 3, (/** @type {number} */ s, /** @type {number} */ at) => {
+      if (s === 16) fast = true // the sequencer changes tempo as it queues the bar line
+      played.push([s, at])
+    })
+    expect(/** @type {[number, number]} */ (played[16])[1]).toBeCloseTo(2, 9)
+    expect(/** @type {[number, number]} */ (played[17])[1]).toBeCloseTo(2.0625, 9)
+    expect(played.length).toBe(32) // 16 steps in 2 s, then 16 more in the next 1 s
+    expect(cursor.next).toBeCloseTo(3, 9)
+  })
+
+  it('skips a stall step by step when the length is a function', () => {
+    const cursor = { step: 0, next: 0 }
+    const steps = /** @type {number[]} */ ([])
+    const len = (/** @type {number} */ s) => (s < 8 ? 0.125 : 0.25)
+    advanceSteps(cursor, 2.2, len, LOOK, (/** @type {number} */ s) => steps.push(s))
+    // Steps 0 to 7 take 1 s, 8 to 11 the next; 12 starts at 2.0 (missed), 13 at 2.25 (queued).
+    expect(steps).toEqual([13])
+    expect(cursor).toEqual({ step: 14, next: 2.5 })
+  })
+
+  it('renders offline in one call', () => {
+    const cursor = { step: 0, next: 0 }
+    const n = advanceSteps(cursor, 0, STEP, 4, () => {}, Number.POSITIVE_INFINITY)
+    expect(n).toBe(32)
   })
 
   describe('createTicker', () => {
