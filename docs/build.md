@@ -287,6 +287,9 @@ Each plugin's logic is exported for tests and scripts.
 | `encodePng(img, { level? })` | A minimal PNG encoder: 8-bit, no interlace. |
 | `APPLE_TOUCH_ICON`, `APPLE_TOUCH_SIZE`, `SHARE_CARD`, `SHARE_CARD_SIZE` | `'apple-touch-icon.png'`, `180`, `'share-card.png'`, `{ width: 1200, height: 630, mark: 420 }`. |
 
+**Testing a D1 board.** `createD1(options?)` from `@ummgames/dev/testing` is a D1 binding over
+`node:sqlite`, with the game's migrations applied. See [board.md](board.md#created1options-in-ummgamesdevtesting).
+
 **Testing the built headers.** `headersFor(dist, pathname)` from `@ummgames/dev/testing` gives the
 headers Cloudflare Pages would send for `pathname` from `dist/_headers`: every matching rule, in
 order, with names lower-cased. It reads splats only, not placeholders, and gives `{}` when the

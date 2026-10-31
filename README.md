@@ -47,7 +47,7 @@ public, so installing needs no credentials.
   `node_modules`. None of them ships in a game's build, and nobody edits them in a game.
 - **Copied runtime code.** Code that ships inside a game lives in `runtime/`: the splash, the dev
   palette and perf HUD, the gamepad profiles, the pure core of a procedural music sequencer
-  (pitch, form, conductor, step clock).
+  (pitch, form, conductor, step clock), the core of a leaderboard server ([docs/board.md](docs/board.md)).
   - `umm-dev copy <path>` writes one of those files into the game. Line 1 is a header naming this
     repo, the version and the path, plus a hash of the body. From then on the game owns its copy.
   - `umm-dev drift` shows, for each copy, whether the game changed it and whether the installed
@@ -121,7 +121,9 @@ export default defineConfig({
 **More plugins.** Licences, the app icon and a share card are plugins too.
 
 `@ummgames/dev/testing` has `headersFor(dist, pathname)`, which reads the headers Cloudflare
-Pages would send from a build's `_headers`. See [docs/build.md](docs/build.md).
+Pages would send from a build's `_headers`. See [docs/build.md](docs/build.md). It also has
+`createD1()`, a D1 binding over `node:sqlite` for testing a board server
+([docs/board.md](docs/board.md)).
 
 **Web portals are not covered.** Since 0.2.0 the kit has no portal build plugins, SDK adapter
 or fake portal. A game that ships to a portal keeps that code itself.

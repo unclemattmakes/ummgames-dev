@@ -649,6 +649,14 @@ call: `advanceSteps(cursor, 0, stepLen, seconds, onStep, Infinity)`.
 `createTicker(fn, ms)` wraps `setInterval(fn, ms)`. `start()` does nothing while it is running
 and `stop()` nothing while it is stopped, so neither needs a check first. `running` says which.
 
+## `runtime/board/`
+
+The shared core of a leaderboard server on a Cloudflare Worker over D1: capped body reads,
+owner-key and salted-address hashes, generated handles, fixed-window rate limits, blocks, the
+admin log and the bearer-token admin door. The game keeps its runs table, validator and routes,
+and meets the core through `defineBoard`. Copy the folder (`umm-dev copy board`). It has its own
+page: [board.md](board.md).
+
 ## Config: `runtime`
 
 In the game's `umm-dev.config.mjs`. `umm-dev copy` reads it; `umm-dev drift` reads no config.
