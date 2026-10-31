@@ -1,8 +1,8 @@
 # Runtime code: copy and drift
 
 Code that ships inside a game's build lives in `runtime/`, as TypeScript: the perf HUD, the dev
-command bar, the gamepad profiles, the loading splash, the pitch and step-clock helpers for a
-Web Audio sequencer. It is **copied**, not linked. `umm-dev copy` writes a file into the game with a header on line 1, and from then on
+command bar, the gamepad profiles, the loading splash, the pure core of a procedural music
+sequencer. It is **copied**, not linked. `umm-dev copy` writes a file into the game with a header on line 1, and from then on
 the copy is the game's to change. `umm-dev drift` reports how far each copy has moved from the
 version it came from, and how far the installed version has moved since. Reach for it when a game
 wants one of these files, and when the game bumps the kit's tag.
@@ -470,26 +470,133 @@ With `prefers-reduced-motion`, it shows the last word at once.
 
 ## `runtime/audio/`
 
-Two small pieces of a Web Audio step sequencer: the pitch arithmetic, and the look-ahead clock
-that decides when each step is queued. The sequencer itself (its instruments, its patterns, its
-`queue(step, at)`) stays the game's own. Neither file imports anything, so either can be copied
-alone (`umm-dev copy audio`, or one file by name).
+The pure core of a procedural music sequencer: the pitch arithmetic, where a step falls in its
+bar, phrase and form, a conductor that decides which song plays and how many layers of it, and
+the look-ahead clock that decides when each step is queued. None of it touches Web Audio or reads
+a clock, so a test or an offline render can replay it exactly. The sequencer itself (its voices,
+its synth patches, its tracks, its `queue(step, at)`) stays the game's own. No file imports
+another, so any one can be copied alone (`umm-dev copy audio`, or one file by name).
 
-| File | Imports |
-|---|---|
-| `pitch.ts`, `step-clock.ts` | nothing |
+| File | Imports | What it decides |
+|---|---|---|
+| `pitch.ts` | nothing | Which note: scale degrees, chords, frequencies. |
+| `form.ts` | nothing | Where a step is: bar, beat, phrase, section of the form; reads of melody lines and drum strings. |
+| `conductor.ts` | nothing | What plays: the song and the level, changed only on bar or phrase lines. |
+| `step-clock.ts` | nothing | When: queues each step at its exact audio time. |
+
+**How a sequencer puts them together.** The game's timer calls `advanceSteps`; for each step it
+asks the conductor what plays, finds the step's place in the form, and plays its own patterns:
+
+```ts
+import { Conductor } from './audio/conductor'
+import { FORM, hitAt, lineAt, position, sectionAt, swingOffset } from './audio/form'
+import { degree, note } from './audio/pitch'
+import { advanceSteps, createTicker } from './audio/step-clock'
+
+const conductor = new Conductor({ song: 'meadow', thresholds: [0, 0.3, 0.6], hysteresis: 0.05 })
+const cursor = { step: 0, next: ctx.currentTime + 0.05 }
+const stepLen = () => 60 / TRACKS[conductor.song].bpm / 4 // read after each step: tempo follows the song
+
+const ticker = createTicker(() => {
+  advanceSteps(cursor, ctx.currentTime, stepLen, 0.12, (step, at) => {
+    const plan = conductor.at(step)
+    const t = TRACKS[plan.song]
+    const pos = position(step, t.progression.length)
+    const section = sectionAt(FORM, pos.bar, t.progression.length)
+    const when = at + swingOffset(step, stepLen(), t.swing)
+    const chord = t.progression[pos.inPhrase] ?? 0
+    if (plan.newSong) crash(when) // the game's own voices from here on
+    if (plan.level >= 1 && hitAt(t.kick, pos.i) > 0) kick(when)
+    const m = section === 'D' ? null : lineAt(t.lead, pos.bar, pos.i)
+    if (plan.level >= 2 && m != null) lead(note(t.root + degree(t.scale, chord + m)), when)
+  })
+}, 25)
+ticker.start()
+// every frame: conductor.setIntensity(heat); on a boss: conductor.cue('boss')
+```
 
 ### `pitch.ts`
 
-**Exports:** `note(semi)`, `dbToGain(db)`, `degree(scale, d)`, and the scales `MINOR`,
-`HARMONIC_MINOR`, `PHRYGIAN`, `DORIAN`, `MAJOR` and `PENTATONIC_MINOR`.
+**Exports:** `note(semi)`, `dbToGain(db)`, `degree(scale, d)`, `chordTones(scale, root, size?)`,
+and the scales `MINOR`, `HARMONIC_MINOR`, `PHRYGIAN`, `DORIAN`, `MAJOR`, `LYDIAN`, `MIXOLYDIAN`,
+`PHRYGIAN_DOMINANT` and `PENTATONIC_MINOR`.
 
 | Export | What it does |
 |---|---|
-| `note(semi)` | The frequency in Hz of the note `semi` semitones from A4, in equal temperament: `440 * 2 ** (semi / 12)`. `note(3)` is C5, 523.25 Hz. |
+| `note(semi)` | The frequency in Hz of the note `semi` semitones from A4, in equal temperament: `440 * 2 ** (semi / 12)`. `note(3)` is C5, 523.25 Hz. For a MIDI note `m`, `note(m - 69)`. |
 | `dbToGain(db)` | A gain factor from decibels: `10 ** (db / 20)`. |
 | `degree(scale, d)` | Scale degree `d` as semitones above the tonic. `d` is any integer: 0 is the tonic, and degrees past the end or below 0 wrap into the next octave up or down. With `MINOR`, degree 7 is 12 and degree -1 is -2. |
+| `chordTones(scale, root, size?)` | The chord stacked in thirds on degree `root`, as semitones above the tonic: `size` notes (default 3, a triad; 4 adds the seventh). `chordTones(MINOR, 5)` is `[8, 12, 15]`. |
 | `MINOR` and the other scales | Semitone offsets from the tonic, one octave, as `readonly number[]`. |
+
+**Melodies above the chord.** Sequencers here write a melody as scale degrees above each bar's
+chord root, so one line fits every chord: the note is `root + degree(scale, chord + m)`.
+
+### `form.ts`
+
+**Exports:** `position(step, phraseBars, stepsPerBar?)`, `sectionAt(form, bar, phraseBars)`,
+`lineAt(line, bar, i, stepsPerBar?)`, `holdSteps(line, pos, max, wrap?)`,
+`hitAt(pattern, i, weights?)`, `swingOffset(step, stepLen, swing)`, `stepsToGrid(step, grid)`,
+`snapToGrid(t, origin, len, to)`, `resumeBar(bars, phraseBars, from)`, the constants
+`STEPS_PER_BAR` (16), `STEPS_PER_BEAT` (4), `FORM` and `DRUM_WEIGHTS`, and the types `Position`,
+`Section`, `DrumWeights`.
+
+A step is a sixteenth, counted from the song's bar 0. A phrase is one trip round the chord
+progression, `phraseBars` long. The form plays one section per phrase and repeats.
+
+| Export | What it does |
+|---|---|
+| `position(step, phraseBars)` | `{ step, bar, i, beat, onBeat, inPhrase, pass, firstBar, lastBar }`: `i` is the step in its bar, `pass` the phrase count, `lastBar` the turnaround bar. A negative step counts back: step -1 is bar -1, `i` 15. |
+| `sectionAt(form, bar, phraseBars)` | The form's section for `bar`. `FORM` is `['A', 'B', 'A2', 'D']`: the tune, its answer, the tune with a harmony, a breakdown. A game passes its own (a boss form with no breakdown, say). Bars before 0 count as 0. Throws a `RangeError` on an empty form. |
+| `lineAt(line, bar, i)` | Step `i` of a line written a bar at a time: a 32 step line plays its first half on even bars and its second on odd ones. A line shorter than a bar repeats within it. `undefined` for an empty line. |
+| `holdSteps(line, pos, max, wrap?)` | How many steps the note at `pos` holds: until the next note (`null` and `undefined` are rests), at most `max`. Without `wrap` the line's end stops it; with it, the count runs round. |
+| `hitAt(pattern, i, weights?)` | The hit at step `i` of a drum string, a character a step, repeating. `DRUM_WEIGHTS` is `{ X: 1, x: 0.75, o: 0.35 }`; other characters rest. Pass `{ x: 1, o: 0.45 }` for a two-weight kit. |
+| `swingOffset(step, stepLen, swing)` | Seconds late an odd step plays: `swing * stepLen`, 0 on even steps. |
+| `stepsToGrid(step, grid)` | Steps to the next multiple of `grid`, 0 on it: `stepsToGrid(step, 4)` is the steps to the next beat. |
+| `snapToGrid(t, origin, len, to)` | Time `t` snapped to a grid of `len` seconds counted from `origin` (step 0's time): `'nearest'` or `'next'`. For landing a cue on a beat. |
+| `resumeBar(bars, phraseBars, from)` | Where to carry a song on when it restarts `bars` (fractional) after its bar 0: `'top'` is 0, `'bar'` the next bar line (a quarter bar late still counts as this one), `'phrase'` the next phrase. |
+
+### `conductor.ts`
+
+**Exports:** `Conductor`, `levelFor(v, prev, thresholds, hysteresis?)`, and the types
+`ConductorOptions`, `StepPlan`, `PendingCue`, `Boundary`.
+
+The conductor holds two choices: the **song** (whatever the game switches between on bar lines:
+a track, its boss variant, a biome's section) and the **level** (how many layers play, 0 and
+up). The game asks for a change whenever it likes; the conductor holds it until its line. The
+sequencer calls `at(step)` for every step it queues, and plays what the plan says.
+
+| Member | What it does |
+|---|---|
+| `new Conductor(options)` | Starts on `options.song`, at `options.level` (default 0). |
+| `cue(song, on?)` | Change song on the next bar line (`'bar'`, the default) or phrase line (`'phrase'`). A later cue replaces a waiting one; cueing the song playing cancels it. |
+| `setLevel(level, when?)` | Ask for a level. A rise waits for `rise`, a fall for `fall`, unless `when` (`'step'`, `'beat'` or `'bar'`) says otherwise: a hit can knock the music back on the next beat. Asking again before it lands replaces it. |
+| `setIntensity(v, when?)` | Ask for the level intensity `v` reaches on `thresholds`, held by `hysteresis`. Returns that level. |
+| `at(step)` | The `StepPlan` for `step`: `{ step, bar, i, song, songBar, level, newSong, levelChange }`. `newSong` is true on the step a cue lands (never on the first step); `levelChange` is the level minus the last step's. |
+| `song`, `level`, `target`, `pending`, `plan` | What plays, the level asked for, the waiting cue, and the last plan (`null` before the first step). |
+| `levelFor(v, prev, thresholds, hysteresis?)` | The pure rule `setIntensity` uses: the highest level whose threshold `v` reaches, holding `prev` while `v` is within `hysteresis` under its threshold. |
+
+| Option | Default | What it does |
+|---|---|---|
+| `song` | required | The song it starts on. |
+| `level` | `0` | The level it starts at. |
+| `thresholds` | `[0]` | For `setIntensity`: where each level comes in, 0 to 1, rising. |
+| `hysteresis` | `0` | For `setIntensity`: how far under its threshold a level holds. |
+| `rise` | `'bar'` | When a rise is heard: `'step'`, `'beat'` or `'bar'`. |
+| `fall` | `'bar'` | When a fall is heard. `'step'` strips a layer at once, so the loss is heard. |
+| `stepsPerBar` | `16` | Steps in a bar. |
+| `stepsPerBeat` | `4` | Steps in a beat. |
+| `phraseBars` | `8` | Bars in a phrase, for `cue(song, 'phrase')`. Phrase lines count from step 0. |
+
+**A change lands only on its line.** A song changes on a step that is on a bar (or phrase) line,
+and a level on a step on its boundary. After a stall the step clock skips steps; a change whose
+line was skipped waits for the next line it queues, so nothing changes mid-bar. The first step
+asked for, and a step before the last (a restart), count as on every line.
+
+**Policy stays in the game.** What raises the level (speed, a combo, a boss's health), a floor
+under a boss or a cap in a tutorial, a lift into a drop, which song a place plays: the game
+computes these and calls `setLevel` or `cue`. Set them inside the step callback, before
+`at(step)`, to have them land on that step's line.
 
 ```ts
 import { MINOR, degree, note } from './audio/pitch'
@@ -501,7 +608,7 @@ const hz = note(root + degree(MINOR, 4)) // the fifth: G4
 ### `step-clock.ts`
 
 **Exports:** `advanceSteps(cursor, now, stepLen, lookahead, onStep, stallSkip?)`,
-`createTicker(fn, ms)`, and the types `StepCursor`, `Ticker`.
+`createTicker(fn, ms)`, and the types `StepCursor`, `StepLength`, `Ticker`.
 
 A timer wakes every few tens of milliseconds and calls `advanceSteps`. It calls
 `onStep(step, at)` for every step that starts before `now + lookahead`, with `at` the step's
@@ -531,10 +638,13 @@ ticker.start()
 |---|---|---|
 | `cursor` | required | `{ step, next }`: the next step to queue and its start time. Changed in place. |
 | `now` | required | The current time on the audio clock, seconds: `ctx.currentTime`. |
-| `stepLen` | required | Seconds per step: `60 / bpm / 4` for sixteenths. Over 0, or it throws a `RangeError`. |
+| `stepLen` | required | Seconds per step: `60 / bpm / 4` for sixteenths. Or a function of the step, for a tempo that changes: it is asked for each step's length after that step's `onStep`, so a tempo changed on a bar line holds from that step. Every length over 0, or it throws a `RangeError`. |
 | `lookahead` | required | How far ahead to queue, seconds. Longer than the timer's period, so no step falls between two ticks: about 0.1 for a 25 ms timer. |
 | `onStep` | required | Called as `onStep(step, at)` for each step, in order. |
 | `stallSkip` | `0.05` | How far behind `now`, seconds, the cursor may fall before it skips instead of playing late. |
+
+**Offline.** To render into an `OfflineAudioContext` (a music check, a capture), drive it in one
+call: `advanceSteps(cursor, 0, stepLen, seconds, onStep, Infinity)`.
 
 `createTicker(fn, ms)` wraps `setInterval(fn, ms)`. `start()` does nothing while it is running
 and `stop()` nothing while it is stopped, so neither needs a check first. `running` says which.

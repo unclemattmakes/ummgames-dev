@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+**A shared core for procedural music.** Five games each wrote their own step sequencer with the
+same pure parts: scale degrees, where a step falls in its bar and form, when a song or a layer
+may change, and the look-ahead clock. `runtime/audio/` now holds all four, with no Web Audio and
+no clock, so a game copies them and keeps only its voices, patches and tracks.
+
+- New runtime file `runtime/audio/form.ts`: `position` (bar, beat, phrase, pass, first and last
+  bar of a step), `sectionAt` and `FORM` (`A B A2 D`), `lineAt` (a melody written a bar at a
+  time), `holdSteps` (how long a note holds), `hitAt` (drum strings, with `DRUM_WEIGHTS` or the
+  game's own), `swingOffset`, `stepsToGrid`, `snapToGrid` and `resumeBar`.
+- New runtime file `runtime/audio/conductor.ts`: `Conductor`, which holds the song and the level
+  and lands each change only on its line (a song on a bar or phrase line, a rise and a fall on
+  the boundary the options give, or one a change names), and `levelFor` (intensity to level,
+  with hysteresis). After a stall it waits for the next line queued, so nothing changes mid-bar.
+- `runtime/audio/pitch.ts`: `chordTones(scale, root, size?)`, and the scales `LYDIAN`,
+  `MIXOLYDIAN` and `PHRYGIAN_DOMINANT`.
+- `runtime/audio/step-clock.ts`: `advanceSteps` takes a step length per step (`StepLength`, a
+  number or a function of the step), so a tempo can change on a bar line. A number works as
+  before.
+- See [docs/runtime.md](docs/runtime.md#runtimeaudio).
+- **What a game may change:** nothing is required. A game with copies of `pitch.ts` or
+  `step-clock.ts` sees them as `changed upstream` in `umm-dev drift`, and takes them with the line
+  drift prints. A game with its own sequencer copies `form.ts` and `conductor.ts`
+  (`umm-dev copy audio`) and moves to them a piece at a time.
+
 ## 0.5.0 (2026-10-30)
 
 **A shared GLB shrink pass, and Web Audio sequencer helpers to copy.** Games that carried their

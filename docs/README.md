@@ -20,7 +20,7 @@
 | Headers, 404, licences, app icon | [build.md](build.md) | linked: `@ummgames/dev/vite`, `@ummgames/dev/testing` |
 | GPU lease, worktrees, merge drivers | [agent.md](agent.md) | linked: `umm-dev gpu`, `worktree`, `merge` |
 | Repo guards and git hooks | [guard.md](guard.md) | linked: `umm-dev guard` |
-| Runtime copies and drift; the dev palette, splash, pad profiles, audio helpers | [runtime.md](runtime.md) | copied: `umm-dev copy`, `drift`; `runtime/` |
+| Runtime copies and drift; the dev palette, splash, pad profiles, music sequencer core | [runtime.md](runtime.md) | copied: `umm-dev copy`, `drift`; `runtime/` |
 | Biome, TypeScript, Vitest, Playwright | [presets.md](presets.md) | linked: `@ummgames/dev/biome`, `/tsconfig`, `/vitest`, `/playwright` |
 | Loudness | [audio.md](audio.md) | linked: `umm-dev loudness`; `@ummgames/dev/audio` |
 | GLB optimizing, meshopt decoding | [gltf.md](gltf.md) | linked: `umm-dev gltf`; `@ummgames/dev/gltf` |

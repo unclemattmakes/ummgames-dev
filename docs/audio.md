@@ -4,8 +4,9 @@
 the loudest moment. It is how a game checks a mix, a music bed or a trailer's audio against a
 target before it ships. It is **linked**: the command and the meter behind it run from
 `node_modules`, and `@ummgames/dev/audio` exports the meter for a game's own tools. It needs
-`ffmpeg` and `ffprobe` on `PATH`. The pitch and step-clock helpers for a game's own Web Audio
-sequencer are runtime code a game copies, in [runtime.md](runtime.md#runtimeaudio).
+`ffmpeg` and `ffprobe` on `PATH`. The core of a game's own procedural music sequencer (pitch,
+form, conductor and step clock) is runtime code a game copies, in
+[runtime.md](runtime.md#runtimeaudio).
 
 ## Quick start
 

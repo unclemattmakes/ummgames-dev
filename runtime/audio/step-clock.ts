@@ -12,6 +12,13 @@ export interface StepCursor {
 }
 
 /**
+ * Seconds per step: one length for the whole song, or a function of the step, for a tempo that
+ * changes. A function is asked for each step's length after that step's `onStep`, so a sequencer
+ * that changes tempo inside `onStep` (on a bar line, say) gets the new length from that step on.
+ */
+export type StepLength = number | ((step: number) => number)
+
+/**
  * Queue every step that starts before `now + lookahead`, calling `onStep(step, at)` for each, and
  * move the cursor past them. Returns how many steps it queued.
  *
@@ -20,28 +27,42 @@ export interface StepCursor {
  * `now`, without queuing the steps it missed. The music skips instead of playing a burst of late
  * notes. The step count still advances, so bar and phrase positions stay right.
  *
- * Times are seconds on one clock, such as `AudioContext.currentTime`. `stepLen` must be over 0.
+ * Times are seconds on one clock, such as `AudioContext.currentTime`. Every step length must be
+ * over 0. To render offline, pass `now` 0, `lookahead` the length to render and `stallSkip`
+ * `Infinity`.
  */
 export function advanceSteps(
   cursor: StepCursor,
   now: number,
-  stepLen: number,
+  stepLen: StepLength,
   lookahead: number,
   onStep: (step: number, at: number) => void,
   stallSkip = 0.05,
 ): number {
-  if (!(stepLen > 0)) throw new RangeError(`stepLen must be over 0, not ${stepLen}`)
+  const lenOf = (step: number): number => {
+    const len = typeof stepLen === 'number' ? stepLen : stepLen(step)
+    if (!(len > 0)) throw new RangeError(`stepLen must be over 0, not ${len}`)
+    return len
+  }
+  if (typeof stepLen === 'number') lenOf(cursor.step)
   if (cursor.next < now - stallSkip) {
-    const missed = Math.ceil((now - cursor.next) / stepLen)
-    cursor.step += missed
-    cursor.next += missed * stepLen
+    if (typeof stepLen === 'number') {
+      const missed = Math.ceil((now - cursor.next) / stepLen)
+      cursor.step += missed
+      cursor.next += missed * stepLen
+    } else {
+      while (cursor.next < now) {
+        cursor.next += lenOf(cursor.step)
+        cursor.step++
+      }
+    }
   }
   const horizon = now + lookahead
   let played = 0
   while (cursor.next < horizon) {
     onStep(cursor.step, cursor.next)
+    cursor.next += lenOf(cursor.step)
     cursor.step++
-    cursor.next += stepLen
     played++
   }
   return played
