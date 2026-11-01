@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- LICENSE says the MIT licence does not cover the Uncle Matt Makes portrait
+  (`src/vite/brand/uncle-matt-circle.webp`): it is the brand mark, all rights reserved.
+
 ## 0.7.0 (2026-11-01)
 
 The loading splash's page side moves into the kit. Nothing in a game must change.
