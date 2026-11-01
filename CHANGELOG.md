@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.7.0 (2026-11-01)
+
+The loading splash's page side moves into the kit. Nothing in a game must change.
+
 **A game names itself once and the kit writes the splash.** Each game that showed the splash
 kept its own copy of the markup (one sizer per word, kept in step with its word list by hand),
 its own copy of the portrait, and its own steady watch. These now come from the kit.

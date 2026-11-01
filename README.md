@@ -14,7 +14,7 @@ is there for the next. It covers:
 ## Install
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.6.1     # or: npm i -D github:unclemattmakes/ummgames-dev#v0.6.1
+pnpm add -D github:unclemattmakes/ummgames-dev#v0.7.0     # or: npm i -D github:unclemattmakes/ummgames-dev#v0.7.0
 pnpm exec umm-dev help                                     # or: npx umm-dev help
 ```
 
