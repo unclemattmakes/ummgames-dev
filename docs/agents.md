@@ -42,8 +42,8 @@ each copy has moved. Docs: `node_modules/@ummgames/dev/docs/README.md`.
   capture `expect`. Fix the cause, or stop and ask.
 - Remove worktrees with `umm-dev worktree remove <name>`, never with rm -rf. It refuses when work
   would be lost; read why before passing --force.
-- Moving to a newer kit tag is its own change: read the kit's CHANGELOG.md, bump the tag, then run
-  `umm-dev drift` and follow docs/upgrading.md.
+- The kit tracks `main`. Updating it is its own change: `pnpm update @ummgames/dev`, read the
+  kit's CHANGELOG.md since the old version, then run `umm-dev drift` and follow docs/upgrading.md.
 ```
 
 ## Why each rule exists
@@ -60,7 +60,7 @@ each copy has moved. Docs: `node_modules/@ummgames/dev/docs/README.md`.
 | Wrap GPU work in `gpu run` | Two sessions measuring the GPU at once both get wrong numbers, and a capture can drop frames. The lease is machine-wide, so it also covers sessions in other repos. A `gpu run` inside another one waits on itself until its wait limit. |
 | Never bypass a check | The checks exist because something shipped broken once. A bypass hides the problem from the next session too, and CI runs the same check anyway. |
 | `worktree remove`, never `rm -rf` | A worktree can hold junctions into the main checkout (`node_modules`, `public`). A recursive delete can follow them. `remove` unlinks them first, and refuses when uncommitted work, an unreachable commit or a nested worktree would be lost. |
-| A tag bump is its own change | Runtime copies do not follow the tag by themselves, so a bump also needs a drift pass. Mixing it into feature work hides both. |
+| A kit update is its own change | Runtime copies do not follow the kit by themselves, so an update also needs a drift pass. Mixing it into feature work hides both. |
 
 ## Gotchas that catch agents
 

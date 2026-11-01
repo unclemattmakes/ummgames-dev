@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `devSplash` and `injectSplash` skip a `<body>`, `</head>` or `id="dev-splash"` named inside a
+  comment, `<script>` or `<style>`. Before, a comment naming `<body>` in the head put the whole
+  splash inside the head's `<style>` (found moving platformer onto the plugin).
 - Games track `main` instead of pinning a tag. Install lines name no tag
   (`github:unclemattmakes/ummgames-dev`); the lockfile still records the commit, and
   `pnpm update @ummgames/dev` moves a game to the newest. Tags are still cut for the changelog

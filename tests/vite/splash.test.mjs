@@ -99,6 +99,23 @@ describe('injectSplash', () => {
     expect(injectSplash(own)).toBe(own)
   })
 
+  it('skips a <body> or </head> named in a comment, script or style', () => {
+    const tricky = PAGE.replace(
+      '</head>',
+      '<!-- the splash goes first in <body> --><style>/* not </head> or <body> */</style><script>"<body>"</script></head>',
+    )
+    const html = injectSplash(tricky, { words: ['x', 'Games'] })
+    expect(html).toContain('<!-- the splash goes first in <body> -->')
+    expect(html).toMatch(/<\/script>\s*<link rel="stylesheet"[^>]*>\s*<\/head>/)
+    expect(html).toMatch(/<body>\s*<div id="dev-splash"/)
+    expect(count(html, 'id="dev-splash"')).toBe(1)
+  })
+
+  it('still writes the markup when a comment names #dev-splash', () => {
+    const html = injectSplash(PAGE.replace('<body>', '<body><!-- id="dev-splash" goes here -->'))
+    expect(html).toMatch(/<body>\s*<div id="dev-splash"/)
+  })
+
   it('links nothing with css false', () => {
     expect(injectSplash(PAGE, { css: false })).not.toContain('<link')
   })

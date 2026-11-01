@@ -130,8 +130,38 @@ function checkWords(words) {
  */
 
 /**
+ * `html` with comments and the contents of `<script>` and `<style>` blanked to spaces, so a tag
+ * named there is not taken for the real one. Offsets match `html`.
+ * @param {string} html
+ * @returns {string}
+ */
+const blankInert = (html) =>
+  html.replace(
+    /<!--[\s\S]*?-->|(<(script|style)\b[^>]*>)([\s\S]*?)(<\/\2\s*>)/gi,
+    (all, open, _tag, body, close) =>
+      open ? open + ' '.repeat(body.length) + close : ' '.repeat(all.length),
+  )
+
+/**
+ * `html` with `insert` placed where `pattern` first matches outside comments, scripts and
+ * styles: before the match, or after it with `after`. null when it does not match.
+ * @param {string} html
+ * @param {RegExp} pattern
+ * @param {string} insert
+ * @param {boolean} after
+ * @returns {string | null}
+ */
+function insertAt(html, pattern, insert, after) {
+  const m = pattern.exec(blankInert(html))
+  if (!m) return null
+  const at = after ? m.index + m[0].length : m.index
+  return html.slice(0, at) + insert + html.slice(at)
+}
+
+/**
  * `html` with the stylesheet link at the end of `<head>` and the markup first in `<body>`. A
- * page that already has a `#dev-splash`, or already links the stylesheet, keeps its own.
+ * page that already has a `#dev-splash`, or already links the stylesheet, keeps its own. A
+ * `<body>`, `</head>` or `#dev-splash` named inside a comment, script or style does not count.
  * @param {string} html
  * @param {InjectSplashOptions} [options]
  * @returns {string}
@@ -139,17 +169,16 @@ function checkWords(words) {
 export function injectSplash(html, options = {}) {
   const css = options.css === undefined ? SPLASH_CSS : options.css
   let out = html
-  if (css && !out.includes(css)) {
-    if (!/<\/head>/i.test(out)) throw new Error('dev-splash: the page has no </head>')
-    out = out.replace(
-      /<\/head>/i,
-      () => `  <link rel="stylesheet" href="${esc(css)}" />\n  </head>`,
-    )
+  if (css && !blankInert(out).includes(css)) {
+    const link = `  <link rel="stylesheet" href="${esc(css)}" />\n  `
+    const linked = insertAt(out, /<\/head\s*>/i, link, false)
+    if (linked === null) throw new Error('dev-splash: the page has no </head>')
+    out = linked
   }
-  if (!/\bid\s*=\s*["']?dev-splash["'\s>]/i.test(out)) {
-    const markup = splashMarkup(options)
-    if (!/<body[^>]*>/i.test(out)) throw new Error('dev-splash: the page has no <body>')
-    out = out.replace(/<body[^>]*>/i, (open) => `${open}\n${markup}`)
+  if (!/\bid\s*=\s*["']?dev-splash["'\s>]/i.test(blankInert(out))) {
+    const marked = insertAt(out, /<body(?=[\s>/])[^>]*>/i, `\n${splashMarkup(options)}`, true)
+    if (marked === null) throw new Error('dev-splash: the page has no <body>')
+    out = marked
   }
   return out
 }
