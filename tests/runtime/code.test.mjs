@@ -153,6 +153,41 @@ describe('boot/dev-splash timing', async () => {
     expect(fadeAt(500, 700, 1000, 900)).toBe(900)
   })
 
+  it('builds a game’s words, the same way the Vite plugin does', async () => {
+    const { splashWords } = await load('boot/dev-splash.ts')
+    const vite = await import('../../src/vite/index.mjs')
+    expect(vite.SPLASH_WORDS).toEqual(SPLASH_WORDS)
+    expect(splashWords('My Game')).toEqual([...SPLASH_WORDS.slice(0, -1), 'My Game', 'Games'])
+    expect(splashWords('My Game')).toEqual(vite.splashWords('My Game'))
+  })
+
+  it('reads the words from the markup’s sizers', async () => {
+    const { splashWordsIn } = await load('boot/dev-splash.ts')
+    const vite = await import('../../src/vite/index.mjs')
+    const html = vite.splashMarkup({ words: vite.splashWords('A & B') })
+    // A stand-in for the DOM: the sizers' text as the browser decodes it.
+    const texts = [...html.matchAll(/class="dev-splash__sizer">([^<]*)</g)].map((m) =>
+      (m[1] ?? '').replace(/&amp;/g, '&'),
+    )
+    const root = { querySelectorAll: () => texts.map((t) => ({ textContent: `  ${t}\n` })) }
+    expect(splashWordsIn(root)).toEqual([...SPLASH_WORDS.slice(0, -1), 'A & B', 'Games'])
+    expect(splashWordsIn({ querySelectorAll: () => [] })).toEqual([])
+  })
+
+  it('calls frames steady after a quick run, or after the give-up time', async () => {
+    const { createSteadyWatch, STEADY_WATCH } = await load('boot/dev-splash.ts')
+    expect(STEADY_WATCH).toEqual({ frameMs: 34, frames: 20, giveUpMs: 3000 })
+    const quick = createSteadyWatch()
+    const run = Array.from({ length: 20 }, () => quick.step(16))
+    expect(run.indexOf(true)).toBe(19)
+    expect(quick.step(500)).toBe(true) // once steady, it stays so
+    const broken = createSteadyWatch()
+    for (let i = 0; i < 19; i++) broken.step(16)
+    expect(broken.step(50)).toBe(false) // a slow frame restarts the run
+    const slow = createSteadyWatch({ giveUpMs: 200 })
+    expect([slow.step(100), slow.step(99), slow.step(1)]).toEqual([false, false, true])
+  })
+
   it('takes a game’s own words and timings', () => {
     const words = ['one', 'Games']
     const beats = splashBeats(words, { ...SPLASH_TIMINGS, finalTypeMs: 10, holdMs: 50 })

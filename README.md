@@ -118,7 +118,9 @@ export default defineConfig({
 
 **Framing.** The headers refuse framing by any other origin. They are for the game's own site.
 
-**More plugins.** Licences, the app icon and a share card are plugins too.
+**More plugins.** Licences, the app icon and a share card are plugins too, and so is the
+loading splash's page side: `devSplash({ game })` writes its markup into `index.html` and
+serves the brand portrait, so a game keeps neither.
 
 `@ummgames/dev/testing` has `headersFor(dist, pathname)`, which reads the headers Cloudflare
 Pages would send from a build's `_headers`. See [docs/build.md](docs/build.md). It also has

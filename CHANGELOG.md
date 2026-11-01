@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+**A game names itself once and the kit writes the splash.** Each game that showed the splash
+kept its own copy of the markup (one sizer per word, kept in step with its word list by hand),
+its own copy of the portrait, and its own steady watch. These now come from the kit.
+
+- New Vite plugin `devSplash(options?)` in `@ummgames/dev/vite`. It writes the `#dev-splash`
+  block first in `<body>` of `index.html`, with a sizer per word built from `game`, and links
+  the game's copy of `dev-splash.css` before Vite reads the page, in dev and build. It serves
+  the brand portrait in dev, emits it in the build at `brand/uncle-matt-circle.webp`, and names
+  it on the `<img>` as `data-src`. Options: `game`, `words`, `portrait` (`true`, a path, or
+  `false`), `portraitPath`, `css`, `url` and `page`. A page with its own `#dev-splash` keeps
+  it, and a portrait at the same path in `public/` wins. Its helpers `splashWords`,
+  `splashMarkup` and `injectSplash` and the constants `SPLASH_WORDS`, `SPLASH_PORTRAIT`,
+  `SPLASH_PORTRAIT_FILE` and `SPLASH_CSS` are exported too. See
+  [docs/build.md](docs/build.md#devsplashoptions-the-loading-splashs-page).
+- `runtime/boot/dev-splash.ts`: `splashWords(game, words?)`, `splashWordsIn(root)`, and
+  `createSteadyWatch(options?)` with `STEADY_WATCH` (`frameMs` 34, `frames` 20, `giveUpMs`
+  3000). `startDevSplash` with no `words` types the sizers' words, and with no `portraitUrl`
+  loads the `<img>`'s `data-src`. Passing either works as before, and markup with no
+  `data-src` still means no portrait.
+- **What a game may change:** nothing is required. A game with the hand-written splash takes
+  the new `dev-splash.ts` (`umm-dev drift` prints the line), adds `devSplash({ game })`, and
+  deletes its markup, stylesheet link, portrait, word list and steady watch:
+  [docs/runtime.md, adopting the splash](docs/runtime.md#adopting-the-splash).
+
 ## 0.6.1 (2026-10-31)
 
 A fix to `cut`. Nothing in a game must change.

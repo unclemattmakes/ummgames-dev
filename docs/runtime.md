@@ -409,13 +409,17 @@ No options. A Valve pad's grips and other extras sit at button 17 and up.
 
 ### `dev-splash.ts` and `dev-splash.css`
 
-**Exports:** `startDevSplash(options)`, `SPLASH_WORDS`, `SPLASH_TIMINGS`, the pure timing
+**Exports:** `startDevSplash(options)`, `splashWords(game, words?)`, `splashWordsIn(root)`,
+`createSteadyWatch(options?)`, `SPLASH_WORDS`, `SPLASH_TIMINGS`, `STEADY_WATCH`, the pure timing
 functions `splashBeats`, `splashFrameAt`, `splashFrameCut`, `landedAfterLoad` and `fadeAt`, and
-the types `DevSplash`, `DevSplashOptions`, `SplashTimings`, `SplashBeat`, `SplashFrame`.
+the types `DevSplash`, `DevSplashOptions`, `SplashTimings`, `SplashBeat`, `SplashFrame`,
+`SteadyWatch`, `SteadyWatchOptions`.
 
 The "Uncle Matt Makes: ___" loading splash. The blank types a word at a time and lands on the
 last word, over a load bar. It drives markup already in the page, so it is up from the first
-paint. Inline `dev-splash.css` in `<head>`, and put this in `<body>`, with one sizer per word:
+paint. The `devSplash()` Vite plugin writes that markup and links the stylesheet
+([build.md](build.md#devsplashoptions-the-loading-splashs-page)); a game without it links
+`dev-splash.css` in `<head>` and puts this in `<body>`, with one sizer per word:
 
 ```html
 <div id="dev-splash" role="status" aria-label="Uncle Matt Makes: Games. Loading.">
@@ -436,15 +440,15 @@ paint. Inline `dev-splash.css` in `<head>`, and put this in `<body>`, with one s
 ```
 
 ```ts
-import { startDevSplash } from './boot/dev-splash'
+import { createSteadyWatch, startDevSplash } from './boot/dev-splash'
 
 const splash = startDevSplash({
   root: document.getElementById('dev-splash'),
-  portraitUrl: '/brand/portrait.webp',
-  words: ['stuff', 'Games'],
   onLift: () => title.start(),
 })
-// during boot: splash.progress(0.4) … splash.ready(); once frames are smooth: splash.steady()
+// during boot: splash.progress(0.4) … splash.ready()
+const steady = createSteadyWatch()
+// every frame after ready(): if (splash.covering() && steady.step(dtMs)) splash.steady()
 // while splash.covering(), treat every confirm as already held
 // on a boot error: splash.fail()
 ```
@@ -456,8 +460,8 @@ With `prefers-reduced-motion`, it shows the last word at once.
 | Option | Default | What it does |
 |---|---|---|
 | `root` | required | The `#dev-splash` element. `null`, or markup missing `.dev-splash__typed` or `.dev-splash__fill`, removes it and returns a splash that does nothing. |
-| `portraitUrl` | none | The brand image. `null` or absent removes the `<img>` and leaves the wordmark. |
-| `words` | `SPLASH_WORDS` | The blank's words; the last is the one it lands on. Match the sizers. |
+| `portraitUrl` | the `<img>`'s `data-src` | The brand image. `null`, or absent with no `data-src`, removes the `<img>` and leaves the wordmark. |
+| `words` | the sizers' words, else `SPLASH_WORDS` | The blank's words; the last is the one it lands on. Absent, it types what the sizers spell, so the markup is the one list. |
 | `timings` | `SPLASH_TIMINGS` | Merged over the defaults: `holdMs` 1200, `fadeMs` 500, `faceWaitMs` 600, and the typing speeds. |
 | `waitForSteady` | `true` | Wait for `steady()` as well as `ready()`. |
 | `onLift` | none | Called as the fade starts. |
@@ -467,6 +471,62 @@ With `prefers-reduced-motion`, it shows the last word at once.
 | `skipKeys` | `['Enter', ' ']` | `KeyboardEvent.key` values that skip. |
 | `padSkip` | `true` | Whether a pad's A (button 0) skips. |
 | `now` | `performance.now` | The clock, for tests. |
+
+| Export | What it does |
+|---|---|
+| `splashWords(game, words?)` | `words` (default `SPLASH_WORDS`) with `game` just before the last: `['stuff', …, 'mistakes', 'My Game', 'Games']`. The plugin's `game` option uses the same rule. |
+| `splashWordsIn(root)` | The words the sizers under `root` spell, trimmed, in order; `[]` when there are none. |
+| `createSteadyWatch(options?)` | `{ step(frameMs) }`, true once frames are steady: a run of `frames` frames at or under `frameMs`, or `giveUpMs` of frame time in all. Once true it stays true. `STEADY_WATCH` is `{ frameMs: 34, frames: 20, giveUpMs: 3000 }`; `options` merge over it. |
+
+### Adopting the splash
+
+A game shows the splash with two copied files, one plugin and a few lines of boot code.
+
+1. **Copy the runtime files** to `src/boot/dev-splash.ts` and `src/boot/dev-splash.css`:
+   ```sh
+   pnpm exec umm-dev copy boot
+   ```
+2. **Add the plugin** in `vite.config`, naming the game:
+   ```js
+   import { devSplash } from '@ummgames/dev/vite'
+   plugins: [devSplash({ game: 'My Game', url: 'example.com' })]
+   ```
+   It writes the markup and the stylesheet link into `index.html` and serves the portrait. A game
+   that keeps the stylesheet elsewhere passes `css: '/<its path>'`.
+3. **Serve the face.** The lockup is set in Bitter 700. Import it in the entry, for example
+   `import '@fontsource/bitter/latin-700.css'` (with `@fontsource/bitter` pinned in
+   `dependencies`). Without it the splash waits `faceWaitMs` and falls back to Georgia.
+4. **Start it in the entry, and feed it the boot:**
+   ```ts
+   import { createSteadyWatch, startDevSplash } from './boot/dev-splash'
+
+   const splash = startDevSplash({ root: document.getElementById('dev-splash') })
+   boot(splash).catch((e) => {
+     console.error(e)
+     splash.fail()
+   })
+   // in boot: splash.progress(f) as it loads, then splash.ready()
+   // in the frame loop, from ready() on:
+   //   if (splash.covering() && steady.step(dtMs)) splash.steady()
+   //   while splash.covering(), read no input: the press that skips it is not a press on the game
+   ```
+5. **Leave it off where a load must not wait,** such as a capture or a bot run: remove the
+   element and pass `root: null`, which returns a splash that does nothing.
+   ```ts
+   const el = document.getElementById('dev-splash')
+   if (!wanted) el?.remove()
+   const splash = startDevSplash({ root: wanted ? el : null })
+   ```
+
+**Moving a game with the hand-written splash onto the plugin.** Take the new runtime copy
+(`umm-dev drift` prints the line), add `devSplash({ game })` with the game's `url` if it shows
+one, then delete:
+- the whole `#dev-splash` block and the `dev-splash.css` link in `index.html`;
+- `public/brand/uncle-matt-circle.webp` (or wherever the game keeps the portrait);
+- the game's word list, portrait URL and steady watch, and the `words` and `portraitUrl` it
+  passes to `startDevSplash`. Import `createSteadyWatch` from the runtime copy instead.
+
+Until the hand-written block is gone the plugin adds nothing, so the steps can land in any order.
 
 ## `runtime/audio/`
 

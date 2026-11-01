@@ -36,3 +36,13 @@ export {
 } from './licences.mjs'
 export { NOT_FOUND_FILE, notFoundHtml, notFoundPage } from './not-found.mjs'
 export { encodePng } from './png.mjs'
+export {
+  devSplash,
+  injectSplash,
+  SPLASH_CSS,
+  SPLASH_PORTRAIT,
+  SPLASH_PORTRAIT_FILE,
+  SPLASH_WORDS,
+  splashMarkup,
+  splashWords,
+} from './splash.mjs'

@@ -2,8 +2,9 @@
 
 `@ummgames/dev/vite` holds the build plugins every game's site build shares: the `_headers` file
 Cloudflare Pages reads, a real `404.html`, the third-party licence notices, and the home-screen
-icon and share card drawn from the game's SVG. Reach for them when a game's site is served by
-Cloudflare Pages, or when it ships dependencies whose licences it must show. Each plugin is
+icon and share card drawn from the game's SVG, and the loading splash's markup and portrait.
+Reach for them when a game's site is served by Cloudflare Pages, when it ships dependencies
+whose licences it must show, or when it shows the Uncle Matt Makes splash. Each plugin is
 configured by its options and reads nothing else from the game.
 
 **Linked.** These plugins run from `node_modules` at build time; only their output ships.
@@ -74,6 +75,7 @@ of `<head>`.
 | `notFoundPage()` | `404.html` | `vite build` |
 | `licences()` | the `virtual:licences` module, and a licences page if asked | dev and build |
 | `appIcon()` | `apple-touch-icon.png` and its `<link>`, and `share-card.png` if asked | dev and build |
+| `devSplash()` | the splash's markup and stylesheet link in `index.html`, and `brand/uncle-matt-circle.webp` | dev and build |
 
 ## `headers(options)`: `_headers`
 
@@ -266,6 +268,79 @@ plugins: [appIcon({ svg: 'icon.svg' })]
 plugins: [appIcon({ svg: 'src/art/icon.svg', shareCard: { fileName: 'card.png', width: 800, height: 800, mark: 480 } })]
 ```
 
+## `devSplash(options)`: the loading splash's page
+
+```ts
+devSplash(options?: DevSplashOptions): Plugin
+```
+
+The Uncle Matt Makes splash is two halves. `runtime/boot/dev-splash.ts` and `dev-splash.css`
+are copied into the game (`umm-dev copy boot`) and drive markup already in the page. This plugin
+writes that markup, so the game keeps no copy of it. It:
+- puts the `#dev-splash` block first in `<body>`, with one sizer per word, built from the game's
+  name. It is in the served HTML, so it is up from the first paint;
+- links the game's copy of `dev-splash.css` at the end of `<head>`. It runs before Vite reads the
+  page, so the stylesheet is bundled like the game's own;
+- serves the brand portrait in dev, emits it in the build, and names it on the `<img>` as
+  `data-src`, which the runtime loads. The kit carries the portrait, so the game does not.
+
+The runtime reads its words from the sizers and its portrait from `data-src` when the game
+passes neither, so the game names itself once, here. See
+[runtime.md, adopting the splash](runtime.md#adopting-the-splash).
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `game` | `string` | none | The game's name, typed just before the last word: `splashWords(game)`. |
+| `words` | `string[]` | `SPLASH_WORDS` | The whole word list instead. Passing it with `game` throws. |
+| `portrait` | `boolean` or `string` | `true` | `true`: the kit's portrait. A path, relative to Vite's root or absolute: the game's own image. `false`: no portrait and no `<img>`. |
+| `portraitPath` | `string` | `'brand/<its file name>'` | Where the portrait is served and emitted, under the base. `brand/uncle-matt-circle.webp` for the kit's. |
+| `css` | `string` or `false` | `'/src/boot/dev-splash.css'` | The href of the game's copy of the stylesheet, where `umm-dev copy boot` puts it. `false` links none. |
+| `url` | `string` | none | A line under the bar, such as the label's site, each `.` in amber. |
+| `page` | `string` | `'index.html'` | The page that gets the splash, relative to Vite's root. Other pages are left alone. |
+
+**A page that has its own splash keeps it.** If the page already has an element with
+`id="dev-splash"`, the plugin adds no markup; if it already names the stylesheet, it adds no link.
+So a game with hand-written markup can add the plugin before deleting its own.
+
+**A portrait in `public/` wins.** If the game keeps a file at `public/<portraitPath>`, the plugin
+neither serves nor emits its own, and Vite serves and copies the game's.
+
+```js
+// vite.config.mjs
+import { devSplash } from '@ummgames/dev/vite'
+
+export default defineConfig({ plugins: [devSplash({ game: 'My Game', url: 'example.com' })] })
+```
+
+`dist/index.html` gains, first in `<body>`:
+
+```html
+<div id="dev-splash" role="status" aria-label="Uncle Matt Makes: Games. Loading.">
+  <div class="dev-splash__lockup">
+    <img class="dev-splash__portrait" alt="" width="384" height="384" decoding="async" data-src="/brand/uncle-matt-circle.webp" />
+    <h1 class="dev-splash__mark">
+      Uncle Matt Makes:
+      <span class="dev-splash__blank" aria-hidden="true">
+        <span class="dev-splash__sizer">stuff</span>
+        …
+        <span class="dev-splash__sizer">mistakes</span>
+        <span class="dev-splash__sizer">My Game</span>
+        <span class="dev-splash__sizer">Games</span>
+        <span class="dev-splash__line"><span class="dev-splash__typed"></span><span class="dev-splash__caret"></span></span>
+      </span>
+      <span class="visually-hidden">Games</span>
+    </h1>
+  </div>
+  <div class="dev-splash__bar" aria-hidden="true"><div class="dev-splash__fill"></div></div>
+  <p class="dev-splash__url">example<span>.</span>com</p>
+</div>
+```
+
+```js
+// The kit's words only, no portrait, the stylesheet linked by the page itself.
+plugins: [devSplash({ portrait: false, css: false })]
+```
+
 ## Helpers and constants
 
 Each plugin's logic is exported for tests and scripts.
@@ -286,6 +361,10 @@ Each plugin's logic is exported for tests and scripts.
 | `appleTouchIconPng(svg, size?)`, `shareCardPng(svg, size?)` | The PNGs as `Buffer`s. |
 | `encodePng(img, { level? })` | A minimal PNG encoder: 8-bit, no interlace. |
 | `APPLE_TOUCH_ICON`, `APPLE_TOUCH_SIZE`, `SHARE_CARD`, `SHARE_CARD_SIZE` | `'apple-touch-icon.png'`, `180`, `'share-card.png'`, `{ width: 1200, height: 630, mark: 420 }`. |
+| `splashWords(game, words?)` | The kit's words with `game` just before the last. The same rule as the runtime's. |
+| `splashMarkup({ words?, portraitSrc?, url? })` | The `#dev-splash` block. No `<img>` without `portraitSrc`. |
+| `injectSplash(html, { words?, portraitSrc?, url?, css? })` | The page with the link and the markup added, unless it has them. |
+| `SPLASH_WORDS`, `SPLASH_PORTRAIT`, `SPLASH_PORTRAIT_FILE`, `SPLASH_CSS` | The kit's words (the runtime's), `'brand/uncle-matt-circle.webp'`, the portrait's path on disk, `'/src/boot/dev-splash.css'`. |
 
 **Testing a D1 board.** `createD1(options?)` from `@ummgames/dev/testing` is a D1 binding over
 `node:sqlite`, with the game's migrations applied. See [board.md](board.md#created1options-in-ummgamesdevtesting).
@@ -313,6 +392,10 @@ expect(headersFor('dist', '/assets/index-CGx80H_5.js')['cache-control']).toConta
   asked for. A dependency added while the dev server runs needs a restart.
 - **`appIcon`** draws each PNG once and keeps it in memory. In dev it answers `<base><fileName>`
   and `/<fileName>` itself.
+- **`devSplash`** changes the page in a `pre` `transformIndexHtml`, before Vite reads its links,
+  in dev and build alike. In dev it answers `<base><portraitPath>` and `/<portraitPath>` from
+  the file; in a build it emits the file in `generateBundle`. It checks the portrait exists when
+  the config loads. Its word list is a copy of the runtime's, and a test keeps the two equal.
 
 ## Troubleshooting
 
@@ -331,6 +414,11 @@ expect(headersFor('dist', '/assets/index-CGx80H_5.js')['cache-control']).toConta
 | `app-icon: a fill must be #rrggbb, got #000` | A short, named or missing fill. | Write six hex digits. |
 | `app-icon: "<g>" is not read here` | A group, circle, ellipse, polygon, polyline or transform. | Flatten it to paths. |
 | `ENOENT ... icon.svg` | `svg` is not relative to Vite's root. | Fix the path, or pass an absolute one. |
+| `dev-splash: no portrait at <path>` | `portrait` names a file that is not there. | Fix the path, or drop the option for the kit's. |
+| `dev-splash: pass game or words, not both` | Both options are set. | Keep one. |
+| Two splashes, or the game's name missing from the blank | The page still has its own `#dev-splash` (the plugin then adds none), or the game still passes its own `words`. | Delete the hand-written block and the `words` option. |
+| The splash shows unstyled | `css` does not match where the game's copy of `dev-splash.css` is. | Pass `css` with the page's href for it, such as `'/src/ui/dev-splash.css'`. |
+| The portrait never shows | The game passes `portraitUrl` to `startDevSplash`, or the runtime copy is from before 0.7.0 and does not read `data-src`. | Drop `portraitUrl`, or take the new copy (`umm-dev drift`). |
 
 ## For agents
 
@@ -345,5 +433,7 @@ expect(headersFor('dist', '/assets/index-CGx80H_5.js')['cache-control']).toConta
   error names. Never `exclude` a package that ships in the bundle.
 - **Keep the icon SVG in the reader's subset.** If an edit adds a curve or a group, flatten it;
   do not replace the plugin with a committed PNG.
+- **Keep the splash in one place.** With `devSplash`, the game's name lives in its options only:
+  no hand-written `#dev-splash` block, no word list in the game's code, no portrait in `public/`.
 - **Check your own work:** run `vite build`, then read `dist/_headers`, check `dist/404.html`
   exists, and check `dist/index.html` has one `apple-touch-icon` link.

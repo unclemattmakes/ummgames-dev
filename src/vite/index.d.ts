@@ -168,3 +168,60 @@ export interface AppIconOptions {
 }
 /** Draw the home-screen icon (and the share card) from an SVG: linked, served in dev, emitted. */
 export declare function appIcon(options: AppIconOptions): Plugin
+
+// The loading splash's markup, stylesheet link and portrait.
+
+/** The kit's splash words, the last one the label's. The same as `runtime/boot/dev-splash.ts`'s. */
+export declare const SPLASH_WORDS: readonly string[]
+/** Where the portrait is served, under the base: `brand/uncle-matt-circle.webp`. */
+export declare const SPLASH_PORTRAIT: 'brand/uncle-matt-circle.webp'
+/** The kit's portrait on disk. */
+export declare const SPLASH_PORTRAIT_FILE: string
+/** Where `umm-dev copy boot` puts the stylesheet, as the page links it: `/src/boot/dev-splash.css`. */
+export declare const SPLASH_CSS: '/src/boot/dev-splash.css'
+/** The kit's words with `game` typed just before the last one. */
+export declare function splashWords(game: string, words?: readonly string[]): string[]
+export interface SplashMarkupOptions {
+  /** The blank's words, one sizer each. Default `SPLASH_WORDS`. */
+  words?: readonly string[]
+  /** The `<img>`'s `data-src`, which the runtime loads. Null or absent leaves the `<img>` out. */
+  portraitSrc?: string | null
+  /** A line under the bar, each `.` in amber. None by default. */
+  url?: string
+}
+/** The `#dev-splash` block, as `runtime/boot/dev-splash.ts` reads it. Throws on an empty word list. */
+export declare function splashMarkup(options?: SplashMarkupOptions): string
+export interface InjectSplashOptions extends SplashMarkupOptions {
+  /** The stylesheet's href; false links none. Default `SPLASH_CSS`. */
+  css?: string | false
+}
+/**
+ * `html` with the stylesheet link at the end of `<head>` and the markup first in `<body>`. A page
+ * that already has a `#dev-splash`, or already names the stylesheet, keeps its own.
+ */
+export declare function injectSplash(html: string, options?: InjectSplashOptions): string
+export interface DevSplashOptions {
+  /** The game's name, typed just before the last word. */
+  game?: string
+  /** The whole word list instead of `game`. Passing both throws. */
+  words?: readonly string[]
+  /**
+   * `true`: the kit's portrait (the default). A path, relative to Vite's root or absolute: the
+   * game's own image. `false`: no portrait, and no `<img>`.
+   */
+  portrait?: boolean | string
+  /** Where the portrait is served, under the base. Default `brand/<its file name>`. */
+  portraitPath?: string
+  /** The href of the game's copy of `dev-splash.css`. Default `/src/boot/dev-splash.css`; false links none. */
+  css?: string | false
+  /** A line under the bar, such as the label's site. None by default. */
+  url?: string
+  /** The page that gets the splash, relative to Vite's root. Default `index.html`. */
+  page?: string
+}
+/**
+ * Write the splash's markup and stylesheet link into the page, in dev and build; serve the
+ * portrait in dev and emit it in a build. A page with its own `#dev-splash` keeps it, and a
+ * portrait at the same path in `public/` wins.
+ */
+export declare function devSplash(options?: DevSplashOptions): Plugin

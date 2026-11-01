@@ -33,9 +33,13 @@
  *   </div>
  *
  * One `dev-splash__sizer` per word in `words`, each a direct child of the blank: they stack in
- * one grid cell, invisible, so the blank is as wide as the widest word. Only `.dev-splash__typed`
- * and `.dev-splash__fill` are required; without them the splash removes itself. The face it
- * waits for is Bitter (`font`), which the page serves.
+ * one grid cell, invisible, so the blank is as wide as the widest word. With no `words` option
+ * the splash types the sizers' words. Only `.dev-splash__typed` and `.dev-splash__fill` are
+ * required; without them the splash removes itself. The face it waits for is Bitter (`font`),
+ * which the page serves.
+ *
+ * The `devSplash()` plugin in `@ummgames/dev/vite` writes this markup into index.html at build
+ * and dev time, from the game's name, with the stylesheet link and the portrait (`data-src`).
  *
  * The timing is pure functions of the clock (`splashFrameAt`, `splashFrameCut`, `fadeAt`), so
  * it is unit-testable without a DOM.
@@ -52,6 +56,59 @@ export const SPLASH_WORDS: readonly string[] = [
   'mistakes',
   'Games',
 ]
+
+/**
+ * The kit's words with the game's name typed just before the last one:
+ * `splashWords('My Game')` is `['stuff', ..., 'mistakes', 'My Game', 'Games']`. The
+ * `devSplash` Vite plugin builds the markup's sizers from the same rule.
+ */
+export const splashWords = (
+  game: string,
+  words: readonly string[] = SPLASH_WORDS,
+): readonly string[] => [...words.slice(0, -1), game, ...words.slice(-1)]
+
+/**
+ * The words the markup's sizers spell, in order, or an empty list when it has none. With no
+ * `words` option, `startDevSplash` reads these, so the sizers are the one list to keep.
+ */
+export const splashWordsIn = (root: Pick<ParentNode, 'querySelectorAll'>): readonly string[] =>
+  Array.from(root.querySelectorAll('.dev-splash__sizer'), (el) => (el.textContent ?? '').trim())
+
+export interface SteadyWatchOptions {
+  /** A frame this quick or quicker counts toward the run, ms. Default 34 (30 Hz, with slack). */
+  frameMs: number
+  /** How many quick frames in a row are steady. Default 20. */
+  frames: number
+  /** After this much frame time the watch says steady anyway, ms. Default 3000. */
+  giveUpMs: number
+}
+
+export const STEADY_WATCH: SteadyWatchOptions = { frameMs: 34, frames: 20, giveUpMs: 3000 }
+
+export interface SteadyWatch {
+  /** Count one frame of `frameMs`; true once steady, and from then on. */
+  step(frameMs: number): boolean
+}
+
+/**
+ * When to call the splash's `steady()`: after a run of quick frames, or once the frames have
+ * added up to `giveUpMs` on a machine that never gets that quick. Feed it each frame's time
+ * from `ready()` on: `if (splash.covering() && steady.step(dtMs)) splash.steady()`.
+ */
+export function createSteadyWatch(options: Partial<SteadyWatchOptions> = {}): SteadyWatch {
+  const { frameMs, frames, giveUpMs } = { ...STEADY_WATCH, ...options }
+  let run = 0
+  let waited = 0
+  let done = false
+  return {
+    step(ms) {
+      run = ms <= frameMs ? run + 1 : 0
+      waited += ms
+      if (run >= frames || waited >= giveUpMs) done = true
+      return done
+    },
+  }
+}
 
 export interface SplashTimings {
   /** Per letter, the first word, ms; each next word is quicker, down to `typeFastMs`. */
@@ -230,9 +287,12 @@ export interface DevSplash {
 export interface DevSplashOptions {
   /** The `#dev-splash` element. Null, or markup missing its parts, removes it and does nothing. */
   root: HTMLElement | null
-  /** Where the brand portrait is served. Null leaves the wordmark on its own. */
+  /**
+   * Where the brand portrait is served. Absent, the `<img>`'s `data-src` (the `devSplash` Vite
+   * plugin writes one); null, or absent with no `data-src`, leaves the wordmark on its own.
+   */
   portraitUrl?: string | null
-  /** The blank's words; the last is the one it lands on. */
+  /** The blank's words; the last is the one it lands on. Absent, the sizers', else `SPLASH_WORDS`. */
   words?: readonly string[]
   timings?: Partial<SplashTimings>
   /** Wait for `steady()` as well as `ready()` before going. Default true. */
@@ -277,7 +337,10 @@ export function startDevSplash(options: DevSplashOptions): DevSplash {
     return NO_SPLASH
   }
   const now = options.now ?? (() => performance.now())
-  const words = options.words ?? SPLASH_WORDS
+  const sized = splashWordsIn(root)
+  const words = options.words ?? (sized.length > 0 ? sized : SPLASH_WORDS)
+  const portraitUrl =
+    options.portraitUrl === undefined ? (portrait?.dataset.src ?? null) : options.portraitUrl
   const timing: SplashTimings = { ...SPLASH_TIMINGS, ...options.timings }
   const beats = splashBeats(words, timing)
   const waitForSteady = options.waitForSteady ?? true
@@ -357,7 +420,7 @@ export function startDevSplash(options: DevSplashOptions): DevSplash {
     : undefined
   const portraitReady = new Promise<void>((resolve) => {
     if (!portrait) return resolve()
-    if (!options.portraitUrl) {
+    if (!portraitUrl) {
       portrait.remove()
       return resolve()
     }
@@ -370,7 +433,7 @@ export function startDevSplash(options: DevSplashOptions): DevSplash {
       portrait.remove()
       resolve()
     })
-    portrait.src = options.portraitUrl
+    portrait.src = portraitUrl
   })
   void Promise.all([faceReady, portraitReady]).then(showFace)
   setTimeout(showFace, timing.faceWaitMs)
