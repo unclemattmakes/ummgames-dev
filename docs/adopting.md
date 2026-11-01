@@ -12,7 +12,7 @@ Many games carry a rule like "copy code between repos, never link it". Adopting 
 it with two rules:
 
 - **Dev tools are linked.** Commands, Vite plugins, test helpers and config presets come from
-  `@ummgames/dev`, pinned to a tag. Nobody edits them in the game.
+  `@ummgames/dev`, which tracks `main`. Nobody edits them in the game.
 - **Runtime code is copied, from one place only.** Code that ships in the game's bundle comes from
   this repo's `runtime/` through `umm-dev copy`. `umm-dev drift` reports how far each copy has
   moved.
@@ -28,7 +28,7 @@ game's full check after each one.**
 ### 1. Install and add the config file
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.7.0
+pnpm add -D github:unclemattmakes/ummgames-dev
 ```
 
 Then create `umm-dev.config.mjs`: [getting-started.md, step 2](getting-started.md#2-add-the-config-file).

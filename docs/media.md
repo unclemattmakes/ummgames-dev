@@ -38,7 +38,7 @@ the working directory.
 Install the kit, Vite and Playwright in the game:
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.7.0 vite playwright
+pnpm add -D github:unclemattmakes/ummgames-dev vite playwright
 pnpm exec playwright install chromium
 ```
 

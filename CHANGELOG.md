@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Games track `main` instead of pinning a tag. Install lines name no tag
+  (`github:unclemattmakes/ummgames-dev`); the lockfile still records the commit, and
+  `pnpm update @ummgames/dev` moves a game to the newest. Tags are still cut for the changelog
+  and for `umm-dev drift`, which fetches originals by tag.
 - LICENSE says the MIT licence does not cover the Uncle Matt Makes portrait
   (`src/vite/brand/uncle-matt-circle.webp`): it is the brand mark, all rights reserved.
 

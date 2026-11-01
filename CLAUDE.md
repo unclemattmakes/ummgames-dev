@@ -1,7 +1,7 @@
 # ummgames-dev
 
 `@ummgames/dev`: the dev tools every Uncle Matt Makes game shares. One package, installed by each
-game as a devDependency pinned to a tag. Read README.md for what is here and how a game uses it.
+game as a devDependency that tracks `main`. Read README.md for what is here and how a game uses it.
 
 ## Hard rules
 
@@ -32,8 +32,9 @@ game as a devDependency pinned to a tag. Read README.md for what is here and how
    the `.d.ts` JSDoc and the Config table's defaults. A new config section also goes into
    `UmmDevConfig` in `src/index.d.ts`. `tests/docs.test.mjs` checks links, `--help` and Config
    tables; it does not check the prose, so read your own page against the code.
-8. **Releases are tags.** Bump `version`, add a CHANGELOG entry, tag `v<version>`. Games pin
-   `github:unclemattmakes/ummgames-dev#v<version>` and move when they choose. Never move a tag.
+8. **Releases are tags.** Bump `version`, add a CHANGELOG entry, tag `v<version>`. Games depend on
+   `github:unclemattmakes/ummgames-dev` with no tag, so they follow `main`: keep `main` green,
+   because every game takes it on its next `pnpm update @ummgames/dev`. Never move a tag.
 
 **Before changing anything, read docs/maintaining.md:** where each kind of thing goes, why each
 rule exists, and how to release.

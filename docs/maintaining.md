@@ -114,8 +114,8 @@ a workaround. When you fix one, delete its line and say so in the changelog.
    ```
    Also check that the raw URL drift uses answers 200:
    `https://raw.githubusercontent.com/unclemattmakes/ummgames-dev/v<version>/runtime/dev/perf-hud.ts`.
-6. Bump the install lines in README.md and the docs to the new tag, in the release commit, so
-   copy-pasted instructions install the latest.
+6. Install lines in README.md and the docs name no tag: games track `main`, so there is nothing
+   to bump.
 
 **Patch or minor:** a patch is fixes and docs only; a minor adds tools or options. While the major
 version is 0, a minor may also rename or remove, and the changelog must say what to change.

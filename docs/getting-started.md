@@ -9,19 +9,19 @@ It covers replacing them without losing your changes.
 
 ## 1. Install it
 
-**Pin a tag.** pnpm (10 or 11):
+**Track `main`:** install with no tag. pnpm (10 or 11):
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.7.0
+pnpm add -D github:unclemattmakes/ummgames-dev
 ```
 
 npm (tested on 11):
 
 ```sh
-npm i -D github:unclemattmakes/ummgames-dev#v0.7.0
+npm i -D github:unclemattmakes/ummgames-dev
 ```
 
-Your lockfile records the exact commit behind the tag, so every checkout and every worktree gets
+Your lockfile records the exact commit it installed, so every checkout and every worktree gets
 the same code.
 
 **No credentials are needed:** the repo is public.

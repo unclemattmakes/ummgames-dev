@@ -1,7 +1,8 @@
 # Upgrading to a newer version
 
-**A game moves to a new version of the kit only when it chooses to.** Nothing changes under a
-game until its pinned tag changes.
+**Games track `main`.** The dependency names no tag, and the lockfile records the commit it
+installed, so nothing changes under a game until it runs `pnpm update @ummgames/dev`. Do that
+when you start work in a game.
 
 ## Versions
 
@@ -17,11 +18,11 @@ Releases are git tags, `v<major>.<minor>.<patch>`. A tag never moves once it is 
 
 ## Steps
 
-1. **Read the changelog** between your tag and the new one. Look for renamed options and outputs,
+1. **Read the changelog** since the version in the game's lockfile. Look for renamed options and outputs,
    and for runtime files that changed.
-2. **Move the pin:**
+2. **Update the kit:**
    ```sh
-   pnpm add -D github:unclemattmakes/ummgames-dev#v0.7.0     # npm: npm i -D …
+   pnpm update @ummgames/dev     # npm: npm update @ummgames/dev
    ```
 3. **Run the game's full check.** The linked tools have changed; fix anything the changelog said
    would break.
@@ -44,7 +45,7 @@ Releases are git tags, `v<major>.<minor>.<patch>`. A tag never moves once it is 
    3. Re-apply your own change by hand.
 
    Drift then reads `changed here` against the new version, which is the truth.
-5. **Run the full check again, and commit** the pin, the lockfile and the copies together.
+5. **Run the full check again, and commit** the lockfile and the copies together.
 
 ## Finding the original of a copy
 

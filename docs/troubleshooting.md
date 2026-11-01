@@ -20,7 +20,7 @@ current bugs with workarounds.
 | Symptom | Cause | Fix |
 |---|---|---|
 | `Cannot find package '@ummgames/dev' imported from …/umm-dev.config.mjs` | The kit is not installed where the command runs: often a fresh worktree outside the main checkout | `pnpm install` there, or `umm-dev worktree hydrate` |
-| `umm-dev: no command "<name>". Run umm-dev help.` | A typo, or a command from a newer version than the one pinned | `umm-dev help` lists what this version has; check the pinned tag in package.json |
+| `umm-dev: no command "<name>". Run umm-dev help.` | A typo, or a command from a newer kit than the one in the lockfile | `umm-dev help` lists what this version has; `pnpm update @ummgames/dev` takes the newest |
 | `Unknown option '--<x>'` and the usage | The option does not exist for that command or subcommand | `umm-dev <command> --help`. Usage errors exit 2, or 64 in `gpu`, `worktree` and `merge` |
 | `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` | Something imported a `.ts` file from `node_modules/@ummgames/dev` | Import the package's documented entry points only. The `.ts` files under `runtime/` are for `umm-dev copy`, not for import |
 | npm writes `git+ssh://git@github.com/…` into package-lock.json | npm's normal form for a GitHub dependency | Nothing to fix: npm falls back to HTTPS for this public repo, so machines without SSH keys install it too |

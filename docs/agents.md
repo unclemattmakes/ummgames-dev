@@ -16,7 +16,7 @@ block below is written that way; keep it so if you edit it.
 ```md
 ## The shared kit (`@ummgames/dev`)
 
-Dev tools come from `@ummgames/dev`, pinned to a tag in package.json. Runtime code that ships in
+Dev tools come from `@ummgames/dev`, which tracks `main` (the lockfile holds the commit). Runtime code that ships in
 the game is copied from the kit's `runtime/` with `umm-dev copy`, and `umm-dev drift` says how far
 each copy has moved. Docs: `node_modules/@ummgames/dev/docs/README.md`.
 

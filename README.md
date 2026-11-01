@@ -14,12 +14,13 @@ is there for the next. It covers:
 ## Install
 
 ```sh
-pnpm add -D github:unclemattmakes/ummgames-dev#v0.7.0     # or: npm i -D github:unclemattmakes/ummgames-dev#v0.7.0
+pnpm add -D github:unclemattmakes/ummgames-dev     # or: npm i -D github:unclemattmakes/ummgames-dev
 pnpm exec umm-dev help                                     # or: npx umm-dev help
 ```
 
-**Pin a tag.** A game moves to a newer version only when it chooses to
-([docs/upgrading.md](docs/upgrading.md)). The lockfile records the exact commit. The repo is
+**Track `main`.** Games install the kit with no tag, so `pnpm update @ummgames/dev` moves a game
+to the newest commit ([docs/upgrading.md](docs/upgrading.md)). The lockfile records the exact commit,
+so nothing changes under a game until it updates. The repo is
 public, so installing needs no credentials.
 
 **Requirements:**
@@ -174,7 +175,7 @@ a block to paste into the game's `CLAUDE.md`. Agents changing this repo follow i
 ## Versions
 
 Releases are tags that never move; every one is listed in [CHANGELOG.md](CHANGELOG.md). Moving a
-game to a newer tag is covered in [docs/upgrading.md](docs/upgrading.md).
+game to the newest kit is covered in [docs/upgrading.md](docs/upgrading.md).
 
 ## Licence
 
