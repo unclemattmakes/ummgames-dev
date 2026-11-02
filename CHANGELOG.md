@@ -1,7 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 (2026-11-01)
 
+A shared rumble scheduler. Nothing in a game must change.
+
+- `runtime/input/haptics.ts`: rumble with a priority scheduler, so a light tick never cuts off a
+  heavy hit. The game passes its own table of effects; the scheduler is pure (it takes the time),
+  and `padSink`, `phoneSink` and `bothSinks` are the only code that touches a device. A hum under
+  the effects, a strength slider, an on/off switch and a hold for pauses. Grown from a game's own
+  copy; see [docs/runtime.md](docs/runtime.md#hapticsts).
+- **What a game may change:** nothing is required. A game with its own rumble code can take
+  `umm-dev copy input/haptics.ts` and keep its effects table beside it.
 - `devSplash` and `injectSplash` skip a `<body>`, `</head>` or `id="dev-splash"` named inside a
   comment, `<script>` or `<style>`. Before, a comment naming `<body>` in the head put the whole
   splash inside the head's `<style>` (found moving platformer onto the plugin).

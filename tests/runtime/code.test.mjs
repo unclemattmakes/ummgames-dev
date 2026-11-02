@@ -112,6 +112,127 @@ describe('input/pad-profiles', async () => {
   })
 })
 
+describe('input/haptics', async () => {
+  const { createHaptics, padSink, phoneSink } = await load('input/haptics.ts')
+  const table = {
+    tick: { priority: 1, segments: [{ at: 0, ms: 40, strong: 0, weak: 0.5 }] },
+    hit: { priority: 5, segments: [{ at: 0, ms: 150, strong: 0.8, weak: 0.6 }] },
+    crash: {
+      priority: 9,
+      segments: [
+        { at: 0, ms: 200, strong: 1, weak: 1 },
+        { at: 200, ms: 300, strong: 0.5, weak: 0.2 },
+      ],
+    },
+  }
+  const recorder = () => {
+    const out = {
+      /** @type {number[][]} */ log: [],
+      stops: 0,
+      /** @param {number} s @param {number} w @param {number} ms */
+      rumble(s, w, ms) {
+        out.log.push([s, w, ms])
+      },
+      stop() {
+        out.stops += 1
+      },
+    }
+    return out
+  }
+
+  it('a stronger effect cuts in; a weaker one is dropped while it runs', () => {
+    const h = createHaptics(table, recorder())
+    expect(h.trigger('tick', 0)).toBe(true)
+    expect(h.trigger('hit', 10)).toBe(true)
+    expect(h.trigger('tick', 50)).toBe(false)
+    expect(h.active(50)).toBe('hit')
+    expect(h.trigger('tick', 400)).toBe(true)
+  })
+
+  it('plays segments on the clock, scaled by strength', () => {
+    const s = recorder()
+    const h = createHaptics(table, s, { strength: 0.5 })
+    h.trigger('crash', 0)
+    expect(s.log).toEqual([[0.5, 0.5, 200]])
+    h.update(250)
+    expect(s.log[1]).toEqual([0.25, 0.1, 300])
+    h.update(600)
+    expect(h.active(600)).toBeNull()
+  })
+
+  it('off, zero strength or held stops what runs and drops triggers', () => {
+    const s = recorder()
+    const h = createHaptics(table, s)
+    h.trigger('hit', 0)
+    h.setHeld(true)
+    expect(s.stops).toBe(1)
+    expect(h.trigger('hit', 10)).toBe(false)
+    h.setHeld(false)
+    h.setEnabled(false)
+    expect(h.trigger('hit', 20)).toBe(false)
+    h.setEnabled(true)
+    h.setStrength(0)
+    expect(h.trigger('hit', 30)).toBe(false)
+  })
+
+  it('hums under the effects, refreshed in pulses', () => {
+    const s = recorder()
+    const h = createHaptics(table, s)
+    h.setHum(0.3)
+    h.update(0)
+    expect(s.log).toEqual([[0.3, 0, 140]])
+    h.update(50)
+    expect(s.log).toHaveLength(1)
+    h.update(100)
+    expect(s.log).toHaveLength(2)
+    h.trigger('tick', 110)
+    expect(h.active(120)).toBe('tick')
+    h.update(200)
+    expect(h.active(200)).toBe('hum')
+  })
+
+  it('pads get dual-rumble; a rejection or a missing pad never escapes', async () => {
+    /** @type {unknown[]} */
+    const calls = []
+    const pad = {
+      vibrationActuator: {
+        /** @param {string} _t @param {unknown} p */
+        playEffect: (_t, p) => {
+          calls.push(p)
+          return Promise.reject(new Error('no motors'))
+        },
+      },
+    }
+    padSink(() => [pad, null]).rumble(0.5, 0.25, 80)
+    padSink(() => null).rumble(1, 1, 10)
+    await Promise.resolve()
+    expect(calls).toEqual([
+      { startDelay: 0, duration: 80, weakMagnitude: 0.25, strongMagnitude: 0.5 },
+    ])
+  })
+
+  it('a phone buzzes only for bursts with weight, and only while enabled', () => {
+    /** @type {number[]} */
+    const buzzes = []
+    const nav = globalThis.navigator
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { vibrate: (/** @type {number} */ ms) => buzzes.push(ms) },
+      configurable: true,
+    })
+    try {
+      let on = true
+      const s = phoneSink(() => on)
+      s.rumble(0, 0.45, 45)
+      s.rumble(0.8, 0.6, 150)
+      on = false
+      s.rumble(1, 1, 200)
+      expect(buzzes).toEqual([150])
+    } finally {
+      Object.defineProperty(globalThis, 'navigator', { value: nav, configurable: true })
+    }
+  })
+})
+
 describe('boot/dev-splash timing', async () => {
   const {
     SPLASH_WORDS,

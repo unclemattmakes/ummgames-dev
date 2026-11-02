@@ -405,6 +405,44 @@ const moveX = pad?.axes[0] ?? 0
 
 No options. A Valve pad's grips and other extras sit at button 17 and up.
 
+### `haptics.ts`
+
+**Exports:** `createHaptics(effects, sink, options?)`, `padSink(getPads)`,
+`phoneSink(enabled?, min?)`, `bothSinks(...sinks)`, `NO_HAPTICS`, and the types `Haptics`,
+`HapticsOptions`, `HapticTable`, `HapticEffect`, `HapticSegment`, `HapticSink`, `HapticPad`.
+
+Rumble, with a priority scheduler. A pad's `playEffect` cuts off whatever is running, so calling
+it from several places has a light tick kill a heavy hit. Give the scheduler the game's table of
+effects and one sink, and call only `trigger`. A stronger effect cuts in over a weaker one; a
+weaker one is dropped while a stronger one runs; an equal one replaces it. `setHum` holds a
+level under every effect (an engine, a boost), refreshed in short pulses. `setStrength` (a
+slider), `setEnabled` (a switch) and `setHeld` (a pause or menu) stop what runs and drop
+triggers. The scheduler is pure: it takes the time, so a test drives it with a fake clock.
+
+The sinks touch the device and never throw. `padSink` sends dual-rumble (or the older `pulse`)
+to the pads `getPads()` names at each burst: one, a list (both XR controllers), or null.
+`phoneSink` uses `navigator.vibrate` for bursts with some weight (Android; iOS Safari has none).
+One scheduler per player, each on their own pad's sink, keeps co-op rumble apart.
+
+```ts
+import { createHaptics, padSink, type HapticTable } from './input/haptics'
+
+const EFFECTS: HapticTable<'hit' | 'dash'> = {
+  hit: { priority: 2, segments: [{ at: 0, ms: 150, strong: 0.8, weak: 0.6 }] },
+  dash: { priority: 1, segments: [{ at: 0, ms: 45, strong: 0, weak: 0.45 }] },
+}
+const rumble = createHaptics(EFFECTS, padSink(() => navigator.getGamepads()[0]))
+rumble.trigger('hit', performance.now())
+// every frame:
+rumble.update(performance.now())
+```
+
+| Option | Default | What it does |
+|---|---|---|
+| `strength` | `1` | 0..1, scales every burst and the hum. 0 is off. |
+| `humRefreshMs` | `100` | How often the hum is refreshed. |
+| `humPulseMs` | `140` | How long each hum pulse runs; longer than the refresh, so no gap opens. |
+
 ## `runtime/boot/`
 
 ### `dev-splash.ts` and `dev-splash.css`
