@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.9.0 (2026-11-04)
+
+A shared making-of core. Nothing in a game must change.
+
+**Games that built a making-of each kept a fork of the same plumbing.** It now lives here, so a fix
+reaches them all. See [docs/making-of.md](docs/making-of.md).
+
+- `@ummgames/dev/making-of`: `createMakingOf(options)`, the site's Vite plugin, with the site's
+  name, nav, footer, chapter list and the game's own page passes as options; and the source pass
+  behind `data-const` and `data-snippet`, which reads numbers statically and cuts code by name,
+  including JSON paths and `Class.member`.
+- `umm-dev making-of shot`: loads every page in Chrome, shoots each toy, and exits 1 on a toy that
+  drew nothing, a console error, or an element past the screen's edge.
+- `createImportGraph` in `@ummgames/dev/testing`: the static import walker a site's guards use.
+- `runtime/making-of/`: the toy host, controls, a 2D canvas, the page starters and a base
+  stylesheet with tokens a game overrides.
+- `typescript` joins the optional peers. Only `@ummgames/dev/making-of` needs it.
+- **What a game may change:** nothing is required. A game with its own making-of can follow the
+  quick start in [docs/making-of.md](docs/making-of.md) and delete its forks. Two things differ from
+  the forks: a snippet's path links to a repo only when the game passes `source.repoBlob`, and
+  `createToyClock` takes the game's step as an argument.
+
 ## 0.8.0 (2026-11-01)
 
 A shared rumble scheduler. Nothing in a game must change.

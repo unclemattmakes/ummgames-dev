@@ -37,3 +37,5 @@ export function headersFor(dist, pathname) {
 }
 
 export { createD1, parameterCount } from './d1.mjs'
+
+export { createImportGraph } from './import-graph.mjs'

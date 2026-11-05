@@ -62,3 +62,37 @@ export declare function createD1(options?: CreateD1Options): TestD1
 
 /** The `?` parameters a statement takes, as SQLite counts them (`?NNN` is NNN). */
 export declare function parameterCount(sql: string): number
+
+export interface ImportGraphOptions {
+  /** The game root. */
+  root: string
+  /** Import prefixes the game's bundler maps to folders. Default `{ '@/': 'src/' }`. */
+  alias?: Readonly<Record<string, string>>
+}
+
+export interface ImportWalkOptions {
+  /** Leave out whole `import type` and `export type` statements, which a compiler erases. */
+  valueOnly?: boolean
+}
+
+/** One node of a walk: the file, and the chain of imports that first reached it. */
+export interface ImportNode {
+  file: string
+  chain: string[]
+}
+
+export interface ImportGraph {
+  /** A forward-slashed path from the game root, for anything printed or compared. */
+  rel(abs: string): string
+  /** An import specifier as a file on disk; `null` for a package. */
+  resolveSpecifier(fromFile: string, spec: string): string | null
+  /** Every imported specifier in a file. */
+  importsOf(file: string, options?: ImportWalkOptions): string[]
+  /** Breadth-first from `entry`, each file once. The entry comes first, and `chain[0]` is it. */
+  walkImports(entry: string, options?: ImportWalkOptions): Generator<ImportNode>
+  /** The TypeScript modules under `under` (default `src`) a file reaches: a test's width. */
+  reachable(entry: string, under?: string): Set<string>
+}
+
+/** A static import walker over one game's sources. See docs/making-of.md. */
+export declare function createImportGraph(options: ImportGraphOptions): ImportGraph

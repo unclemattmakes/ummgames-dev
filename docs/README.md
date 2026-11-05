@@ -22,6 +22,7 @@
 | Repo guards and git hooks | [guard.md](guard.md) | linked: `umm-dev guard` |
 | Runtime copies and drift; the dev palette, splash, pad profiles, music sequencer core | [runtime.md](runtime.md) | copied: `umm-dev copy`, `drift`; `runtime/` |
 | Leaderboard servers on a Worker and D1: rate limits, blocks, admin routes; a D1 test shim | [board.md](board.md) | copied: `runtime/board/`; linked: `createD1` in `@ummgames/dev/testing` |
+| A making-of site: pages, toys, numbers and code quoted from the source | [making-of.md](making-of.md) | linked: `umm-dev making-of`, `@ummgames/dev/making-of`, `createImportGraph` in `@ummgames/dev/testing`; copied: `runtime/making-of/` |
 | Biome, TypeScript, Vitest, Playwright | [presets.md](presets.md) | linked: `@ummgames/dev/biome`, `/tsconfig`, `/vitest`, `/playwright` |
 | Loudness | [audio.md](audio.md) | linked: `umm-dev loudness`; `@ummgames/dev/audio` |
 | GLB optimizing, meshopt decoding | [gltf.md](gltf.md) | linked: `umm-dev gltf`; `@ummgames/dev/gltf` |

@@ -66,6 +66,7 @@ Run `pnpm exec umm-dev help` for the list, and `umm-dev <command> --help` for a 
 | `umm-dev loop` | Make a site loop: a silent 720p faststart mp4 and a poster, from a cut or a store preview | [media](docs/media.md) |
 | `umm-dev loudness` | Meter audio: integrated LUFS, true peak, momentary max, checked against a target | [audio](docs/audio.md) |
 | `umm-dev gltf` | Shrink GLB files in place: dedup, weld, prune, meshopt. Never joins meshes, so node extras survive | [gltf](docs/gltf.md) |
+| `umm-dev making-of` | Check a making-of site in a real browser: shoot each toy, fail on a blank toy, a console error or an element past the screen's edge | [making-of](docs/making-of.md) |
 | `umm-dev copy` | Copy a `runtime/` file or folder into the game, stamped with its version and hash | [runtime](docs/runtime.md) |
 | `umm-dev drift` | Report how far each copy has moved, here and upstream (`--diff`, `--strict`) | [runtime](docs/runtime.md) |
 | `umm-dev gpu` | Share one GPU between parallel sessions on the machine: run, status, wait, release | [agent](docs/agent.md) |
@@ -164,6 +165,9 @@ validator and planner, the store checks. `@ummgames/dev/audio` is the loudness m
 that run inside a game's own tools. `@ummgames/dev/gltf` is a glTF-Transform `NodeIO` with both
 meshopt codecs, the shrink pass behind `umm-dev gltf`, and a decoder for KHR_meshopt_compression
 GLBs; its glTF packages are optional peers a game adds itself ([docs/gltf.md](docs/gltf.md)).
+`@ummgames/dev/making-of` is a making-of site's build plugin and its source pass, which quotes
+numbers and code from the game's source; `typescript` is an optional peer a game adds itself
+([docs/making-of.md](docs/making-of.md)).
 
 ## For AI agents
 

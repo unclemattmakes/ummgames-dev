@@ -755,6 +755,11 @@ admin log and the bearer-token admin door. The game keeps its runs table, valida
 and meets the core through `defineBoard`. Copy the folder (`umm-dev copy board`). It has its own
 page: [board.md](board.md).
 
+## `runtime/making-of/`
+
+A making-of site's toy host, its controls, a 2D canvas, what a page's script calls, and a base
+stylesheet with tokens a game overrides. It has its own page: [making-of.md](making-of.md).
+
 ## Config: `runtime`
 
 In the game's `umm-dev.config.mjs`. `umm-dev copy` reads it; `umm-dev drift` reads no config.
