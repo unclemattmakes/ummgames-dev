@@ -39,7 +39,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { openBridge } from './msys.mjs'
-import { pidAlive, sleep, WIN } from './proc.mjs'
+import { pidAlive, sleep, sleepSync, WIN } from './proc.mjs'
 
 export const MARK = 'umm-dev/1'
 /** A ticket older than this is dead whatever its pid says. */
@@ -145,15 +145,31 @@ export function parseTicket(name, file, raw, mtimeMs = Date.now()) {
   }
 }
 
+/** How long a holder waits to replace its file: a reader has it open for well under this. */
+const REPLACE_TRIES = 100
+const REPLACE_WAIT_MS = 10
+
 /**
- * Write a file whole: a temp name beside it, then a rename, so no reader sees half of it.
+ * Write a file whole: a temp name beside it, then a rename, so no reader sees half of it. Windows
+ * refuses to rename over a file while any process has it open, and every waiter reads the holder
+ * file on each poll, so the refusal comes and goes: wait it out, or `gpu run` dies mid-lease.
  * @param {string} file
  * @param {string} text
  */
 function writeWhole(file, text) {
   const tmp = path.join(path.dirname(file), `.new-${process.pid}-${path.basename(file)}`)
   fs.writeFileSync(tmp, text)
-  fs.renameSync(tmp, file)
+  for (let tries = 1; ; tries++) {
+    try {
+      fs.renameSync(tmp, file)
+      return
+    } catch (e) {
+      const code = /** @type {NodeJS.ErrnoException} */ (e).code
+      if (!WIN || tries >= REPLACE_TRIES || !['EPERM', 'EACCES', 'EBUSY'].includes(code ?? ''))
+        throw e
+      sleepSync(REPLACE_WAIT_MS)
+    }
+  }
 }
 
 /** @param {string} file */
@@ -450,7 +466,9 @@ export async function acquire(L, o) {
         take()
         return { ok: true, token, adopted: false }
       } catch (e) {
-        if (/** @type {NodeJS.ErrnoException} */ (e).code !== 'EEXIST') throw e
+        // Windows says EPERM, not EEXIST, while the last holder's lock is still being deleted.
+        const code = /** @type {NodeJS.ErrnoException} */ (e).code
+        if (code !== 'EEXIST' && !(WIN && code === 'EPERM')) throw e
       }
       const h = L.holder()
       if ((await L.holderState(h)) === 'dead') {

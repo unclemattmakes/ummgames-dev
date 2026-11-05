@@ -12,6 +12,12 @@ shot's first frames can move: see the first entry.
   or when the page finishes loading if it never does. `bootFrames` counts from there.
   `tests/media/media.slow.test.mjs` holds the game's script back to prove it, and its compare tests
   no longer need an earlier test: run alone, they printed `pixels: 0/0`.
+- `gpu run`: **the watchdog starved on a busy machine.** It inherited `gpu.priority`, so the query
+  that finds a dead run's command tree ran below normal and took more than 12 s. The command ran on,
+  and the next waiter reclaimed the lease on top of it. It now raises itself to normal first.
+- `gpu run`: **a waiter could crash the holder on Windows.** Replacing the holder file while a waiter
+  was reading it threw `EPERM`, and the run died holding the lease until a reclaim. It now waits
+  the read out. A waiter taking the lock while the last one was being deleted died the same way.
 
 ## 0.10.1 (2026-11-04)
 

@@ -31,6 +31,8 @@ here, or upstream as an issue, never into a local patch of `node_modules`.
 |---|---|
 | Usage errors exit 64 in `gpu`, `worktree` and `merge`, and 2 everywhere else | Read each command's exit-code table; in `gpu run`, 2 means it gave up waiting |
 | A non-numeric `gpu run --wait-limit` or `gpu wait --timeout` waits forever | Pass whole numbers |
+| `gpu run` starts its watchdog just after the command. Killed in those few milliseconds, it leaves the command's children running, and the lease goes to the queue after `gpu.staleGraceSeconds` | Check for a leftover command after a run killed the moment it started |
+| A waiter reclaims a dead run's lease after `gpu.staleGraceSeconds` even if the watchdog has not finished killing its tree, because the holder names no watchdog | Keep `gpu.staleGraceSeconds` well above the second or two the watchdog takes |
 | `guard em-dash --staged` passes everything when git's `diff.mnemonicPrefix` or `diff.noprefix` is set, and skips paths git quotes (non-ASCII) | Leave those settings off, or run `guard em-dash <paths>` |
 | A config that fails to load makes `guard` exit 1, not 2 | Read the message: it names the config error |
 | The merge driver without `%P` skips the markdown check, so it resolves any file | Always pass `%P`, as docs/agent.md shows |

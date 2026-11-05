@@ -477,7 +477,10 @@ dies while its lease is still held, the watchdog kills the command's whole tree 
 lease. On POSIX the command is its own process group, and the group is killed. On Windows Node
 puts a child in a job that dies with Node, but the child's own children (a browser, say) can
 break away, so the watchdog asks Windows once for the live processes whose parent was the child
-and kills each tree. It never kills by the child's pid alone: Windows reuses pids.
+and kills each tree. It never kills by the child's pid alone: Windows reuses pids. The watchdog
+inherits `gpu.priority`, so it raises itself to normal before it asks: below normal, the query can
+take more than 12 s on a busy machine, and the head of the queue reclaims the lease after
+`gpu.staleGraceSeconds` with the command still running.
 
 ### Windows: pids and the bridge
 

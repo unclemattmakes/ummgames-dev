@@ -8,8 +8,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterAll, describe, expect, it } from 'vitest'
-import { leaseDir, parseHolder, parseTicket } from '../../src/agent/lease.mjs'
+import { afterAll, describe, expect, it, vi } from 'vitest'
+import { acquire, Lease, leaseDir, parseHolder, parseTicket } from '../../src/agent/lease.mjs'
 import { findBash } from '../../src/agent/msys.mjs'
 import { pidAlive } from '../../src/agent/proc.mjs'
 
@@ -17,6 +17,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const BIN = path.join(ROOT, 'bin/umm-dev.mjs')
 const HOLD = path.join(ROOT, 'tests/agent/fixtures/hold.mjs')
 const LEGACY = path.join(ROOT, 'tests/agent/fixtures/legacy-lease.sh')
+const WATCHDOG = path.join(ROOT, 'src/agent/watchdog.mjs')
 const WIN = process.platform === 'win32'
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'umm-dev-gpu-'))
@@ -131,6 +132,49 @@ describe('lease format', () => {
   })
 })
 
+// What Windows refuses while another process touches the lease, which POSIX never does.
+describe.runIf(WIN)('lease files on Windows', { timeout: 15_000 }, () => {
+  it('replaces the holder file while a waiter has it open', async () => {
+    const g = setup()
+    fs.mkdirSync(path.join(g.lease, 'gpu.lock'), { recursive: true })
+    const L = new Lease(g.lease, null)
+    const holder = { who: 'a', since: 1, asked: 5, child: null, token: 't' }
+    L.writeHolder(holder)
+    const hold = `const fd = require('fs').openSync(process.argv[1], 'r'); console.log('open'); setTimeout(() => require('fs').closeSync(fd), 300)`
+    const reader = spawn(process.execPath, ['-e', hold, L.holderFile], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    await new Promise((resolve) => reader.stdout.once('data', resolve))
+    L.writeHolder({ ...holder, who: 'b' })
+    expect(L.holder()?.who).toBe('b')
+  })
+
+  it('waits when the last lock is still being deleted', async () => {
+    const g = setup()
+    const L = new Lease(g.lease, null)
+    fs.mkdirSync(g.lease, { recursive: true })
+    const real = fs.mkdirSync
+    const mkdir = vi.spyOn(fs, 'mkdirSync').mockImplementationOnce((p, o) => real(p, o))
+    mkdir.mockImplementationOnce(() => {
+      throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' })
+    })
+    try {
+      const got = await acquire(L, {
+        name: 'a',
+        minutes: 5,
+        waitLimitMs: 5000,
+        pollMs: 20,
+        staleGraceMs: 1000,
+        say: () => {},
+      })
+      expect(got.ok).toBe(true)
+      expect(L.holder()?.who).toBe('a')
+    } finally {
+      mkdir.mockRestore()
+    }
+  })
+})
+
 // Each test starts and kills real process trees, which Windows sometimes takes seconds to do.
 describe('umm-dev gpu', { timeout: 15_000 }, () => {
   it('runs two holders one after the other, and waiters in the order they asked', async () => {
@@ -233,6 +277,39 @@ describe('umm-dev gpu', { timeout: 15_000 }, () => {
     expect(e.a?.end).toBe(0)
     expect(e.b?.start).toBeLessThan((e.a?.start ?? 0) + 8000)
     expect(fs.readFileSync(path.join(g.lease, 'gpu-lease.log'), 'utf8')).toContain('umm-dev died')
+  })
+
+  // Below normal, the watchdog's query waits behind every normal process on a busy machine: the
+  // command outlives the lease it should have died with. Starving it here would need a loaded
+  // machine, so this reads the priority it runs at instead.
+  it.runIf(WIN)('runs its watchdog at normal priority once umm-dev is dead', async () => {
+    const g = setup()
+    fs.mkdirSync(path.join(g.lease, 'gpu.lock'), { recursive: true })
+    const L = new Lease(g.lease, null)
+    L.writeHolder({ who: 'a', since: 1, asked: 5, child: deadPid(), token: 't' })
+    const owner = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], {
+      stdio: 'ignore',
+    })
+    const child = L.holder()?.node?.child
+    const dog = spawn(
+      process.execPath,
+      [WATCHDOG, String(owner.pid), String(child), String(Date.now()), g.lease, 't', 'a'],
+      { stdio: 'ignore' },
+    )
+    const gone = new Promise((resolve) => dog.on('exit', resolve))
+    const below = os.constants.priority.PRIORITY_BELOW_NORMAL
+    os.setPriority(/** @type {number} */ (dog.pid), below) // what it inherits from gpu run
+    owner.kill('SIGKILL')
+    let raised = false
+    await until(() => {
+      try {
+        raised ||= os.getPriority(dog.pid) === os.constants.priority.PRIORITY_NORMAL
+      } catch {}
+      return raised || dog.exitCode !== null
+    }, 12_000)
+    await gone
+    expect(raised).toBe(true)
+    expect(fs.existsSync(path.join(g.lease, 'gpu.lock'))).toBe(false)
   })
 
   it('caps a booking at the max hold, and --long lifts the cap', async () => {
