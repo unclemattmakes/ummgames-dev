@@ -43,6 +43,17 @@ describe('createLiveSet', () => {
     expect(live.ids()).toEqual(['c'])
   })
 
+  it('gives no place to what it never admitted', () => {
+    const live = createLiveSet(2)
+    live.seen('flat')
+    live.unseen('flat')
+    expect(live.ids()).toEqual([])
+    expect(live.admit('a')).toEqual([])
+    live.unseen('a')
+    expect(live.admit('b')).toEqual([])
+    expect(live.ids()).toEqual(['a', 'b'])
+  })
+
   it('holds few enough contexts for a browser', () => {
     expect(MAX_LIVE_3D).toBeLessThan(16)
   })

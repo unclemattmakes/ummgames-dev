@@ -23,5 +23,5 @@
     "tests/**/*",
     "vitest.config.mjs"
   ],
-  "exclude": ["node_modules", "runtime"]
+  "exclude": ["node_modules", "runtime", "tests/making-of/host-page"]
 }

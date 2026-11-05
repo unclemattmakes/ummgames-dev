@@ -11,6 +11,9 @@ import { launchChromium, MediaError } from '../media/util.mjs'
 /** A stage with fewer distinct colours than this drew nothing: a flat fill, or nearly. */
 export const MIN_COLOURS = 4
 
+/** How long a toy's slot may wait for the host to build its stage before it counts as unmounted. */
+const STAGE_TIMEOUT_MS = 10_000
+
 export const VIEWPORTS = {
   desktop: { width: 1280, height: 800, scale: 1 },
   phone: { width: 375, height: 812, scale: 2 },
@@ -138,14 +141,22 @@ export async function shootPages(urls, options = {}) {
       for (let i = 0; i < count; i++) {
         const toy = found.nth(i)
         const id = (await toy.getAttribute('data-toy')) ?? `toy-${i}`
-        await toy.scrollIntoViewIfNeeded()
-        await page.waitForTimeout(wait)
-        const file = path.join(out, `${slug}--${id}${phone ? '-phone' : ''}.png`)
-        await toy.screenshot({ path: file })
         const stage = toy.locator('.demo-stage')
+        // `load` can fire while the page's script is still importing its toys.
+        await stage.waitFor({ state: 'attached', timeout: STAGE_TIMEOUT_MS }).catch(() => {})
         const staged = (await stage.count()) > 0
+        // Centre the stage, not the toy, and read it before anything else moves the page. A toy
+        // taller than the screen leaves its stage off the top, and a capture that has to scroll
+        // back to it can wake the toy above: that toy's controls push the page down mid-capture,
+        // and the shot comes back as flat page background.
+        await (staged ? stage : toy).evaluate((el) => {
+          el.scrollIntoView({ block: 'center', behavior: 'instant' })
+        })
+        await page.waitForTimeout(wait)
         const unmounted = !staged || (await stage.locator('.poster').count()) > 0
         const colours = staged ? await coloursIn(probe, await stage.screenshot()) : 0
+        const file = path.join(out, `${slug}--${id}${phone ? '-phone' : ''}.png`)
+        await toy.screenshot({ path: file })
         const readouts = await toy
           .locator('.demo-readouts')
           .innerText({ timeout: 500 })

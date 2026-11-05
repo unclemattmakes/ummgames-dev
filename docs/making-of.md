@@ -99,6 +99,10 @@ its poster, the page logs a console error or throws, or an element sits past the
 edge. The edge is measured element by element, because `body { overflow-x: hidden }` hides page
 overflow from `scrollWidth`. An element inside something that scrolls or clips is left alone.
 
+Each stage is centred on the screen and read before the toy's own shot, so the capture never has to
+scroll: a scroll can wake the toy above, and its controls would move the page mid-capture. It passes
+each toy once, going down, so it cannot see a fault that needs a reader to scroll back.
+
 | Exit code | When |
 |---|---|
 | 0 | Every page clean. |
@@ -290,7 +294,10 @@ export const toy: ToyDef = {
 **The host owns everything that is not the toy.** A toy mounts when it comes within a viewport of
 the screen and is disposed when it goes further. `frame` runs only while it is on screen. `kind:
 '3d'` holds a WebGL context and counts against `MAX_LIVE_3D`: browsers cap contexts near 16 and
-silently kill the oldest, and a game's world is heavy, so the least recently seen is evicted.
+silently kill the oldest, and a game's world is heavy, so the least recently seen is evicted. A
+`kind: '2d'` toy takes no place under the cap and is never evicted. On a phone more toys fit inside
+the margin than the cap allows, so an evicted toy can stay on its poster until it reaches the screen,
+where it mounts again.
 
 `createToyClock(stepSeconds)` is the game's fixed step for a toy, so its physics never becomes a
 `dt`-per-frame imitation. `step(frameSeconds, onTick)` calls `onTick(dt, tick)` for each whole step

@@ -69,7 +69,8 @@ export const createLiveSet = (max: number) => {
     },
     seen(id: string) {
       visible.add(id)
-      touch(id)
+      // Only what was admitted holds a place: a 2D toy, or one on its poster, takes none.
+      if (order.includes(id)) touch(id)
     },
     unseen(id: string) {
       visible.delete(id)
@@ -116,6 +117,8 @@ interface Live {
   readonly controlsEl: HTMLElement
   toy: Toy | null
   loading: boolean
+  /** Pushed out while its `mount` was still running: dropped as soon as that returns. */
+  evicted: boolean
   onScreen: boolean
 }
 
@@ -125,9 +128,9 @@ const prefersReducedMotion = (): boolean =>
 /**
  * Mount every `<div data-toy="<id>">` on the page whose id is in `defs`. The
  * element becomes the frame; the toy mounts into its stage when it is within a
- * viewport of the screen and is disposed when it has been far away. `line`
- * picks the line under the stage: a chapter's `about`, or the playground's
- * fuller `caption`.
+ * viewport of the screen, or on reaching the screen if the cap pushed it out on
+ * the way, and is disposed when it has been far away. `line` picks the line
+ * under the stage: a chapter's `about`, or the playground's fuller `caption`.
  */
 export const mountToysOnPage = (
   defs: readonly ToyDef[],
@@ -152,7 +155,16 @@ export const mountToysOnPage = (
     label.textContent = def[line]
     const controlsEl = document.createElement('div')
     root.append(stage, controlsEl, label)
-    return { def, root, stage, controlsEl, toy: null, loading: false, onScreen: false }
+    return {
+      def,
+      root,
+      stage,
+      controlsEl,
+      toy: null,
+      loading: false,
+      evicted: false,
+      onScreen: false,
+    }
   }
 
   const dispose = (live: Live) => {
@@ -169,27 +181,33 @@ export const mountToysOnPage = (
   const mount = async (live: Live) => {
     if (live.toy || live.loading) return
     live.loading = true
-    const evicted = live.def.kind === '3d' ? liveSet.admit(live.def.id) : []
-    for (const id of evicted) {
-      const victim = lives.find((l) => l.def.id === id)
-      if (victim) dispose(victim)
+    live.evicted = false
+    if (live.def.kind === '3d') {
+      for (const id of liveSet.admit(live.def.id)) {
+        const victim = lives.find((l) => l.def.id === id)
+        if (victim?.loading) victim.evicted = true
+        else if (victim) dispose(victim)
+      }
+      // `admit` takes a toy for on screen, and one near the screen is not there yet.
+      if (!live.onScreen) liveSet.unseen(live.def.id)
     }
     live.stage.replaceChildren()
     live.controlsEl.replaceChildren()
     const controls = createControls(live.controlsEl)
+    let toy: Toy
     try {
-      const toy = await live.def.mount({ stage: live.stage, controls, reducedMotion: reduced })
-      if (!live.onScreen && !isNear(live.root)) {
-        live.toy = toy
-        dispose(live)
-        return
-      }
-      live.toy = toy
-      const r = live.stage.getBoundingClientRect()
-      toy.resize?.(r.width, r.height)
+      toy = await live.def.mount({ stage: live.stage, controls, reducedMotion: reduced })
     } finally {
       live.loading = false
     }
+    live.toy = toy
+    if (live.evicted || (!live.onScreen && !isNear(live.root))) {
+      dispose(live)
+      if (live.onScreen) void mount(live)
+      return
+    }
+    const r = live.stage.getBoundingClientRect()
+    toy.resize?.(r.width, r.height)
   }
 
   const isNear = (el: HTMLElement): boolean => {
@@ -213,8 +231,12 @@ export const mountToysOnPage = (
       const live = lives.find((l) => l.root === e.target)
       if (!live) continue
       live.onScreen = e.isIntersecting
-      if (e.isIntersecting) liveSet.seen(live.def.id)
-      else liveSet.unseen(live.def.id)
+      if (e.isIntersecting) {
+        liveSet.seen(live.def.id)
+        // `near` fires only on crossing its margin, so a toy the cap pushed out inside the
+        // margin has nothing else to bring it back.
+        void mount(live)
+      } else liveSet.unseen(live.def.id)
     }
   })
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.10.1 (2026-11-04)
+
+The toy host and the shot check, fixed for a phone. A game with a copy of `toy-host.ts` should take
+the new one (`umm-dev drift` prints the line).
+
+- `runtime/making-of/toy-host.ts`: **a toy could stay on its poster on screen.** `near` fires only on
+  crossing its margin, so a toy evicted inside the margin had nothing to bring it back, and a reader
+  who scrolled back a little found an empty frame. A toy now mounts on reaching the screen too.
+- `createLiveSet`: `seen` gave a place to anything it saw, so 2D toys filled the 3D cap and were then
+  disposed as if they held a context. Only what was admitted holds a place now. A toy admitted while
+  off screen no longer counts as on screen, which had kept it from ever being evicted.
+- A toy evicted while its `mount` was running used to land on its poster, uncounted by the cap. It is
+  now dropped when `mount` returns.
+- `umm-dev making-of shot`: centres each stage and reads it before shooting the toy. A toy taller
+  than the screen left its stage off the top, the capture's own scroll woke the toy above, and the
+  page moved mid-capture: "drew nothing" for a toy that had drawn. It also waits for a stage the page
+  builds after `load`.
+- A clean shot does not prove the host. It passes each toy once, and the stuck poster needs a reader
+  who comes back, so `tests/making-of/shot.slow.test.mjs` walks a page down and back instead.
 ## 0.10.0 (2026-11-04)
 
 A mix bus. Nothing in a game must change.
