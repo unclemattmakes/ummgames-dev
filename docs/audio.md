@@ -3,8 +3,8 @@
 `umm-dev loudness` meters audio files after ITU-R BS.1770-4: integrated loudness, true peak and
 the loudest moment. It is how a game checks a mix, a music bed or a trailer's audio against a
 target before it ships. It is **linked**: the command and the meter behind it run from
-`node_modules`, and `@ummgames/dev/audio` exports the meter for a game's own tools. It needs
-`ffmpeg` and `ffprobe` on `PATH`. The core of a game's own procedural music sequencer (pitch,
+`node_modules`, and `@ummgames/dev/audio` exports the meter and a [mix bus](#the-mix-bus) for a
+game's own tools. The command needs `ffmpeg` and `ffprobe` on `PATH`. The core of a game's own procedural music sequencer (pitch,
 form, conductor and step clock) is runtime code a game copies, in
 [runtime.md](runtime.md#runtimeaudio).
 
@@ -98,8 +98,47 @@ const result = meter.result()                                 // once; then make
 | `TRUE_PEAK_TAPS` | Taps per phase of the true-peak interpolator (48). |
 
 Every result is a `Loudness`: `integrated`, `momentaryMax`, `shortTermMax` (the loudest 3 s),
-`truePeak`, `samplePeak`, `seconds`, `sampleRate` and `channels`. LUFS and dB values are
+`range` (loudness range in LU, 0 under 3 s), `truePeak`, `samplePeak`, `seconds`, `sampleRate` and `channels`. LUFS and dB values are
 `-Infinity` for silence.
+
+### The mix bus
+
+For a tool that renders its own stems, such as a trailer soundtrack made from a game's own sound.
+**Audio is one `Float32Array` per channel.** Every function takes `sampleRate` in its options,
+default 48000. Nothing here reads a file or needs ffmpeg.
+
+```js
+import { duck, encodeWav, master, measure, phone } from '@ummgames/dev/audio'
+
+const d = duck(effects, { threshold: -20, depth: 6 })        // the music, under the effects
+const mix = [0, 1].map((c) => music[c].map((v, i) => v * d.gain[i] + effects[c][i]))
+const { out, cut } = master(mix, { target: -14, ceiling: -1.5 })
+fs.writeFileSync('soundtrack.wav', encodeWav(out))
+fs.writeFileSync('soundtrack-phone.wav', encodeWav(phone(out)))
+console.log(measure(out, 48000).integrated, cut)
+```
+
+| Export | What it does |
+|---|---|
+| `master(chans, { target, ceiling, passes })` | Gain to `target` LUFS (default -14), limit at `ceiling` dBTP (default -1.5), and again until both hold, at most `passes` times (default 4). Returns `{ out, cut }`. Silence comes back unchanged. |
+| `limit(chans, ceiling, { lookahead, release })` | A look-ahead true-peak limiter, one gain for all channels. `lookahead` defaults to 0.005 s, `release` to 0.12 s. Returns `{ out, cut }`, `cut` being the deepest cut in dB. |
+| `duck(key, { threshold, depth, ratio, attack, release })` | A sidechain duck: `key` over `threshold` dBFS cuts by `ratio` (default 0.6) of each dB, at most `depth` dB. `attack` defaults to 0.01 s, `release` to 0.3 s. Returns `{ gain, ducked, deepest }`: the linear gain per sample, the share of time cut by over 1 dB, and the deepest cut in dB. |
+| `phone(chans)` | A phone's speaker: one channel, nothing under 300 Hz, rolled off over 8 kHz. |
+| `peakAt(chans)` | The true peak and when it is: `{ db, at }`. |
+| `gain(chans, db)`, `dbToGain(db)` | A copy `db` louder; dB to a linear gain. |
+| `biquad(x, f)` | One `Biquad` over one channel. |
+| `pass(kind, hz, { q })`, `shelf(kind, hz, db)` | RBJ filters as a `Biquad`: `'high'` or `'low'`. `q` defaults to 0.7071. |
+| `encodeWav(chans)` | A 24-bit PCM WAV in a `Buffer`, clipped at full scale. |
+
+**Into a cut.** A finished soundtrack goes into [`umm-dev cut`](media.md) as its `music`, one
+range long: `"music": { "file": "dist-audio/soundtrack.wav", "ranges": [[0, 60]], "fadeOut": 0.01 }`.
+Give `fadeOut` a small value, or the cut adds its 3 s default on top of the master's own ending.
+Then meter the finished video with `umm-dev loudness`: the AAC encoder moves the true peak, which
+is why the default ceiling sits at -1.5 dBTP, under the -1 most platforms ask for.
+
+**Sound on the frame.** To replay what a game played during a capture, return its sound calls from
+the [`state` hook](media.md): each frame's line in `states.jsonl` then holds the calls made on that
+frame, on the clip's own clock. Rendering them is the game's own code, since only it has its synth.
 
 ## Config: `loudness`
 
@@ -134,6 +173,7 @@ audio stream is metered, at its own sample rate and channel count.
     "integrated": -19.993203182819908,
     "momentaryMax": -19.993200092926944,
     "shortTermMax": -19.993200092927115,
+    "range": 0,
     "truePeak": -19.999469871546843,
     "samplePeak": -19.999469871546843,
     "seconds": 10,
@@ -158,6 +198,9 @@ audio stream is metered, at its own sample rate and channel count.
   Rs: the LFE weighs 0, the surrounds 1.41, and any channel past the sixth 1. A mono file is one
   channel, so a 0 dBFS 1 kHz sine reads -3.01 LUFS, as the standard says. The same sine in both
   channels of a stereo file reads 0.
+- **Limiter.** The detector is the meter's own true-peak interpolator, so what the limiter holds is
+  what `measure` reads. Each sample's needed gain is held forward over the look-ahead and ramped
+  in, so the gain is down before the peak arrives, then let go over `release`.
 - **Checks.** The tests check the meter against signals with known answers (a 1 kHz sine at
   -20 dBFS, silence, a quarter-rate sine whose samples all miss its crest). The slow test checks
   it against ffmpeg's own `ebur128` filter on pink noise: within 0.1 LU and 0.2 dB.

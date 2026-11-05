@@ -161,7 +161,7 @@ export default defineConfig(playwrightConfig({ device: devices['Desktop Chrome']
 ## Libraries
 
 `@ummgames/dev/media` is the code behind the media commands: the capture clock, the edit-list
-validator and planner, the store checks. `@ummgames/dev/audio` is the loudness meter, for meters
+validator and planner, the store checks. `@ummgames/dev/audio` is the loudness meter and a mix bus, for meters
 that run inside a game's own tools. `@ummgames/dev/gltf` is a glTF-Transform `NodeIO` with both
 meshopt codecs, the shrink pass behind `umm-dev gltf`, and a decoder for KHR_meshopt_compression
 GLBs; its glTF packages are optional peers a game adds itself ([docs/gltf.md](docs/gltf.md)).

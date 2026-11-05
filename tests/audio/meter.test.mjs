@@ -94,3 +94,18 @@ describe('loudness', () => {
     expect(lufs(0)).toBe(Number.NEGATIVE_INFINITY)
   })
 })
+
+describe('loudness range', () => {
+  it('is the spread of the 3 s blocks: 0 for a steady tone, about the step for two levels', () => {
+    const steady = sine(-20, 1000, 12)
+    expect(measure([steady, steady], 48000).range).toBeCloseTo(0, 1)
+    const stepped = new Float32Array(24 * 48000)
+    stepped.set(sine(-30, 1000, 12), 0)
+    stepped.set(sine(-20, 1000, 12), 12 * 48000)
+    expect(measure([stepped, stepped], 48000).range).toBeCloseTo(10, 0)
+  })
+
+  it('is 0 under 3 s', () => {
+    expect(measure([sine(-20, 1000, 2)], 48000).range).toBe(0)
+  })
+})

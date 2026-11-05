@@ -1,8 +1,8 @@
 // @ts-check
 /**
  * A loudness meter after ITU-R BS.1770-4: K-weighted, gated integrated loudness (LUFS), the
- * loudest 400 ms (momentary max) and 3 s (short-term max), and true peak (dBTP, 4x
- * oversampled below 96 kHz).
+ * loudest 400 ms (momentary max) and 3 s (short-term max), the loudness range, and true peak
+ * (dBTP, 4x oversampled below 96 kHz).
  *
  * It streams: `push()` takes interleaved float samples in chunks of any size, and memory is a
  * few numbers per 100 ms of audio, so an hour-long file meters in the same space as a second.
@@ -88,10 +88,18 @@ function interpolators(factor) {
 }
 
 /**
+ * The interpolators for a sample rate's true peak: 4x below 96 kHz, 2x below 192 kHz, else none.
+ * @param {number} sampleRate
+ */
+export const oversampling = (sampleRate) =>
+  interpolators(sampleRate < 96000 ? 4 : sampleRate < 192000 ? 2 : 1)
+
+/**
  * @typedef {{
  *   integrated: number,
  *   momentaryMax: number,
  *   shortTermMax: number,
+ *   range: number,
  *   truePeak: number,
  *   samplePeak: number,
  *   seconds: number,
@@ -116,8 +124,7 @@ export function createMeter({ sampleRate, channels }) {
   let segFill = 0
   let frames = 0
 
-  const factor = sampleRate < 96000 ? 4 : sampleRate < 192000 ? 2 : 1
-  const phases = interpolators(factor)
+  const phases = oversampling(sampleRate)
   const N = TRUE_PEAK_TAPS
   // History ring per channel, doubled so a window is always contiguous.
   const hist = Array.from({ length: channels }, () => new Float64Array(2 * N))
@@ -226,12 +233,23 @@ export function createMeter({ sampleRate, channels }) {
         const gated = abs.filter((b) => lufs(b) > rel)
         if (gated.length) integrated = lufs(mean(gated))
       }
+      // Loudness range: the 3 s blocks over -70 LUFS and within 20 LU of their mean, 10th to 95th
+      // percentile.
+      const absShort = short.filter((b) => lufs(b) > -70)
+      const floor = absShort.length ? lufs(mean(absShort)) - 20 : 0
+      const spread = absShort
+        .filter((b) => lufs(b) > floor)
+        .map(lufs)
+        .sort((a, b) => a - b)
+      const pct = (/** @type {number} */ p) =>
+        spread[Math.min(spread.length - 1, Math.floor(p * spread.length))] ?? 0
       const db = (/** @type {number} */ a) =>
         a > 0 ? 20 * Math.log10(a) : Number.NEGATIVE_INFINITY
       return {
         integrated,
         momentaryMax: lufs(momentary.reduce((a, b) => Math.max(a, b), 0)),
         shortTermMax: lufs(short.reduce((a, b) => Math.max(a, b), 0)),
+        range: pct(0.95) - pct(0.1),
         truePeak: db(truePeak),
         samplePeak: db(samplePeak),
         seconds: frames / sampleRate,

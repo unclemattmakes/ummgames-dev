@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.0 (2026-11-04)
+
+A mix bus. Nothing in a game must change.
+
+**The kit could meter a soundtrack and put one in a cut, but not make one.** A tool that renders
+its own stems now has the rest in `@ummgames/dev/audio`. See
+[docs/audio.md](docs/audio.md#the-mix-bus).
+
+- `master`, `limit`, `duck`, `phone`, `peakAt`, `gain`, `dbToGain`, `biquad`, `pass`, `shelf` and
+  `encodeWav`, on plain channel arrays at any sample rate. The limiter's detector is the meter's
+  true-peak interpolator.
+- `Loudness` gains `range`, the loudness range in LU, so `umm-dev loudness --json` rows carry it too.
+- docs/audio.md says how a soundtrack goes into `umm-dev cut`, and how the `state` hook records a
+  game's sound calls frame by frame during a capture.
+
 ## 0.9.0 (2026-11-04)
 
 A shared making-of core. Nothing in a game must change.
