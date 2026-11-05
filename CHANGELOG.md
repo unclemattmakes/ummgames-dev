@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- docs/audio.md: **the 0.10.0 note on recording sound calls was wrong.** It said the `state` hook
+  records a game's sound calls frame by frame. The hook runs only on recorded frames, so calls from
+  before the clip opens would all land on frame 0, and the route was never tested. The page now says
+  the kit doesn't record them yet, that the mix bus is the last stage only, and what `cut` needs from
+  an edit planned in beats.
+
 ## 0.10.2 (2026-11-04)
 
 Fixes found by the release gate failing on a shared machine. Nothing in a game must change, but a

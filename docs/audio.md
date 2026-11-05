@@ -104,6 +104,8 @@ Every result is a `Loudness`: `integrated`, `momentaryMax`, `shortTermMax` (the 
 ### The mix bus
 
 For a tool that renders its own stems, such as a trailer soundtrack made from a game's own sound.
+This is the last stage only: the kit mixes stems, and making them is the tool's job, including
+replaying the game's sound, placing music on a beat and levelling each stem.
 **Audio is one `Float32Array` per channel.** Every function takes `sampleRate` in its options,
 default 48000. Nothing here reads a file or needs ffmpeg.
 
@@ -136,9 +138,15 @@ Give `fadeOut` a small value, or the cut adds its 3 s default on top of the mast
 Then meter the finished video with `umm-dev loudness`: the AAC encoder moves the true peak, which
 is why the default ceiling sits at -1.5 dBTP, under the -1 most platforms ask for.
 
-**Sound on the frame.** To replay what a game played during a capture, return its sound calls from
-the [`state` hook](media.md): each frame's line in `states.jsonl` then holds the calls made on that
-frame, on the clip's own clock. Rendering them is the game's own code, since only it has its synth.
+`cut` reads a plain edit list: each shot has its own `in` and `dur` in seconds, and `validateEdl`
+refuses fields it doesn't know. A tool that plans an edit in beats, or times a shot to a moment in
+the game, works those out first and writes the plain list.
+
+**Sound during a capture.** The kit doesn't record a game's sound calls yet. The
+[`state` hook](media.md) isn't enough on its own, because it runs only on recorded frames: calls
+made before the clip opens, such as the music's opening state or a pre-roll, would all arrive on
+frame 0. A game trying it has to log each call's own time and convert it to the clip's clock. That
+route is untested. Rendering the calls is the game's own code, since only it has its synth.
 
 ## Config: `loudness`
 
