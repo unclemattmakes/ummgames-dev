@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.2 (2026-11-04)
 
 Fixes found by the release gate failing on a shared machine. Nothing in a game must change, but a
 shot's first frames can move: see the first entry.
