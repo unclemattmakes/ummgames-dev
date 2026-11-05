@@ -7,9 +7,12 @@
  * runs, and seeds `Math.random`. rAF callbacks run only from the clock's own pump, which runs on
  * the real rAF and moves through three phases:
  *
- *   boot  one virtual frame per real frame, so loading screens animate as usual. On the first
- *         frame at or past `bootFrames` where the ready predicate holds (or the moment the game
- *         assigns its debug global, with `hold: 'assign'`), the clock enters hold.
+ *   boot  one virtual frame per real frame, so loading screens animate as usual. Time starts
+ *         when the game first asks for a frame, or the page finishes loading if it never does:
+ *         a page takes as long to load as the machine and the dev server allow, so a frame
+ *         counted before the game exists would move it along by a different amount each run.
+ *         On the first frame at or past `bootFrames` where the ready predicate holds (or the
+ *         moment the game assigns its debug global, with `hold: 'assign'`), the clock enters hold.
  *   hold  time FREEZES. rAF callbacks still run (the game keeps rendering, a fixed-step sim
  *         gains no ticks), so code that awaits a frame still finishes. The harness hides
  *         overlays and runs prep hooks here, at a known tick: tick 0.
@@ -228,8 +231,10 @@ export function installClock(cfg) {
     vt.pumps++
     if (vt.busy) return
     if (vt.mode === 'run' && ++vt.count % cfg.skip) return
-    if (vt.mode === 'boot') vt.frames++
-    else if (vt.mode === 'run') {
+    if (vt.mode === 'boot') {
+      if (!pending.size && document.readyState !== 'complete') return
+      vt.frames++
+    } else if (vt.mode === 'run') {
       if (vt.frames - vt.tick0 >= vt.hi) {
         vt.mode = 'hold'
         vt.recording = false

@@ -449,7 +449,7 @@ cutEdl({ ...edl, out: 'dist-video/from-code.mp4' }, { root: process.cwd() })
 | `debugGlobal` | `string \| null` | `null` | The name of the game's debug handle on `window`. Hooks and shot JS get it as `debug`. |
 | `ready` | `((debug, clock) => boolean) \| string \| null` | `null` (always ready) | Page hook: the game is ready to shoot. |
 | `hold` | `'ready' \| 'assign'` | `'ready'` | What ends boot. `'ready'`: the first frame at or past `bootFrames` where `ready` holds. `'assign'`: the moment the game assigns `window[debugGlobal]`; then capture waits, time frozen, for `ready`. Needs `debugGlobal`. |
-| `bootFrames` | `number` | `60` | The earliest boot frame that can become tick 0, with `hold: 'ready'`. |
+| `bootFrames` | `number` | `60` | The earliest boot frame that can become tick 0, with `hold: 'ready'`. Boot frames count from the game's first `requestAnimationFrame`. |
 | `hide` | `((names, debug) => void) \| string \| null` | `null` (CSS selectors) | Page hook: hides a shot's `hide` list at tick 0. The default treats each name as a CSS selector and sets it `display: none`. |
 | `prep` | `((shot, debug) => unknown) \| string \| null` | `null` | Page hook: runs at tick 0 for every shot, before the shot's own `prep`. What it returns is printed. |
 | `state` | `((debug) => unknown) \| string \| null` | `null` | Page hook: runs on every recorded frame. What it returns goes to `states.jsonl`, one JSON line per frame, and `--compare` compares those lines. |
@@ -825,10 +825,11 @@ clock before any game code runs. It replaces `requestAnimationFrame`, `performan
 `Date.now`, and seeds `Math.random`. rAF callbacks then run only from the clock's own pump, in
 three phases:
 
-1. **Boot.** One virtual frame per real frame, so loading screens animate as usual. With
-   `hold: 'ready'`, the clock holds on the first frame at or past `bootFrames` where `ready`
-   holds. With `hold: 'assign'`, it holds the moment the game assigns `debugGlobal`, then waits
-   for `ready`.
+1. **Boot.** One virtual frame per real frame, so loading screens animate as usual. Time starts
+   when the game first calls `requestAnimationFrame`, or when the page finishes loading if it
+   never does, so a slow page load does not move the game along. With `hold: 'ready'`, the clock
+   holds on the first frame at or past `bootFrames` where `ready` holds. With `hold: 'assign'`, it
+   holds the moment the game assigns `debugGlobal`, then waits for `ready`.
 2. **Hold.** Time freezes. rAF callbacks still run, so the game keeps drawing, but a fixed-step
    sim gains no ticks. Capture runs `hide` and `prep` here. This frame is tick 0.
 3. **Run.** Each pumped frame advances exactly `1/fps` s. Events fire on their frame, before its
@@ -842,6 +843,10 @@ fixed-step accumulator steps 0 ticks, then 2.
 **Only those clocks are virtual.** `setTimeout`, `setInterval`, CSS animations, `<video>`, Web
 Audio's clock and Workers run in real time. A game that times its sim with them does not stay in
 step.
+
+**A game that starts itself late needs `hold: 'assign'`.** A game that awaits a fetch before its
+first frame, with a loading screen already on rAF, starts at a boot frame set by how fast the fetch
+was. Assign `debugGlobal` when it is ready to start, so tick 0 is that moment in every run.
 
 ### Frame numbers
 
@@ -883,7 +888,7 @@ join first puts every segment on ffmpeg's default timebase (`settb=AVTB`).
 | `expect false` on a shot with a `query`, and the printed URL lacks its flags | `capture.shotUrl` drops the shot's `query`. | Merge `shot.query` in `shotUrl`: see [The URL](#the-url-query-and-shoturl). |
 | `expect error: ... Cannot read properties of undefined` | `debug` is undefined: `debugGlobal` is unset or wrong. | Set `debugGlobal`. |
 | `[<shot>] Failed to load resource: the server responded with a status of 404 (Not Found)` | Usually the browser asking for `/favicon.ico`. | Harmless. Add a favicon to silence it. |
-| `--compare` says `DIFFERENT footage` | The game reads a real clock (timers, Web Audio, Workers) or unseeded randomness (`crypto.getRandomValues`), or the GPU drew differently. | Compare the `state` line: when the state agrees, only the pixels differ, on the GPU. |
+| `--compare` says `DIFFERENT footage` | The game reads a real clock (timers, Web Audio, Workers) or unseeded randomness (`crypto.getRandomValues`), starts itself at a boot frame set by a load, or the GPU drew differently. | Compare the `state` line. When the state agrees, only the drawing differs: check that it does not depend on how long the game took to start, then look to the GPU. |
 | `--compare` says `SAME footage` with `frames: 0 vs 0` | Neither folder holds frames, often a mistyped path. | Check both paths. |
 | `no shots file <file>: write one (docs/media.md, Shots), or set capture.shots or --file` | The shots file is not there. Under `store`, `store.shots` names it. | Write the file, or fix the path. |
 | `no shot "<name>" in <file> (--list shows them)` | The name is not in the shots file. | `umm-dev capture --list`. |

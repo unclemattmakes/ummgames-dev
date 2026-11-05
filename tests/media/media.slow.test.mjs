@@ -39,6 +39,14 @@ async function umm(/** @type {{ run: Function }} */ cmd, /** @type {string[]} */
   }
 }
 
+/** @type {ReturnType<typeof umm> | undefined} */
+let firstCapture
+/** The shot's first capture, taken once: the compare tests need it and may run alone with -t. */
+const captureMove = () => {
+  firstCapture ??= umm(capture, ['move', '--sheet', '--out', cap])
+  return firstCapture
+}
+
 /** moov before mdat: the file plays before it has fully loaded. @param {string} f */
 const faststart = (f) => {
   const b = fs.readFileSync(f)
@@ -52,7 +60,7 @@ afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }))
 
 describe.sequential('capture, cut, loop, store', () => {
   it('captures a shot frame-exact, keys landing on their frame', async () => {
-    const r = await umm(capture, ['move', '--sheet', '--out', cap])
+    const r = await captureMove()
     expect(r.code, r.text).toBe(0)
     expect(r.text).toContain('[move] 30 frames, 0 missing')
     const dir = path.join(cap, 'move')
@@ -74,6 +82,7 @@ describe.sequential('capture, cut, loop, store', () => {
   })
 
   it('captures the same footage twice', async () => {
+    expect((await captureMove()).code).toBe(0)
     expect((await umm(capture, ['move', '--tag', 'again', '--out', cap])).code).toBe(0)
     const r = await umm(capture, [
       '--compare',
@@ -82,6 +91,30 @@ describe.sequential('capture, cut, loop, store', () => {
     ])
     expect(r.text).toContain('pixels: 30/30 frames bit-identical')
     expect(r.text).toContain('state: 30/30 frames identical')
+    expect(r.code).toBe(0)
+  })
+
+  it('captures the same footage when the game loads late', async () => {
+    expect((await captureMove()).code).toBe(0)
+    // The dev server holds the game's script back, as a busy machine does. Hundreds of real
+    // frames can pass before the game exists; none of them may count as game time.
+    const config = path.join(game, 'vite.config.mjs')
+    fs.writeFileSync(
+      config,
+      `export default { plugins: [{ name: 'late', configureServer(s) {
+        s.middlewares.use((req, _res, next) => {
+          if (req.url?.startsWith('/main.js')) setTimeout(next, 500)
+          else next()
+        })
+      } }] }`,
+    )
+    try {
+      expect((await umm(capture, ['move', '--tag', 'late', '--out', cap])).code).toBe(0)
+    } finally {
+      fs.rmSync(config)
+    }
+    const r = await umm(capture, ['--compare', path.join(cap, 'move'), path.join(cap, 'move@late')])
+    expect(r.text).toContain('pixels: 30/30 frames bit-identical')
     expect(r.code).toBe(0)
   })
 

@@ -77,7 +77,7 @@ export interface CaptureConfig {
   ready?: ((debug: Debug, clock: CaptureClock) => boolean) | string | null
   /** What ends boot: `ready` holds, or the game assigns `debugGlobal` (default `'ready'`). */
   hold?: 'ready' | 'assign'
-  /** The earliest boot frame that can become tick 0, with `hold: 'ready'` (default 60). */
+  /** The earliest boot frame that can become tick 0, with `hold: 'ready'`, counted from the game's first rAF (default 60). */
   bootFrames?: number
   /** Page hook hiding a shot's `hide` list at tick 0 (default null: each name is a CSS selector). */
   hide?: ((names: string[], debug: Debug) => void) | string | null

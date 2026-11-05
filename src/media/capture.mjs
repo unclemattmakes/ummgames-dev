@@ -54,7 +54,7 @@ export const CAPTURE_DEFAULTS = {
   /** `ready`: hold on the first boot frame where `ready` holds. `assign`: hold the moment the
    *  game assigns `debugGlobal`, then wait (time frozen) for `ready`. */
   hold: /** @type {'ready' | 'assign'} */ ('ready'),
-  /** Earliest boot frame that can become tick 0. */
+  /** Earliest boot frame that can become tick 0, counted from the game's first rAF. */
   bootFrames: 60,
   /** Page function `(names, debug) => void` hiding a shot's `hide` list. Default: CSS selectors. */
   hide: /** @type {unknown} */ (null),

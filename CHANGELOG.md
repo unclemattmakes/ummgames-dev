@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+Fixes found by the release gate failing on a shared machine. Nothing in a game must change, but a
+shot's first frames can move: see the first entry.
+
+- `capture`: **a slow page load moved the game along.** The clock counted boot frames from the
+  moment the page opened, so a game whose script arrived 532 real frames late (seen on a busy
+  machine) was 532 frames younger at tick 0, and every frame of the shot differed from the last
+  capture's, though `states.jsonl` agreed. Boot time now starts when the game first asks for a frame,
+  or when the page finishes loading if it never does. `bootFrames` counts from there.
+  `tests/media/media.slow.test.mjs` holds the game's script back to prove it, and its compare tests
+  no longer need an earlier test: run alone, they printed `pixels: 0/0`.
+
 ## 0.10.1 (2026-11-04)
 
 The toy host and the shot check, fixed for a phone. A game with a copy of `toy-host.ts` should take
