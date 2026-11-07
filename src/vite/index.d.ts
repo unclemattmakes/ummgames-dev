@@ -24,6 +24,11 @@ export interface HeadersOptions {
   assetsDir?: string
   /** More rules after the built-in ones: path pattern to headers. Default none. */
   rules?: Readonly<Record<string, Readonly<Record<string, string>>>>
+  /**
+   * Exact `https://` origins that may frame the site beside its own, such as a station that airs it.
+   * They join `frame-ancestors 'self'`, and `X-Frame-Options` is left out. Default none.
+   */
+  framedBy?: readonly string[]
 }
 /**
  * The text of `_headers`. Throws on a newline in a rule, and on `target` or `frameAncestors`

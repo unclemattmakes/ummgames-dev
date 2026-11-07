@@ -9,6 +9,8 @@
  *   hostnames a game does not own the list of.
  * - **Framing.** The build may be framed by its own origin only: `X-Frame-Options: SAMEORIGIN`
  *   and CSP `frame-ancestors 'self'`. A CSP holding only `frame-ancestors` restricts nothing else.
+ *   `framedBy` names other exact origins that may frame the site too, such as a station that airs
+ *   it; then `X-Frame-Options` is left out, because it cannot name another origin.
  * - **Permissions-Policy** denying what a game never asks for: camera, microphone, geolocation,
  *   payment, USB. Gamepads, fullscreen and the clipboard stay at the browser's default.
  *
@@ -46,7 +48,32 @@ export function securityHeaders() {
  * @property {string} [assetsDir] Default `assets`, Vite's `build.assetsDir`.
  * @property {Readonly<Record<string, Readonly<Record<string, string>>>>} [rules]
  *   More rules, path pattern to headers, after the built-in ones.
+ * @property {readonly string[]} [framedBy] Exact `https://` origins that may frame the site, beside
+ *   its own.
  */
+
+/** `https://host` or `https://host:port`, nothing more: no path, no wildcard, no scheme but https. */
+const ORIGIN =
+  /^https:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:\d{1,5})?$/
+
+/**
+ * The `/*` headers, with `framedBy` folded in.
+ * @param {readonly string[]} framedBy
+ * @returns {Record<string, string>}
+ */
+function siteHeaders(framedBy) {
+  const h = securityHeaders()
+  if (framedBy.length === 0) return h
+  for (const origin of framedBy) {
+    if (!ORIGIN.test(origin)) {
+      throw new Error(
+        `headers: framedBy takes exact https:// origins, not ${JSON.stringify(origin)}`,
+      )
+    }
+  }
+  const { 'X-Frame-Options': _, ...rest } = h
+  return { ...rest, 'Content-Security-Policy': `frame-ancestors 'self' ${framedBy.join(' ')}` }
+}
 
 /**
  * The text of `_headers`.
@@ -60,13 +87,13 @@ export function headersFile(options = {}) {
       throw new Error(`headers: ${gone} was removed in 0.2.0; _headers is for the site build only`)
     }
   }
-  const { immutableAssets = false, assetsDir = 'assets', rules = {} } = options
+  const { immutableAssets = false, assetsDir = 'assets', rules = {}, framedBy = [] } = options
   const block = (/** @type {string} */ pattern, /** @type {Record<string, string>} */ h) => {
     clean(pattern)
     const lines = Object.entries(h).map(([k, v]) => `  ${clean(k)}: ${clean(v)}\n`)
     return `${pattern}\n${lines.join('')}`
   }
-  const sections = [block('/*', securityHeaders())]
+  const sections = [block('/*', siteHeaders(framedBy))]
   if (immutableAssets) sections.push(block(`/${assetsDir}/*`, { 'Cache-Control': IMMUTABLE_CACHE }))
   for (const [pattern, h] of Object.entries(rules)) sections.push(block(pattern, { ...h }))
   return sections.join('')

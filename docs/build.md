@@ -93,6 +93,7 @@ that matches. Pages alone sends only `nosniff` and a referrer policy.
 |---|---|---|---|
 | `immutableAssets` | `boolean` | `false` | Adds a year-long immutable cache rule for `/<build.assetsDir>/*`, and fails the build on an unhashed file there. |
 | `rules` | `Record<string, Record<string, string>>` | `{}` | More path rules, written after the built-in ones. |
+| `framedBy` | `string[]` | `[]` | Exact `https://` origins that may frame the site beside its own. |
 
 The assets folder is Vite's `build.assetsDir` (default `assets`), read from the config.
 
@@ -102,6 +103,13 @@ The assets folder is Vite's `build.assetsDir` (default `assets`), read from the 
   `Content-Security-Policy: frame-ancestors 'self'`.
 - `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`. Gamepads,
   fullscreen and the clipboard stay at the browser's default.
+
+**Framed by another site of ours.** `framedBy: ['https://tv.ummgames.com']` lets that origin show
+the site in an iframe, as a station airs a game. The `/*` rule then sends
+`Content-Security-Policy: frame-ancestors 'self' https://tv.ummgames.com` and no `X-Frame-Options`,
+which cannot name another origin; every browser that reads `frame-ancestors` prefers it anyway. Only
+exact `https://` origins are taken: no path, no wildcard, no `http://`. Do not use it to keep one
+`/*` rule of your own beside the kit's, since Cloudflare drops an earlier rule with the same pattern.
 
 **For the site build only.** A build another origin frames, such as one a web portal shows in an
 iframe, needs its own `_headers`, and this plugin does not write one. Until 0.2.0 that was

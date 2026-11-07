@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **`headers({ framedBy })`.** Exact `https://` origins that may frame the site build beside its own,
+  for a station that airs a game. They join `frame-ancestors 'self'`, and `X-Frame-Options` is left
+  out. Anything but an exact `https://` origin throws when the config loads. Without it, nothing
+  changes.
+
 - docs/audio.md: **the 0.10.0 note on recording sound calls was wrong.** It said the `state` hook
   records a game's sound calls frame by frame. The hook runs only on recorded frames, so calls from
   before the clip opens would all land on frame 0, and the route was never tested. The page now says

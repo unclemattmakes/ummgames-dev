@@ -51,6 +51,26 @@ describe('headersFile', () => {
     expect(() => headersFile({ rules: { '/x': { A: 'b\nC: d' } } })).toThrow(/bad _headers text/)
   })
 
+  it('lets a named origin frame the site, and only an exact https origin', () => {
+    const text = headersFile({ framedBy: ['https://tv.ummgames.com'] })
+    expect(header(text, 'Content-Security-Policy')).toBe(
+      "frame-ancestors 'self' https://tv.ummgames.com",
+    )
+    expect(text).not.toContain('X-Frame-Options')
+    expect(header(text, 'Strict-Transport-Security')).toBe('max-age=31536000')
+    expect(header(headersFile({ framedBy: [] }), 'X-Frame-Options')).toBe('SAMEORIGIN')
+    for (const bad of [
+      'http://tv.ummgames.com',
+      'https://*.ummgames.com',
+      'https://tv.ummgames.com/',
+      'https://tv.ummgames.com/x',
+      "'self'",
+      'https://tv.ummgames.com https://evil.example',
+    ]) {
+      expect(() => headersFile({ framedBy: [bad] }), bad).toThrow(/framedBy/)
+    }
+  })
+
   it('knows a hashed name from a stable one', () => {
     expect(hashedAsset().test('assets/index-CmsxLgAy.js')).toBe(true)
     expect(hashedAsset().test('assets/index-a_b-c1d2.css')).toBe(true)
