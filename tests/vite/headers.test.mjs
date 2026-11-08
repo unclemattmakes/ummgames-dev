@@ -25,6 +25,12 @@ describe('the header policy', () => {
     expect(h['Strict-Transport-Security']).toBe('max-age=31536000')
     expect(h['Permissions-Policy']).toContain('camera=()')
   })
+
+  it('sends nosniff and a referrer policy itself, which Workers static assets do not', () => {
+    const h = securityHeaders()
+    expect(h['X-Content-Type-Options']).toBe('nosniff')
+    expect(h['Referrer-Policy']).toBe('strict-origin-when-cross-origin')
+  })
 })
 
 describe('headersFile', () => {
@@ -36,6 +42,8 @@ describe('headersFile', () => {
     expect(text).toBe(
       [
         '/*',
+        '  X-Content-Type-Options: nosniff',
+        '  Referrer-Policy: strict-origin-when-cross-origin',
         '  Strict-Transport-Security: max-age=31536000',
         '  X-Frame-Options: SAMEORIGIN',
         "  Content-Security-Policy: frame-ancestors 'self'",

@@ -1,9 +1,10 @@
 // @ts-check
 /**
- * Cloudflare Pages' `_headers` file: security headers on every path, and a year-long cache on
- * hashed output.
+ * Cloudflare's `_headers` file: security headers on every path, and a year-long cache on hashed
+ * output. Workers static assets and Pages both read it.
  *
- * Pages sends only `nosniff` and a referrer policy by default. This adds:
+ * - **`nosniff` and a referrer policy.** Pages sends these by default, but Workers static assets,
+ *   where every game site is served, sends neither. A site went without them until 2026-11-08.
  *
  * - **Strict-Transport-Security**, one year. No `includeSubDomains` or `preload`: both bind
  *   hostnames a game does not own the list of.
@@ -27,6 +28,7 @@ import path from 'node:path'
 export const HEADERS_FILE = '_headers'
 export const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable'
 export const HSTS = 'max-age=31536000'
+export const REFERRER_POLICY = 'strict-origin-when-cross-origin'
 export const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
 
 /**
@@ -35,6 +37,8 @@ export const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), pay
  */
 export function securityHeaders() {
   return {
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': REFERRER_POLICY,
     'Strict-Transport-Security': HSTS,
     'X-Frame-Options': 'SAMEORIGIN',
     'Content-Security-Policy': "frame-ancestors 'self'",

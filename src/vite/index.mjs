@@ -11,6 +11,7 @@ export {
   headersFile,
   IMMUTABLE_CACHE,
   PERMISSIONS_POLICY,
+  REFERRER_POLICY,
   securityHeaders,
   unhashedUnderAssets,
 } from './headers.mjs'

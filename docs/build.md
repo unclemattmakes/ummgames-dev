@@ -86,8 +86,9 @@ headers(options?: {
 }): Plugin
 ```
 
-Cloudflare Pages reads a top-level `_headers` file and adds its headers to every static response
-that matches. Pages alone sends only `nosniff` and a referrer policy.
+Cloudflare reads a top-level `_headers` file and adds its headers to every static response that
+matches, on Workers static assets as on Pages. Pages would send `nosniff` and a referrer policy on
+its own; Workers static assets, where the game sites are, sends neither, so the set has both.
 
 | Option | Type | Default | What it does |
 |---|---|---|---|
@@ -98,6 +99,7 @@ that matches. Pages alone sends only `nosniff` and a referrer policy.
 The assets folder is Vite's `build.assetsDir` (default `assets`), read from the config.
 
 **The security headers,** on `/*`:
+- `X-Content-Type-Options: nosniff` and `Referrer-Policy: strict-origin-when-cross-origin`.
 - `Strict-Transport-Security: max-age=31536000`, with no `includeSubDomains` and no `preload`.
 - Framing by the site's own origin only: `X-Frame-Options: SAMEORIGIN` and
   `Content-Security-Policy: frame-ancestors 'self'`.
@@ -359,7 +361,7 @@ Each plugin's logic is exported for tests and scripts.
 | `headersFile(options?)` | The text of `_headers`. Takes `assetsDir` too. |
 | `hashedAsset(assetsDir?)` | The `RegExp` a hashed file name under `assetsDir` matches. |
 | `unhashedUnderAssets(fileNames, assetsDir?)` | The names the immutable check fails on. |
-| `HEADERS_FILE`, `HSTS`, `IMMUTABLE_CACHE`, `PERMISSIONS_POLICY` | `'_headers'` and the header values above. |
+| `HEADERS_FILE`, `HSTS`, `IMMUTABLE_CACHE`, `PERMISSIONS_POLICY`, `REFERRER_POLICY` | `'_headers'` and the header values above. |
 | `notFoundHtml(options?)`, `NOT_FOUND_FILE` | The 404 page's text, and `'404.html'`. |
 | `collectLicences(root, options?)` | The licence list for the game at `root`. Throws on a dependency with no notice. |
 | `fallbackName(pkg)` | `@scope/name` to `scope-name.LICENSE`. |

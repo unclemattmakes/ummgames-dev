@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **`headers()` sends `nosniff` and a referrer policy.** The set left both to Cloudflare Pages,
+  which sends them itself, but every game site is on Workers static assets, which sends neither, so
+  four sites and tv.ummgames.com went without them. A site with its own `_headers` that already has
+  them (Blazewing's) is unchanged. Rebuild and deploy a site to pick it up.
+
 - **`headers({ framedBy })`.** Exact `https://` origins that may frame the site build beside its own,
   for a station that airs a game. They join `frame-ancestors 'self'`, and `X-Frame-Options` is left
   out. Anything but an exact `https://` origin throws when the config loads. Without it, nothing

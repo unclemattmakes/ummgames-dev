@@ -10,10 +10,13 @@ export declare const HSTS: string
 export declare const IMMUTABLE_CACHE: string
 /** `camera=(), microphone=(), geolocation=(), payment=(), usb=()`. */
 export declare const PERMISSIONS_POLICY: string
+/** `strict-origin-when-cross-origin`. */
+export declare const REFERRER_POLICY: string
 
 /**
- * Header name to value for every path of the build: HSTS, framing by its own origin only
- * (`X-Frame-Options: SAMEORIGIN`, `frame-ancestors 'self'`) and the Permissions-Policy.
+ * Header name to value for every path of the build: `nosniff`, the referrer policy, HSTS, framing
+ * by its own origin only (`X-Frame-Options: SAMEORIGIN`, `frame-ancestors 'self'`) and the
+ * Permissions-Policy.
  */
 export declare function securityHeaders(): Record<string, string>
 
