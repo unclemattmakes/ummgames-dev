@@ -8,8 +8,23 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { bodyHash, commentStyleFor, normalizeEol, parseCopy, stamp } from './header.mjs'
+import {
+  bodyHash,
+  commentStyleFor,
+  normalizeEol,
+  parseCopy,
+  parseSourceCopy,
+  stamp,
+  stampSource,
+} from './header.mjs'
 import { PACKAGE_ROOT, packageVersion, readRuntime, resolveRuntime, toPosix } from './source.mjs'
+import {
+  getSource,
+  lastCommit,
+  normalizeSourceSpec,
+  readSource,
+  resolveSourceSpec,
+} from './sources.mjs'
 
 /**
  * @typedef {'written' | 'updated' | 'current' | 'refused' | 'would-write'} CopyOutcome
@@ -24,15 +39,19 @@ import { PACKAGE_ROOT, packageVersion, readRuntime, resolveRuntime, toPosix } fr
  *   keeping each file's path below the folder that was asked for.
  * - `to` naming a file: exactly there (one file only).
  *
- * @param {{ files: string[], spec: string, root: string, into: string, to?: string | undefined }} p
- * @returns {Map<string, string>} runtime path -> absolute destination
+ * `prefix` is what every file path starts with and a default destination drops: `runtime/` for
+ * this package's files, nothing for a source's.
+ *
+ * @param {{ files: string[], spec: string, root: string, into: string, to?: string | undefined, prefix?: string }} p
+ * @returns {Map<string, string>} file path -> absolute destination
  */
-export function plan({ files, spec, root, into, to }) {
+export function plan({ files, spec, root, into, to, prefix = 'runtime/' }) {
   /** @type {Map<string, string>} */
   const out = new Map()
-  const asked = files.length === 1 && files[0] === normalizeSpec(spec) ? null : normalizeSpec(spec)
+  const norm = prefix ? normalizeSpec(spec) : normalizeSourceSpec(spec)
+  const asked = files.length === 1 && files[0] === norm ? null : norm
   for (const f of files) {
-    const underRuntime = f.slice('runtime/'.length)
+    const underRuntime = f.slice(prefix.length)
     if (to === undefined) {
       out.set(f, path.resolve(root, into, ...underRuntime.split('/')))
       continue
@@ -86,62 +105,142 @@ export function copyRuntime({
   const namedOne = files.length === 1 && files[0] === normalizeSpec(spec)
   /** @type {CopyResult[]} */
   const results = []
-  for (const [runtimePath, dest] of dests) {
-    const file = toPosix(path.relative(root, dest))
-    if (!commentStyleFor(dest)) {
-      results.push({
+  for (const [runtimePath, dest] of dests)
+    results.push(
+      place({
+        runtimePath,
+        dest,
+        root,
+        namedOne,
+        force,
+        dryRun,
+        hint: runtimePath.slice('runtime/'.length),
+        text: () =>
+          stamp({
+            file: dest,
+            version,
+            runtimePath,
+            source: /** @type {string} */ (readRuntime(runtimePath, pkgRoot)),
+          }),
+      }),
+    )
+  return results
+}
+
+/**
+ * Copy files from one of the game's own sources (`runtime.sources`), each stamped with the source's
+ * name, the commit that last changed it, its path there and its hash. The same rules as a kit
+ * copy: an untouched copy is replaced, a changed one or a file that is not a copy needs `force`.
+ *
+ * @param {{
+ *   name: string,
+ *   spec: string,
+ *   root: string,
+ *   sources: Record<string, import('./sources.mjs').Source>,
+ *   into?: string,
+ *   to?: string | undefined,
+ *   force?: boolean,
+ *   dryRun?: boolean,
+ * }} p
+ * @returns {CopyResult[]}
+ */
+export function copySource({
+  name,
+  spec,
+  root,
+  sources,
+  into = 'src',
+  to,
+  force = false,
+  dryRun = false,
+}) {
+  const src = getSource(sources, name)
+  const files = resolveSourceSpec(spec, src)
+  if (files.length === 0)
+    throw new Error(`no file or folder "${spec}" in source "${name}" at ${src.ref}`)
+  const dests = plan({ files, spec, root, into, to, prefix: '' })
+  const namedOne = files.length === 1 && files[0] === normalizeSourceSpec(spec)
+  /** @type {CopyResult[]} */
+  const results = []
+  for (const [srcPath, dest] of dests)
+    results.push(
+      place({
+        runtimePath: srcPath,
+        dest,
+        root,
+        namedOne,
+        force,
+        dryRun,
+        hint: `--from ${name} ${srcPath}`,
+        text: () =>
+          stampSource({
+            file: dest,
+            name,
+            commit: lastCommit(src, srcPath),
+            srcPath,
+            source: /** @type {string} */ (readSource(src, srcPath)),
+          }),
+      }),
+    )
+  return results
+}
+
+/**
+ * Write one stamped file, or say why not. Over an existing file it writes only an untouched copy
+ * (of the kit or of a source), unless `force`.
+ * @param {{
+ *   runtimePath: string,
+ *   dest: string,
+ *   root: string,
+ *   namedOne: boolean,
+ *   force: boolean,
+ *   dryRun: boolean,
+ *   hint: string,
+ *   text: () => string,
+ * }} p
+ * @returns {CopyResult}
+ */
+function place({ runtimePath, dest, root, namedOne, force, dryRun, hint, text: make }) {
+  const file = toPosix(path.relative(root, dest))
+  if (!commentStyleFor(dest))
+    return {
+      runtimePath,
+      file,
+      outcome: 'refused',
+      reason: `no comment syntax for ${path.extname(dest) || 'a file without an extension'}`,
+    }
+  const text = make()
+  /** @type {CopyOutcome} */
+  let outcome = 'written'
+  if (fs.existsSync(dest)) {
+    const existing = fs.readFileSync(dest, 'utf8')
+    if (normalizeEol(existing) === text) return { runtimePath, file, outcome: 'current' }
+    const copy = parseCopy(existing) ?? parseSourceCopy(existing)
+    const clean = copy !== null && bodyHash(copy.body) === copy.hash
+    // --force overwrites a file that is not a copy only when the spec named exactly that file:
+    // a folder copy must never replace the game's own code.
+    if (copy === null && force && !namedOne)
+      return {
         runtimePath,
         file,
         outcome: 'refused',
-        reason: `no comment syntax for ${path.extname(dest) || 'a file without an extension'}`,
-      })
-      continue
-    }
-    const source = /** @type {string} */ (readRuntime(runtimePath, pkgRoot))
-    const text = stamp({ file: dest, version, runtimePath, source })
-    /** @type {CopyOutcome} */
-    let outcome = 'written'
-    if (fs.existsSync(dest)) {
-      const existing = fs.readFileSync(dest, 'utf8')
-      if (normalizeEol(existing) === text) {
-        results.push({ runtimePath, file, outcome: 'current' })
-        continue
+        reason: `exists and is not a copy; a folder copy never overwrites it, even with --force (name the file: umm-dev copy ${hint} --to ${file} --force)`,
       }
-      const copy = parseCopy(existing)
-      const clean = copy !== null && bodyHash(copy.body) === copy.hash
-      // --force overwrites a file that is not a copy only when the spec named exactly that file:
-      // a folder copy must never replace the game's own code.
-      if (copy === null && force && !namedOne) {
-        results.push({
-          runtimePath,
-          file,
-          outcome: 'refused',
-          reason: `exists and is not a copy; a folder copy never overwrites it, even with --force (name the file: umm-dev copy ${runtimePath.slice('runtime/'.length)} --to ${file} --force)`,
-        })
-        continue
+    if (!clean && !force)
+      return {
+        runtimePath,
+        file,
+        outcome: 'refused',
+        reason: copy
+          ? 'changed here since it was copied (umm-dev drift --diff shows how); --force overwrites'
+          : 'exists and is not a copy; --force overwrites',
       }
-      if (!clean && !force) {
-        results.push({
-          runtimePath,
-          file,
-          outcome: 'refused',
-          reason: copy
-            ? 'changed here since it was copied (umm-dev drift --diff shows how); --force overwrites'
-            : 'exists and is not a copy; --force overwrites',
-        })
-        continue
-      }
-      outcome = 'updated'
-    }
-    if (dryRun) {
-      results.push({ runtimePath, file, outcome: 'would-write' })
-      continue
-    }
-    fs.mkdirSync(path.dirname(dest), { recursive: true })
-    fs.writeFileSync(dest, text)
-    results.push({ runtimePath, file, outcome })
+    outcome = 'updated'
   }
-  return results
+  if (dryRun) return { runtimePath, file, outcome: 'would-write' }
+  fs.mkdirSync(path.dirname(dest), { recursive: true })
+  fs.writeFileSync(dest, text)
+  return { runtimePath, file, outcome }
 }
 
 /**

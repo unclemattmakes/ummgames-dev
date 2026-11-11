@@ -3,23 +3,26 @@
  * `umm-dev drift [--json] [--diff] [--strict]`
  *
  * Lists every runtime copy in the game (found by its header) and whether it changed here, upstream
- * (the installed `runtime/` file), or both. Drift is information: the exit code is 0 unless
- * `--strict`. See docs/runtime.md.
+ * (the installed `runtime/` file, or for a copy from one of the game's own sources, that source's
+ * file at its ref), or both. Drift is information: the exit code is 0 unless `--strict`.
+ * See docs/runtime.md.
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { findGameRoot } from '../config.mjs'
+import { loadConfig } from '../config.mjs'
 import { unifiedDiff } from '../runtime/diff.mjs'
 import {
   advice,
   fetchOriginal,
   installedVersion,
+  readCopy,
   STATUS_TEXT,
   scanDrift,
+  sourceOriginal,
 } from '../runtime/drift.mjs'
-import { parseCopy } from '../runtime/header.mjs'
 import { readRuntime } from '../runtime/source.mjs'
+import { readSource, resolveSources } from '../runtime/sources.mjs'
 
 export const describe = 'report how far each copied runtime file has drifted'
 
@@ -34,6 +37,10 @@ const HELP = `usage: umm-dev drift [--json] [--diff] [--strict]
 
 Finds copies by their line 1 header (git ls-files in a checkout). Each is current,
 changed here, changed upstream, changed here and upstream, or no longer shipped.
+A copy from one of the game's own sources (copy --from) compares with that source's
+file at its ref, read through git; "source not found" when runtime.sources does not
+name it or its checkout is not on this machine. --diff reads its original from the
+source at the header's commit.
 After bumping the kit, run each "take it:" line as printed: it keeps the copy's path.
 
 exit: 0 reported (drift or not); 1 --strict and something drifted; 2 usage`
@@ -63,8 +70,20 @@ export async function run(argv, ctx) {
     console.log(HELP)
     return 0
   }
-  const root = findGameRoot(ctx.cwd)
-  const copies = scanDrift({ root })
+  const cfg = await loadConfig('runtime', { sources: {} }, ctx.cwd)
+  const root = cfg.root
+  /** @type {Record<string, import('../runtime/sources.mjs').Source>} */
+  let sources
+  try {
+    sources = resolveSources(
+      /** @type {Record<string, import('../runtime/sources.mjs').SourceConfig>} */ (cfg.sources),
+      root,
+    )
+  } catch (e) {
+    console.error(`umm-dev drift: ${e instanceof Error ? e.message : e}`)
+    return 2
+  }
+  const copies = scanDrift({ root, sources })
   const installed = installedVersion()
   const drifted = copies.some((c) => c.status !== 'current')
 
@@ -88,41 +107,47 @@ export async function run(argv, ctx) {
   if (values.diff) {
     for (const c of copies) {
       if (c.status === 'current') continue
-      console.log(`\n=== ${c.file} (${c.runtimePath}, copied at ${c.version})`)
+      const from = c.source === null ? '' : `${c.source} `
+      console.log(`\n=== ${c.file} (${from}${c.runtimePath}, copied at ${c.version})`)
       const local = /** @type {{ body: string }} */ (
-        parseCopy(fs.readFileSync(path.join(root, c.file), 'utf8'))
+        readCopy(fs.readFileSync(path.join(root, c.file), 'utf8'))
       ).body
-      const upstream = readRuntime(c.runtimePath)
+      const src = c.source === null ? undefined : sources[c.source]
+      const upstream =
+        c.source === null ? readRuntime(c.runtimePath) : src ? readSource(src, c.runtimePath) : null
       /** @type {string | null} */
       let original = null
       if (!c.changedHere) original = local
       else if (!c.changedUpstream && upstream !== null) original = upstream
       else {
-        const got = await fetchOriginal(c)
+        const got = c.source === null ? await fetchOriginal(c) : sourceOriginal(c, sources)
         if (got.text !== null) {
           original = got.text
           console.log(`(original from ${got.from})`)
         } else {
           console.log(`(the original at ${c.version} is not available: ${got.why})`)
-          console.log('(set UMM_DEV_REPO to a local clone to diff offline)')
+          if (c.source === null) console.log('(set UMM_DEV_REPO to a local clone to diff offline)')
         }
       }
       if (original !== null) {
         if (c.changedHere)
           process.stdout.write(
-            unifiedDiff(original, local, { from: `${c.version} ${c.runtimePath}`, to: c.file }),
+            unifiedDiff(original, local, {
+              from: `${from}${c.version} ${c.runtimePath}`,
+              to: c.file,
+            }),
           )
         if (c.changedUpstream && upstream !== null)
           process.stdout.write(
             unifiedDiff(original, upstream, {
-              from: `${c.version} ${c.runtimePath}`,
-              to: `installed ${installed} ${c.runtimePath}`,
+              from: `${from}${c.version} ${c.runtimePath}`,
+              to: `${upstreamName(c, src, installed)} ${c.runtimePath}`,
             }),
           )
       } else if (upstream !== null) {
         process.stdout.write(
           unifiedDiff(upstream, local, {
-            from: `installed ${installed} ${c.runtimePath}`,
+            from: `${upstreamName(c, src, installed)} ${c.runtimePath}`,
             to: c.file,
           }),
         )
@@ -130,4 +155,14 @@ export async function run(argv, ctx) {
     }
   }
   return values.strict && drifted ? 1 : 0
+}
+
+/**
+ * How the diff names the upstream side: the installed package, or the source at its ref.
+ * @param {{ source: string | null }} c
+ * @param {import('../runtime/sources.mjs').Source | undefined} src
+ * @param {string} installed
+ */
+function upstreamName(c, src, installed) {
+  return c.source === null ? `installed ${installed}` : `${c.source} at ${src?.ref ?? '?'}`
 }

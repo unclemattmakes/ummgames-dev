@@ -10,6 +10,10 @@
  * When both moved, the diff needs the original: the file at the header's tag, read from a local
  * clone named by `UMM_DEV_REPO`, or fetched from the public repo. Offline, the diff falls back
  * to comparing the copy with the installed file.
+ *
+ * A copy from one of the game's own sources (`runtime.sources`) is compared the same way, with the
+ * source's file at its ref as upstream and the file at the header's commit as the original, both
+ * read through git from the source's checkout. Nothing is fetched for it.
  */
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -21,8 +25,10 @@ import {
   isSafeRuntimePath,
   isSafeVersion,
   parseCopy,
+  parseSourceCopy,
 } from './header.mjs'
 import { PACKAGE_ROOT, packageVersion, readRuntime, toPosix } from './source.mjs'
+import { readSource } from './sources.mjs'
 
 export const RAW_BASE = 'https://raw.githubusercontent.com/unclemattmakes/ummgames-dev'
 
@@ -30,9 +36,10 @@ export const RAW_BASE = 'https://raw.githubusercontent.com/unclemattmakes/ummgam
 const SKIP_DIRS = new Set(['node_modules', '.git', 'test-results', 'coverage', '.vite'])
 
 /**
- * @typedef {'current' | 'changed-here' | 'changed-upstream' | 'changed-both' | 'gone-upstream'} DriftStatus
+ * @typedef {'current' | 'changed-here' | 'changed-upstream' | 'changed-both' | 'gone-upstream' | 'no-source'} DriftStatus
  * @typedef {{
  *   file: string,
+ *   source: string | null,
  *   runtimePath: string,
  *   version: string,
  *   hash: string,
@@ -87,32 +94,40 @@ function firstLine(file) {
 }
 
 /**
- * Every copy in the game and how it stands.
- * @param {{ root: string, pkgRoot?: string }} p
+ * Every copy in the game and how it stands. `sources` is the game's `runtime.sources`, resolved:
+ * a copy from a source missing there, or not on this machine, is `no-source`.
+ * @param {{ root: string, pkgRoot?: string, sources?: Record<string, import('./sources.mjs').Source> }} p
  * @returns {DriftEntry[]}
  */
-export function scanDrift({ root, pkgRoot = PACKAGE_ROOT }) {
+export function scanDrift({ root, pkgRoot = PACKAGE_ROOT, sources = {} }) {
   /** @type {DriftEntry[]} */
   const entries = []
   for (const file of gameFiles(root)) {
     if (!commentStyleFor(file)) continue
     const abs = path.join(root, file)
-    if (!firstLine(abs).includes('Copied from ummgames-dev ')) continue
-    const copy = parseCopy(fs.readFileSync(abs, 'utf8'))
+    if (!firstLine(abs).includes('Copied from ')) continue
+    const copy = readCopy(fs.readFileSync(abs, 'utf8'))
     if (!copy) continue
     const localHash = bodyHash(copy.body)
-    const upstream = readRuntime(copy.runtimePath, pkgRoot)
+    const src = copy.source === null ? undefined : sources[copy.source]
+    const reachable = copy.source === null || (src !== undefined && fs.existsSync(src.repo))
+    /** @type {string | null} */
+    let upstream = null
+    if (copy.source === null) upstream = readRuntime(copy.runtimePath, pkgRoot)
+    else if (src && reachable) upstream = readSource(src, copy.runtimePath)
     const upstreamHash = upstream === null ? null : bodyHash(upstream)
     const changedHere = localHash !== copy.hash
-    const changedUpstream = upstreamHash !== copy.hash
+    const changedUpstream = reachable && upstreamHash !== copy.hash
     /** @type {DriftStatus} */
     let status = 'current'
-    if (upstreamHash === null) status = 'gone-upstream'
+    if (!reachable) status = 'no-source'
+    else if (upstreamHash === null) status = 'gone-upstream'
     else if (changedHere && changedUpstream) status = 'changed-both'
     else if (changedHere) status = 'changed-here'
     else if (changedUpstream) status = 'changed-upstream'
     entries.push({
       file,
+      source: copy.source,
       runtimePath: copy.runtimePath,
       version: copy.version,
       hash: copy.hash,
@@ -234,6 +249,7 @@ export const STATUS_TEXT = /** @type {Record<DriftStatus, string>} */ ({
   'changed-upstream': 'changed upstream',
   'changed-both': 'changed here and upstream',
   'gone-upstream': 'no longer shipped',
+  'no-source': 'source not found',
 })
 
 /**
@@ -241,17 +257,69 @@ export const STATUS_TEXT = /** @type {Record<DriftStatus, string>} */ ({
  * @returns {string | null} the next step, when there is one
  */
 export function advice(e) {
-  const short = e.runtimePath.slice('runtime/'.length)
+  const short =
+    e.source === null
+      ? e.runtimePath.slice('runtime/'.length)
+      : `--from ${e.source} ${e.runtimePath}`
   switch (e.status) {
     case 'changed-upstream':
       return `take it: umm-dev copy ${short} --to ${e.file}`
     case 'changed-both':
       return 'merge by hand: umm-dev drift --diff'
     case 'gone-upstream':
-      return 'the installed version no longer has it: the copy is wholly the game’s'
+      return e.source === null
+        ? 'the installed version no longer has it: the copy is wholly the game’s'
+        : `source ${e.source} no longer has it at its ref: the copy is wholly the game’s`
+    case 'no-source':
+      return `name ${e.source} in runtime.sources, with the path to its checkout, to compare it`
     default:
       return null
   }
+}
+
+/**
+ * A copied file's header and body, of either kind: `source` is `null` for a copy of this
+ * package's runtime/, else the source's name; `version` is the tag or the commit.
+ * @param {string} text
+ * @returns {{ source: string | null, runtimePath: string, version: string, hash: string, body: string } | null}
+ */
+export function readCopy(text) {
+  const kit = parseCopy(text)
+  if (kit)
+    return {
+      source: null,
+      runtimePath: kit.runtimePath,
+      version: kit.version,
+      hash: kit.hash,
+      body: kit.body,
+    }
+  const own = parseSourceCopy(text)
+  if (own)
+    return {
+      source: own.name,
+      runtimePath: own.srcPath,
+      version: own.commit,
+      hash: own.hash,
+      body: own.body,
+    }
+  return null
+}
+
+/**
+ * A source copy's original: the file at the header's commit, read from the source's checkout and
+ * checked against the header's hash.
+ * @param {DriftEntry} e
+ * @param {Record<string, import('./sources.mjs').Source>} sources
+ * @returns {{ text: string, from: string } | { text: null, why: string }}
+ */
+export function sourceOriginal(e, sources) {
+  const src = e.source === null ? undefined : sources[e.source]
+  if (!src) return { text: null, why: `no source ${e.source} in runtime.sources` }
+  const text = readSource(src, e.runtimePath, e.version)
+  if (text === null) return { text: null, why: `${src.repo} has no ${e.version}:${e.runtimePath}` }
+  if (bodyHash(text) !== e.hash)
+    return { text: null, why: `${e.version}:${e.runtimePath} does not match the header's hash` }
+  return { text, from: `source ${e.source} at ${e.version}` }
 }
 
 /** @param {string} [pkgRoot] */

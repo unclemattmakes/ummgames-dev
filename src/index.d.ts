@@ -2,7 +2,7 @@ import type { GpuConfig, WorktreeConfig } from './agent/config.js'
 import type { LoudnessConfig } from './audio/index.js'
 import type { GuardConfig } from './guard/config.js'
 import type { CaptureConfig, LoopConfig, StoreConfig } from './media/index.js'
-import type { RuntimeConfig } from './runtime/config.js'
+import type { RuntimeConfig, RuntimeSource } from './runtime/config.js'
 
 export type {
   CaptureConfig,
@@ -11,6 +11,7 @@ export type {
   LoopConfig,
   LoudnessConfig,
   RuntimeConfig,
+  RuntimeSource,
   StoreConfig,
   WorktreeConfig,
 }

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **`umm-dev copy --from <source>`: copy from the game's own sources.** Code that several games
+  share but that cannot be public now copies like a runtime file. A game names each source in
+  `runtime.sources` (`{ <name>: { repo, ref } }`), a git checkout on the same machine. Copy reads
+  committed work at `ref` through git, and stamps the source's name, the commit that last changed
+  the file, its path and its hash. `umm-dev drift` reads `runtime.sources` too, compares each such
+  copy with the source at `ref`, diffs against the file at the header's commit, and calls a copy
+  whose source is not on this machine `source not found`. A relative `repo` is read from the
+  game's main checkout, so it works from every worktree. Nothing changes for a game without
+  sources. docs/runtime.md, "Copying from the game's own sources".
+
 - **`headers()` sends `nosniff` and a referrer policy.** The set left both to Cloudflare Pages,
   which sends them itself, but every game site is on Workers static assets, which sends neither, so
   four sites and tv.ummgames.com went without them. A site with its own `_headers` that already has

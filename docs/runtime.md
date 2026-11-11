@@ -7,6 +7,10 @@ the copy is the game's to change. `umm-dev drift` reports how far each copy has 
 version it came from, and how far the installed version has moved since. Reach for it when a game
 wants one of these files, and when the game bumps the kit's tag.
 
+The same two commands also copy from **the game's own sources**: git checkouts on the same
+machine, named in the game's config, for code that several games share but that cannot be public
+(see "Copying from the game's own sources" below).
+
 ## Quick start
 
 From the game's root (`npx umm-dev` under npm):
@@ -43,7 +47,8 @@ says `written`, and exits 0. Run with `--dry-run` first whenever the game alread
 
 ```
 umm-dev copy <runtime path> [--to <path in game>] [--force] [--dry-run]
-umm-dev copy --list
+umm-dev copy --from <source> <path> [--to <path in game>] [--force] [--dry-run]
+umm-dev copy [--from <source>] --list
 ```
 
 `<runtime path>` is a file or a folder under `runtime/`, with or without the `runtime/` prefix:
@@ -54,7 +59,8 @@ umm-dev copy --list
 | `--to` | a path from the game root | `<runtime.into>/<path under runtime/>` | Where it goes. A trailing `/`, an existing folder, or a folder copy means "inside this folder"; otherwise it is the file's exact path. Relative to the game root, not the current folder. |
 | `--force` | | off | Overwrite a copy that was changed here. Overwrite a file that is not a copy only when `<runtime path>` names that one file. |
 | `--dry-run` | | off | Say what would be written; write nothing. Refusals still show. |
-| `--list` | | | List the runtime files this version ships, and exit. |
+| `--from` | a name in `runtime.sources` | | Copy from that source instead of `runtime/`. `<path>` is a file or folder in the source's checkout, read at its `ref`. The default destination is `<runtime.into>/<path>`. |
+| `--list` | | | List the runtime files this version ships, and exit. With `--from`, list the files the source has at its `ref`. |
 | `-h`, `--help` | | | Print the usage. |
 
 **Destinations.**
@@ -156,7 +162,53 @@ umm-dev copy input/pad-profiles.ts                   # one file, to src/input/pa
 umm-dev copy boot/dev-splash.ts --to src/boot/splash.ts
 umm-dev copy dev --to src/tools/dev/                 # a folder, into another folder
 umm-dev copy dev/fuzzy.ts --to src/dev/fuzzy.ts --force   # replace one changed copy
+umm-dev copy --from net client/net.ts --to src/net/net.ts  # a file from the game's source "net"
+umm-dev copy --from net --list                       # what that source has
 ```
+
+### Copying from the game's own sources
+
+Some code is shared by several games but cannot go in this public package: it names a game, a
+host or a service, or it is not ready to be public. Keep it in one private repo, the **source**,
+and copy it into each game the same way as a runtime file. The copies carry a header, so drift
+can say which games hold an old copy.
+
+1. Name the source in each game's `umm-dev.config.mjs`. `repo` is the path to its git checkout;
+   a relative path is read from the game's main checkout, so it means the same folder from every
+   worktree.
+
+   ```js
+   export default defineConfig({
+     runtime: { sources: { net: { repo: '../network', ref: 'main' } } },
+   })
+   ```
+
+2. Commit the change in the source. Copy reads committed work only, through git at `ref`, so an
+   unfinished edit in the source's working tree never leaks into a game.
+3. Copy it into each game, with the game's path:
+
+   ```sh
+   pnpm exec umm-dev copy --from net client/net.ts --to src/net/net.ts
+   ```
+
+   Line 1 names the source, the commit that last changed the file, and its path:
+
+   ```ts
+   // Copied from net 1a2b3c4d5e6f client/net.ts (sha256 0123456789abcdef). Change it there and copy it again; `umm-dev drift` compares.
+   ```
+
+4. `umm-dev drift` in each game then says `current`, or `changed upstream` with the line that
+   takes the new version.
+
+**Change it in the source, not in a game.** A copy changed in a game says `changed here`, and the
+next copy refuses it without `--force`, as with a runtime copy.
+
+**On another machine,** or in a checkout without the source beside it, drift calls each source
+copy `source not found` and the game still builds: the copies are ordinary files. Nothing is
+installed and no token is needed.
+
+**This package never names a source.** The names and paths live only in each game's config.
+
 
 ## `umm-dev drift`
 
@@ -165,7 +217,8 @@ umm-dev drift [--json] [--diff] [--strict]
 ```
 
 It finds every copy by its header and compares three hashes: the header's (the body when it was
-copied), the body's now, and the installed `runtime/` file's.
+copied), the body's now, and the installed `runtime/` file's. For a copy from one of the game's
+own sources, the third is the source's file at its `ref`, read through git.
 
 | Option | Value | Default | What it does |
 |---|---|---|---|
@@ -180,14 +233,17 @@ copied), the body's now, and the installed `runtime/` file's.
 | `changed here` | The game edited its copy. Upstream has not moved. | None: the copy is the game's. |
 | `changed upstream` | The installed version's file differs from what was copied. | Run the `take it:` line drift prints. |
 | `changed here and upstream` | Both moved. | Merge by hand; `--diff` shows both sides. |
-| `no longer shipped` | The installed version has no such file. | None: the copy is wholly the game's. |
+| `no longer shipped` | The installed version has no such file. A source copy: the source has no such file at its `ref`. | None: the copy is wholly the game's. |
+| `source not found` | A source copy whose source is not in `runtime.sources`, or whose checkout is not on this machine. | Name it in `runtime.sources`, or run drift where the source is. |
 
 A status compares hashes, not versions. A copy taken at `v0.1.0` stays `current` under `v0.2.0`
 when that file did not change.
 
-**`--json`.** Each entry in `copies` has `file`, `runtimePath`, `version`, `hash`, `localHash`,
-`upstreamHash` (`null` when no longer shipped), `changedHere`, `changedUpstream` and `status`
-(`current`, `changed-here`, `changed-upstream`, `changed-both` or `gone-upstream`).
+**`--json`.** Each entry in `copies` has `file`, `source` (`null` for a runtime copy, else the
+source's name), `runtimePath` (the path in its source), `version` (a tag, or a source's commit),
+`hash`, `localHash`, `upstreamHash` (`null` when no longer shipped or the source is not found),
+`changedHere`, `changedUpstream` and `status` (`current`, `changed-here`, `changed-upstream`,
+`changed-both`, `gone-upstream` or `no-source`).
 
 **`--diff`.** It shows the original against the game's copy, and the original against the
 installed file. The original is free when only one side moved (it is the other side). When both
@@ -198,14 +254,15 @@ moved, drift needs the file at the header's tag:
    with an 8 s timeout.
 
 Either way the text must hash to the header's hash, or it is not used. Offline, or with neither,
-drift says why and diffs the copy against the installed file instead.
+drift says why and diffs the copy against the installed file instead. A source copy's original
+is the source's file at the header's commit, read through git; nothing is fetched.
 
 **Exit codes.** Drift is information, not an error.
 
 | Code | When |
 |---|---|
 | 0 | Reported, drifted or not. Also when there are no copies. |
-| 1 | `--strict`, and some copy is not current. |
+| 1 | `--strict`, and some copy is not current. `source not found` counts. |
 | 2 | A usage error. |
 
 ### Examples
@@ -762,7 +819,7 @@ stylesheet with tokens a game overrides. It has its own page: [making-of.md](mak
 
 ## Config: `runtime`
 
-In the game's `umm-dev.config.mjs`. `umm-dev copy` reads it; `umm-dev drift` reads no config.
+In the game's `umm-dev.config.mjs`. `umm-dev copy` reads it; `umm-dev drift` reads `sources`.
 
 ```js
 import { defineConfig } from '@ummgames/dev'
@@ -772,7 +829,8 @@ export default defineConfig({ runtime: { into: 'src/shared' } })
 
 | Key | Type | Default | What it does |
 |---|---|---|---|
-| `into` | string | `'src'` | The folder, from the game root, that a copy without `--to` goes under: `<into>/<path under runtime/>`. |
+| `into` | string | `'src'` | The folder, from the game root, that a copy without `--to` goes under: `<into>/<path under runtime/>`, or `<into>/<path in the source>` with `--from`. |
+| `sources` | object | `{}` | The game's own sources, by name: `{ <name>: { repo, ref } }`. `repo` is the path to a git checkout, read from the game's main checkout when relative. `ref` is the commit-ish files are read at, default `'HEAD'`. A name is letters, digits, `_` and `-`, and not `ummgames-dev`. |
 
 ## File formats
 
@@ -789,6 +847,17 @@ Line 1 of every copy, in the file type's comment syntax:
 | version | `v0.1.0` | The installed package's version when it was copied: the tag the original can be fetched at. `v` and three numbers, with an optional `-suffix`. |
 | runtime path | `runtime/dev/fuzzy.ts` | The file in this package. Plain segments under `runtime/`: no `.` or `..`. |
 | hash | `1872b1d747ecb7a2` | The first 16 hex digits of the SHA-256 of the body when it was copied. |
+
+A copy from one of the game's own sources has the source's name where `ummgames-dev` is, the
+commit that last changed the file (12 hex digits) where the version is, and the file's path in
+the source where the runtime path is:
+
+```ts
+// Copied from net 1a2b3c4d5e6f client/net.ts (sha256 0123456789abcdef). Change it there and copy it again; `umm-dev drift` compares.
+```
+
+The commit is the one that last changed the file, not the source's newest, so copying an
+unchanged file again writes the same header.
 
 - **The body** is everything after line 1. The hash reads CRLF as LF, so a checkout's line
   endings never count as a change. Copy writes LF.
@@ -816,6 +885,11 @@ and `runtime/env.d.ts` are the folder's own tooling and are never listed.
   checkout, so ignored files are skipped; otherwise a walk that skips `node_modules`, `.git`,
   `dist*`, `test-results`, `coverage` and `.vite`). It keeps each file whose line 1 is a header,
   and compares the three hashes.
+- **A source** is read only through git: `git ls-tree` at its `ref` to list, `git show <ref>:<path>`
+  to copy and compare, `git show <commit>:<path>` for an original, and `git log -1` for the
+  header's commit. The working tree is never read. A relative `repo` resolves from the folder
+  holding the game's git data (`git rev-parse --git-common-dir`), which is the main checkout from
+  any linked worktree.
 - **The game root** is the nearest folder at or above the current one holding a `package.json`.
 - **Each runtime file imports nothing outside its own folder**, so a folder copies as a unit.
   Each typechecks under `runtime/tsconfig.json` (strict, Bundler resolution, DOM, `types: []`).
@@ -831,6 +905,10 @@ and `runtime/env.d.ts` are the folder's own tooling and are never listed.
 | `refused  <file>: no comment syntax for .json` | The destination's type cannot carry a header. | Use a destination with an extension from the table above. |
 | `umm-dev copy: no runtime file or folder "<path>". umm-dev copy --list shows them.` | No such runtime path. | `umm-dev copy --list`. |
 | `imports ./<name>, which is not beside it: copy that too` | The copy needs a sibling file. | Copy the sibling into the same folder. |
+| `umm-dev copy: no source "<name>" in runtime.sources` | `--from` names a source the game's config does not. | Add it to `runtime.sources`, or fix the name. |
+| `umm-dev copy: source "<name>": <path> is not on this machine` | The source's checkout is not where `repo` says. | Clone it there, or fix `repo`. A relative `repo` is read from the game's main checkout. |
+| A source copy says `source not found` in drift. | The same, seen by drift. | As above. The copy still builds; only the comparison is missing. |
+| A change made in the source does not reach the copy. | It is not committed, or not on `ref`. | Commit it on the branch `ref` names, then copy again. |
 | `(the original at <tag> is not available: <url> unreachable (...))` | Drift is offline, or the tag is not on the public repo. | Set `UMM_DEV_REPO` to a local clone with its tags. Until then the diff is against the installed file. |
 | `(the original at <tag> is not available: UMM_DEV_REPO has no <tag>:<path>; ...)` | The clone lacks that tag. | `git -C $UMM_DEV_REPO fetch --tags`. |
 | `no runtime copies in <root>`, though there are copies. | Their line 1 was edited, or git ignores them. | Restore the header (take the file again with `--to <file> --force`), or stop ignoring the folder. |
@@ -849,5 +927,8 @@ and `runtime/env.d.ts` are the folder's own tooling and are never listed.
   `<runtime.into>/<path under runtime/>`: `src/dev/perf-hud.ts` for `dev/perf-hud.ts`. A game that keeps the file anywhere else gets a second copy. Run
   `--dry-run` first and check every path it prints.
 - **Never pass `--force` to a folder copy.** It overwrites every changed copy in the folder.
+- **Change a source copy in its source, never in a game.** Commit it there, then run
+  `umm-dev copy --from <source> <path> --to <the game's path>` in each game that has it.
+- **Never write a source's name or path into this package.** They belong in each game's config.
 - **Upgrade with drift's own lines.** After a bump, run each `take it:` line as printed. Treat
   `changed here and upstream` as a decision for the user, not a `--force`.
