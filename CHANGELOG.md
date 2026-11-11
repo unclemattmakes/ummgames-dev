@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **`runtime/sim/sphere.ts`: `unitOnSphere(rng, out)`, out of `rng.ts`.** `Rng.unit` called
+  `Math.cos` and `Math.sin`, so a sim whose guard test bans engine trig could not copy `rng.ts`. The
+  direction is now a free function in its own file, with the same two draws in the same order; a game
+  that called `rng.unit(out)` calls `unitOnSphere(rng, out)`. A test keeps engine trig out of `rng.ts`
+  and `det.ts`.
+
 - **New runtime files a game copies: `sim/rng.ts`, `sim/det.ts`, `sim/fixed-step.ts`,
   `input/stick.ts`, `audio/synth.ts` and `worker/security-headers.ts`.** Each was a file several
   games held their own copies of. The kit's file gives the same outputs as those copies: the same

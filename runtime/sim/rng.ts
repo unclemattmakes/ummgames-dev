@@ -9,8 +9,9 @@
  * For the same seed both give the same draws. Plus stateless hashes: `hash3` (ints to [0, 1)),
  * `hashSeed` (numbers to a seed) and `seedFromString` (text to a seed).
  *
- * Only `Rng.unit` calls the engine's own trig (`Math.cos`, `Math.sin`); everything else is
- * integer arithmetic and one exact division, the same in every engine.
+ * It is all integer arithmetic and one exact division, the same in every engine, and it calls no
+ * engine trig, so a sim that bans `Math.sin` and the like can copy it. A random direction, which
+ * needs trig, is `unitOnSphere` in `sphere.ts` beside it.
  */
 
 /** A draw in [0, 1): what `mulberry32` returns. */
@@ -191,19 +192,5 @@ export class Rng {
       list[j] = t
     }
     return list
-  }
-
-  /**
-   * A uniform direction on the unit sphere, written into `out`. Two draws. Uses `Math.cos` and
-   * `Math.sin`, so it can differ between engines in the last bit.
-   */
-  unit(out: [number, number, number]): [number, number, number] {
-    const z = this.range(-1, 1)
-    const a = this.range(0, Math.PI * 2)
-    const r = Math.sqrt(1 - z * z)
-    out[0] = r * Math.cos(a)
-    out[1] = r * Math.sin(a)
-    out[2] = z
-    return out
   }
 }

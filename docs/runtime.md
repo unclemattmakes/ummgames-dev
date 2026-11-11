@@ -940,7 +940,6 @@ const kind = pick(draw, KINDS)
 | `pick(list)` | One item, uniformly. One draw. Throws when the draw lands on `undefined` (an empty list), unless `options.emptyPick` is `'undefined'`. |
 | `weighted(weights)` | An index by weight; negative weights count as 0. One draw, or -1 and no draw when no weight is over 0. |
 | `shuffle(list)` | Shuffles in place (Fisher-Yates from the end) and returns the list. `length - 1` draws. |
-| `unit(out)` | A uniform direction on the unit sphere, into `out`. Two draws. Uses `Math.cos` and `Math.sin`, so the last bit can differ between engines. |
 | `state` | The whole generator. Read it to save; set it (taken `>>> 0`) to carry on from there. |
 
 | `RngOptions` | Default | What it does |
@@ -956,6 +955,13 @@ const kind = pick(draw, KINDS)
 | `hash3(a, b, c, seed)` | A stateless hash of three integers and a seed to [0, 1): the same cell of a grid always gets the same value, in any order of visiting. |
 | `hashSeed(...parts)` | Mixes numbers (each floored) into one 32-bit seed: FNV-1a over their four low bytes. For a stream per level, per room, per wave. |
 | `seedFromString(text)` | A 32-bit seed from text, such as a `?seed=` or a daily date: FNV-1a over its UTF-16 code units. `seedFromText` is the same function. |
+
+**A random direction** is in `sim/sphere.ts`, beside it: `unitOnSphere(rng, out)` writes a uniform
+direction on the unit sphere into `out`, from two draws (z, then the angle). It calls `Math.cos` and
+`Math.sin`, so the last bit can differ between engines. It lives apart so that `rng.ts` calls no
+engine trig: a sim whose guard test bans engine trig copies `rng.ts` and not `sphere.ts`. A game that
+called `rng.unit(out)` gets the same directions from `unitOnSphere(rng, out)`; copy `sphere.ts`
+beside `rng.ts`, since it imports it.
 
 **Adopting it over a game's own copy.** Every function here gives the draws of the copies it
 came from, held by golden tests (`tests/runtime/sim-goldens.mjs`). Where those copies differed,

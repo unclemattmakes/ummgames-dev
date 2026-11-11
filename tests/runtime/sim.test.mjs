@@ -26,6 +26,18 @@ function exact(got, want) {
 describe('sim/rng: the same draws as the games', async () => {
   const rng = await load('sim/rng.ts')
   const { Rng, mulberry32, range, pick, pickWeighted, GOLDEN_SEED } = rng
+  const { unitOnSphere } = await load('sim/sphere.ts')
+
+  it('calls no engine trig, so a sim that bans it can copy rng.ts and det.ts', async () => {
+    const { readFileSync } = await import('node:fs')
+    for (const rel of ['sim/rng.ts', 'sim/det.ts']) {
+      const text = readFileSync(new URL(`../../runtime/${rel}`, import.meta.url), 'utf8')
+      const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+      expect(code, rel).not.toMatch(
+        /Math\.(sin|cos|tan|asin|acos|atan|atan2|exp|log|pow|sinh|cosh|tanh)\b/,
+      )
+    }
+  })
 
   for (const seed of RNG.seeds) {
     const want = RNG.bySeed[String(seed)]
@@ -90,7 +102,7 @@ describe('sim/rng: the same draws as the games', async () => {
       expect([a.shuffle(ten()), a.shuffle(ten())]).toEqual(want.shuffle)
 
       a = r()
-      const units = times(3, () => [...a.unit([0, 0, 0])])
+      const units = times(3, () => [...unitOnSphere(a, [0, 0, 0])])
       for (const [i, u] of units.entries()) exact(u, want.unit[i])
 
       a = r()
