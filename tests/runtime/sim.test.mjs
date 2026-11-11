@@ -37,6 +37,11 @@ describe('sim/rng: the same draws as the games', async () => {
         /Math\.(sin|cos|tan|asin|acos|atan|atan2|exp|log|pow|sinh|cosh|tanh)\b/,
       )
     }
+    // Games' sim guards grep whole files, comments too, for a clock, the engine's random or a page.
+    for (const rel of ['sim/rng.ts', 'sim/det.ts', 'sim/fixed-step.ts']) {
+      const text = readFileSync(new URL(`../../runtime/${rel}`, import.meta.url), 'utf8')
+      expect(text, rel).not.toMatch(/Math\.random|Date\.now|performance\.now|document\.|window\./)
+    }
   })
 
   for (const seed of RNG.seeds) {

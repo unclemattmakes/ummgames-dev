@@ -1,6 +1,7 @@
 /**
- * Seeded random numbers for a deterministic sim. A sim draws only from here, never from
- * `Math.random` or a clock, so a seed and the inputs replay a run exactly on any machine.
+ * Seeded random numbers for a deterministic sim. A sim draws only from here, never from the
+ * engine's own random source or a clock, so a seed and the inputs replay a run exactly on any
+ * machine. (The file never names those, even in a comment: games' guard tests grep for them.)
  *
  * Two styles over the same generator, mulberry32, whose whole state is one 32-bit number:
  * - `Rng`, a class: `rng.next()`, `rng.range(lo, hi)`, `rng.pick(list)` and the rest.
