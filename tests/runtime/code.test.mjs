@@ -112,6 +112,52 @@ describe('input/pad-profiles', async () => {
   })
 })
 
+describe('input/stick', async () => {
+  const { shapeStick, clampUnit, MOVE_STICK, CAMERA_STICK } = await load('input/stick.ts')
+  const out = () => ({ x: Number.NaN, y: Number.NaN })
+
+  it('reads zero inside the round dead zone, whatever the direction', () => {
+    for (const [x, y] of [
+      [0.17, 0],
+      [0, -0.17],
+      [0.12, 0.12],
+      [Number.NaN, 0],
+    ]) {
+      expect(shapeStick(x, y, MOVE_STICK, out())).toEqual({ x: 0, y: 0 })
+    }
+    // A per-axis dead zone would zero x here; a round one keeps the diagonal.
+    const d = shapeStick(0.15, 0.6, MOVE_STICK, out())
+    expect(d.x).toBeGreaterThan(0)
+    expect(d.x / d.y).toBeCloseTo(0.25, 12)
+  })
+
+  it('rescales inner..outer onto 0..1 and keeps the direction', () => {
+    const mid = (MOVE_STICK.inner + MOVE_STICK.outer) / 2
+    const r = shapeStick(mid * 0.6, mid * 0.8, MOVE_STICK, out())
+    expect(Math.hypot(r.x, r.y)).toBeCloseTo(0.5, 12)
+    expect(r.y / r.x).toBeCloseTo(0.8 / 0.6, 12)
+    const full = shapeStick(1, 0, MOVE_STICK, out())
+    expect(full).toEqual({ x: 1, y: 0 })
+    expect(shapeStick(MOVE_STICK.outer, 0, MOVE_STICK, out()).x).toBeCloseTo(1, 12)
+  })
+
+  it('bends the middle with the curve', () => {
+    const mid = (CAMERA_STICK.inner + CAMERA_STICK.outer) / 2
+    expect(shapeStick(mid, 0, CAMERA_STICK, out()).x).toBeCloseTo(0.5 ** 1.6, 12)
+    expect(MOVE_STICK).toEqual({ inner: 0.18, outer: 0.92, curve: 1 })
+    expect(CAMERA_STICK).toEqual({ inner: 0.2, outer: 0.95, curve: 1.6 })
+  })
+
+  it('writes into the object it is given, and clamps a digital diagonal to length 1', () => {
+    const o = out()
+    expect(shapeStick(0.5, 0.5, MOVE_STICK, o)).toBe(o)
+    const k = clampUnit({ x: 1, y: -1 })
+    expect(k.x).toBeCloseTo(Math.SQRT1_2, 12)
+    expect(k.y).toBeCloseTo(-Math.SQRT1_2, 12)
+    expect(clampUnit({ x: 0.3, y: 0 })).toEqual({ x: 0.3, y: 0 })
+  })
+})
+
 describe('input/haptics', async () => {
   const { createHaptics, padSink, phoneSink } = await load('input/haptics.ts')
   const table = {

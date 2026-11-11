@@ -501,6 +501,35 @@ rumble.update(performance.now())
 | `humRefreshMs` | `100` | How often the hum is refreshed. |
 | `humPulseMs` | `140` | How long each hum pulse runs; longer than the refresh, so no gap opens. |
 
+### `stick.ts`
+
+**Exports:** `shapeStick(x, y, shape, out)`, `clampUnit(out)`, `MOVE_STICK`, `CAMERA_STICK`, and
+the types `StickShape`, `Vec2Out`.
+
+Analog stick shaping, radial rather than per axis. A per-axis dead zone snaps a near-diagonal
+onto the axes, so a shallow diagonal cannot be held. Here the dead zone is a circle: below
+`inner` the stick reads 0, the length from `inner` to `outer` maps onto 0 to 1, and the
+direction is kept exactly. That 0 to 1 is then raised to the power `curve`.
+
+```ts
+import { clampUnit, MOVE_STICK, shapeStick } from './input/stick'
+
+const move = { x: 0, y: 0 }
+shapeStick(pad.axes[0] ?? 0, pad.axes[1] ?? 0, MOVE_STICK, move) // writes into move
+// keys: move.x = right - left; move.y = down - up; clampUnit(move)
+```
+
+| Export | What it does |
+|---|---|
+| `shapeStick(x, y, shape, out)` | Writes the shaped stick into `out` and returns it. A `NaN` reads as 0. Allocates nothing. |
+| `clampUnit(out)` | Scales a direction longer than 1 down to 1, so a keyboard diagonal is not 41% faster. Shorter ones pass through. |
+| `MOVE_STICK` | `{ inner: 0.18, outer: 0.92, curve: 1 }`: linear, so walk and run speeds follow the stick. |
+| `CAMERA_STICK` | `{ inner: 0.2, outer: 0.95, curve: 1.6 }`: a softer centre for fine aim. |
+
+**Shape input before a replay records it.** `shapeStick` uses `Math.hypot` and `**`, which
+engines may round differently in the last bit. Record the shaped values, or the raw ones and
+shape them inside the sim with `runtime/sim/det.ts`.
+
 ## `runtime/boot/`
 
 ### `dev-splash.ts` and `dev-splash.css`
@@ -628,10 +657,11 @@ Until the hand-written block is gone the plugin adds nothing, so the steps can l
 
 The pure core of a procedural music sequencer: the pitch arithmetic, where a step falls in its
 bar, phrase and form, a conductor that decides which song plays and how many layers of it, and
-the look-ahead clock that decides when each step is queued. None of it touches Web Audio or reads
-a clock, so a test or an offline render can replay it exactly. The sequencer itself (its voices,
-its synth patches, its tracks, its `queue(step, at)`) stays the game's own. No file imports
-another, so any one can be copied alone (`umm-dev copy audio`, or one file by name).
+the look-ahead clock that decides when each step is queued. None of those touches Web Audio or
+reads a clock, so a test or an offline render can replay it exactly. `synth.ts` adds a set of
+instruments on Web Audio for a sequencer that wants them. The sequencer itself (its tracks, its
+mix, its `queue(step, at)`) stays the game's own. Only `synth.ts` imports another file
+(`pitch.ts`), so any other one can be copied alone (`umm-dev copy audio`, or one file by name).
 
 | File | Imports | What it decides |
 |---|---|---|
@@ -639,6 +669,7 @@ another, so any one can be copied alone (`umm-dev copy audio`, or one file by na
 | `form.ts` | nothing | Where a step is: bar, beat, phrase, section of the form; reads of melody lines and drum strings. |
 | `conductor.ts` | nothing | What plays: the song and the level, changed only on bar or phrase lines. |
 | `step-clock.ts` | nothing | When: queues each step at its exact audio time. |
+| `synth.ts` | `pitch.ts` | How it sounds: drums, bass, pads, plucks, a lead and stabs on Web Audio. |
 
 **How a sequencer puts them together.** The game's timer calls `advanceSteps`; for each step it
 asks the conductor what plays, finds the step's place in the form, and plays its own patterns:
@@ -967,6 +998,218 @@ the time carried over, and `stepSeconds` reads the step length back.
 | `maxStepsPerFrame` | `8` | Most steps in one frame. Past it the backlog is dropped, not carried, and `dropped` is true. |
 | `maxFrameSeconds` | `0.25` | Longest frame counted. A longer one (a tab switch, a breakpoint) is clamped to it, and `dropped` is true. |
 
+### `synth.ts`
+
+**Exports:** `createKit(ctx, noise)`, `noiseBuffer(ctx, seconds?)`, `impulse(ctx, seconds, decay)`,
+`driveCurve(amount)`, `softClipCurve(n?)`, `softClip(x, knee?)`, `FLOOR`, and the types `Kit`,
+`Note`. Imports `note` from `pitch.ts`: copy both.
+
+A sequencer's instruments on Web Audio, synthesised from oscillators and one shared noise buffer,
+so nothing is sampled. Every voice stops its sources at a fixed time and disconnects its own nodes
+when its last source ends, so the graph does not grow.
+
+```ts
+import { createKit, noiseBuffer, softClipCurve } from './audio/synth'
+
+const kit = createKit(ctx, noiseBuffer(ctx))
+const clip = new WaveShaperNode(ctx, { curve: softClipCurve() })
+clip.connect(ctx.destination)
+kit.kick(at, 0.8, clip)
+kit.bass({ semi: -21, at, dur: 0.2, vol: 0.6 }, clip, 'sawtooth', 300)
+```
+
+| Voice | Arguments | Sound |
+|---|---|---|
+| `kick` | `at, vol, out` | A sine dropping from 160 to 38 Hz, with a noise click for small speakers. |
+| `snare` | `at, vol, out` | Band-passed noise and a falling triangle. |
+| `clap` | `at, vol, out` | Three quick noise slaps and a short tail. |
+| `hat` | `at, vol, out, open?` | High-passed noise, 0.04 s closed or 0.26 s open. |
+| `crash` | `at, vol, out` | High-passed noise over 1.6 s. |
+| `tom` | `semi, at, vol, out` | A sine at `note(semi)` falling to 60%. |
+| `riser` | `at, dur, vol, out` | Band-passed noise sweeping 400 Hz to 7 kHz and growing over `dur`: the build into a drop. |
+| `bass` | `note, out, wave, cutoff` | Two detuned `wave` oscillators through a resonant low-pass, plus a sine sub. |
+| `pad` | `semis, at, dur, vol, out, cutoff, width` | A held chord of detuned saws, spread left and right by `width` (0 to 1). |
+| `pluck` | `note, out, wave, cutoff, pan` | A short filtered note, panned. |
+| `lead` | `note, out, wave, cutoff` | Two detuned oscillators with a delayed vibrato and a decay to 75%. |
+| `stab` | `semis, at, dur, vol, out` | A chord of detuned saws under a closing filter. |
+
+A `Note` is `{ semi, at, dur, vol }`: semitones from A4, a start time on the context's clock,
+seconds, a level.
+
+| Export | What it does |
+|---|---|
+| `noiseBuffer(ctx, seconds?)` | Mono white noise, default 1 s. Make one per context and pass it to `createKit`; every noise voice loops it from a random offset. |
+| `impulse(ctx, seconds, decay)` | A stereo reverb impulse for a `ConvolverNode`: noise fading as `(1 - t) ** decay`, different in each ear. |
+| `driveCurve(amount)` | A tanh drive curve for a `WaveShaperNode`, `amount` 0 (nearly clean) to 1 (heavy), still reaching plus or minus 1 at full input. Cached per hundredth. |
+| `softClipCurve(n?)` | The output's safety clipper, `n` points (default 2048): straight through below 0.7, then a tanh knee that stays under 0.93. |
+| `softClip(x, knee?)` | One sample of that shape, for a game that builds its own curve: `x` up to `knee` (default 0.7), then the tanh shoulder. |
+| `FLOOR` | `0.0001`, the lowest level an exponential ramp is sent to; it cannot reach 0. |
+
+**Not deterministic.** The noise comes from `Math.random`, and the voices from the audio clock.
+Nothing here feeds a sim.
+
+## `runtime/sim/`
+
+The deterministic core of a sim that replays from a seed and its inputs: seeded random numbers,
+math that gives the same float on every engine, and the fixed-step clock that runs it. A replay
+recorded in one browser plays the same in another, in a desktop build and on a server only if the
+sim draws from `rng.ts`, does its trig through `det.ts`, and steps at a fixed rate. No file
+imports another.
+
+| File | Imports | What it decides |
+|---|---|---|
+| `rng.ts` | nothing | Every random draw, from a seed. |
+| `det.ts` | nothing | Trig, `exp`, `ln` and powers, to the last bit. |
+| `fixed-step.ts` | nothing | How many sim steps a display frame runs, and the blend between the last two. |
+
+**Keep the engine out of the sim.** A test in the game that greps its sim folder for
+`Math.random`, `Date.now`, `performance.now`, `Math.sin(`, `Math.cos(`, `Math.atan2(`,
+`Math.exp(`, `Math.pow(` and `**` keeps it that way. `Math.sqrt`, `Math.floor`, `Math.abs`,
+`Math.min` and `Math.max` are exact everywhere and fine to use.
+
+### `rng.ts`
+
+**Exports:** `Rng`, `mulberry32(seed)`, `range(rng, lo, hi)`, `pick(rng, items)`,
+`pickWeighted(rng, items)`, `hash3(a, b, c, seed)`, `hashSeed(...parts)`,
+`seedFromString(text)` (also as `seedFromText`), `GOLDEN_SEED`, and the types `RngFn`,
+`RngOptions`.
+
+One generator, mulberry32, whose whole state is one 32-bit number, in two styles. For the same
+seed both give the same draws.
+
+```ts
+import { hashSeed, mulberry32, pick, Rng } from './sim/rng'
+
+const rng = new Rng(hashSeed(runSeed, level, 7)) // a stream of its own per level
+const x = rng.range(-4, 4)
+const lane = rng.int(0, 2) // 0, 1 or 2
+if (rng.chance(0.25)) spawn(rng.pick(KINDS))
+save.rng = rng.state // and later: rng.state = save.rng
+
+const draw = mulberry32(seed) // the function style: draw() is in [0, 1)
+const kind = pick(draw, KINDS)
+```
+
+| `Rng` member | What it does |
+|---|---|
+| `new Rng(seed, options?)` | Starts from `seed >>> 0`. A seed of 0 starts at `options.zeroSeed` (default 0). |
+| `next()` | Uniform in [0, 1). Every other member is built on it. |
+| `range(lo, hi)` | In [lo, hi). One draw. |
+| `int(n)` | 0 to n - 1: `Math.floor(next() * n)`. One draw. |
+| `int(lo, hi)` | lo to hi, both included. One draw. |
+| `chance(p)` | True with probability `p`. One draw. |
+| `pick(list)` | One item, uniformly. One draw. Throws when the draw lands on `undefined` (an empty list), unless `options.emptyPick` is `'undefined'`. |
+| `weighted(weights)` | An index by weight; negative weights count as 0. One draw, or -1 and no draw when no weight is over 0. |
+| `shuffle(list)` | Shuffles in place (Fisher-Yates from the end) and returns the list. `length - 1` draws. |
+| `unit(out)` | A uniform direction on the unit sphere, into `out`. Two draws. Uses `Math.cos` and `Math.sin`, so the last bit can differ between engines. |
+| `state` | The whole generator. Read it to save; set it (taken `>>> 0`) to carry on from there. |
+
+| `RngOptions` | Default | What it does |
+|---|---|---|
+| `zeroSeed` | `0` | Where a seed of 0 starts. mulberry32 handles 0 like any other seed; pass `GOLDEN_SEED` (`0x9e3779b9`) for a sim that has always swapped 0 out. |
+| `emptyPick` | `'throw'` | `'undefined'` makes `pick` return `undefined` (typed as the item) instead of throwing, for a sim that has always carried on. |
+
+| Function | What it does |
+|---|---|
+| `mulberry32(seed)` | A bare generator, `() => number` in [0, 1) (an `RngFn`). The same draws as `new Rng(seed)`. |
+| `range(rng, lo, hi)`, `pick(rng, items)` | As the members, on an `RngFn`. `pick` throws on an empty list. |
+| `pickWeighted(rng, items)` | One of `[item, weight]` pairs by weight, which need not sum to 1. One draw; the last item is the fallback. Throws on an empty list. |
+| `hash3(a, b, c, seed)` | A stateless hash of three integers and a seed to [0, 1): the same cell of a grid always gets the same value, in any order of visiting. |
+| `hashSeed(...parts)` | Mixes numbers (each floored) into one 32-bit seed: FNV-1a over their four low bytes. For a stream per level, per room, per wave. |
+| `seedFromString(text)` | A 32-bit seed from text, such as a `?seed=` or a daily date: FNV-1a over its UTF-16 code units. `seedFromText` is the same function. |
+
+**Adopting it over a game's own copy.** Every function here gives the draws of the copies it
+came from, held by golden tests (`tests/runtime/sim-goldens.mjs`). Where those copies differed,
+the difference is an option, not a fix:
+- **A copy whose constructor swaps a seed of 0** (`seed >>> 0 || 0x9e3779b9`) keeps that with
+  `zeroSeed: GOLDEN_SEED`, and one whose `pick` returns `undefined` on an empty list keeps that
+  with `emptyPick: 'undefined'`. Pass them from a small subclass in the game, so its call sites
+  stay `new Rng(seed)`:
+  ```ts
+  import { GOLDEN_SEED, Rng as KitRng } from './rng-kit'
+  export class Rng extends KitRng {
+    constructor(seed: number) {
+      super(seed, { zeroSeed: GOLDEN_SEED, emptyPick: 'undefined' })
+    }
+  }
+  ```
+- **A copy whose `Rng` is the function type** (`type Rng = () => number`) re-exports `RngFn` under
+  that name from its barrel: `export { type RngFn as Rng, mulberry32, pick } from './rng'`.
+  `export *` would bring the class `Rng` instead.
+- **`state` is an accessor,** not an own property, so `JSON.stringify(rng)` and a spread do not
+  carry it. Save `rng.state` itself.
+
+### `det.ts`
+
+**Exports:** `M` (`sin`, `cos`, `tan`, `atan`, `atan2`, `asin`, `acos`, `exp`, `ln`, `hypot`,
+`tanh`), `sq(x)`, `powi(x, n)`, `powf(x, p)`.
+
+The language leaves `Math.sin` and the rest to each engine, and engines differ: two of them
+disagreed on about 3% of sines, enough to turn the same inputs into a different run within
+seconds. These use only `+ - * /` and `Math.sqrt`, which IEEE 754 fixes exactly, so they return
+the same float everywhere. The kernels are FreeBSD msun's (from Sun's fdlibm), cut down for the
+small angles a sim uses.
+
+```ts
+import { M, powf } from './sim/det'
+
+const heading = M.atan2(dy, dx)
+x += M.cos(heading) * speed * dt
+const dist = M.hypot(dx, dy, dz)
+const ease = powf(t, 2.2)
+```
+
+| Export | What it does |
+|---|---|
+| `M.sin`, `M.cos`, `M.tan` | Reduced by whole quarter turns against a two-part pi/2, then fdlibm's kernels. `tan` is `sin / cos`. Keep angles small: there is no big-number reduction. |
+| `M.atan`, `M.atan2(y, x)` | fdlibm's atan. `atan2` keeps the signs of zero as `Math.atan2` does. |
+| `M.asin`, `M.acos` | Through `atan2` and `Math.sqrt`. |
+| `M.exp` | Clamped to -700..700, then fdlibm's kernel and an exact power of two. |
+| `M.ln` | For a finite `x` over 0. At 0, below it or at `Infinity` it never returns: guard the input. |
+| `M.hypot(x, y, z?)` | `Math.sqrt(x * x + y * y + z * z)`. No overflow guard, unlike `Math.hypot`. |
+| `M.tanh` | Through `exp`. |
+| `sq(x)`, `powi(x, n)` | `x * x`; `x` multiplied `n` times (a whole `n`, 0 or more). |
+| `powf(x, p)` | `exp(p * ln(x))` for `x` over 0, and 0 for `x` at 0 or below. For curves; engines disagree on `**`. |
+
+**Bit for bit, not close.** The golden tests compare exact floats over chosen inputs, and a
+fingerprint of every output over a sweep of thousands of inputs per function, so a change of one
+ulp anywhere fails. They were taken from the games' copies before the kit had this file. Never
+"improve" a constant here: every replay recorded against it would change.
+
+### `fixed-step.ts`
+
+**Exports:** `createFixedStepper(options?)`, `SIM_HZ` (120), `SIM_DT` (`1 / 120`), and the types
+`FixedStepper`, `FixedStepperOptions`, `FrameAdvance`.
+
+The sim advances in exact steps; the display draws once a frame and blends the last two sim
+states by `alpha`. It is pure: the caller passes each frame's elapsed seconds.
+
+```ts
+import { createFixedStepper } from './sim/fixed-step'
+
+const stepper = createFixedStepper()
+let last = performance.now()
+function frame(now: number) {
+  const { steps, alpha } = stepper.advance((now - last) / 1000)
+  last = now
+  for (let i = 0; i < steps; i++) sim.step(readInput())
+  render(sim, alpha)
+  requestAnimationFrame(frame)
+}
+// when the tab comes back: stepper.reset()
+```
+
+`advance(seconds)` returns `{ steps, alpha, dropped }`, the same object every frame. A `NaN`,
+negative or infinite frame counts as 0. A tolerance of `1e-9` of a step makes a 60 Hz frame run
+exactly two 120 Hz steps, not one and three in turn. `alpha` stays under 1. `reset()` forgets
+the time carried over, and `stepSeconds` reads the step length back.
+
+| Option | Default | What it does |
+|---|---|---|
+| `stepSeconds` | `SIM_DT` | Seconds per sim step. |
+| `maxStepsPerFrame` | `8` | Most steps in one frame. Past it the backlog is dropped, not carried, and `dropped` is true. |
+| `maxFrameSeconds` | `0.25` | Longest frame counted. A longer one (a tab switch, a breakpoint) is clamped to it, and `dropped` is true. |
+
 ## `runtime/board/`
 
 The shared core of a leaderboard server on a Cloudflare Worker over D1: capped body reads,
@@ -1076,6 +1319,8 @@ and `runtime/env.d.ts` are the folder's own tooling and are never listed.
 | `(the original at <tag> is not available: UMM_DEV_REPO has no <tag>:<path>; ...)` | The clone lacks that tag. | `git -C $UMM_DEV_REPO fetch --tags`. |
 | `no runtime copies in <root>`, though there are copies. | Their line 1 was edited, or git ignores them. | Restore the header (take the file again with `--to <file> --force`), or stop ignoring the folder. |
 | A merged copy still says `changed here and upstream`. | Its header still names the old tag and hash. | Take the new version with `--to <file> --force`, then apply the game's changes again. |
+| A replay or a seeded level comes out different after a game takes `sim/rng.ts` over its own copy. | Its copy swapped a seed of 0 for `0x9e3779b9`, or its `pick` returned `undefined` on an empty list. | Construct with `{ zeroSeed: GOLDEN_SEED, emptyPick: 'undefined' }` (see "Adopting it over a game's own copy"). |
+| A game's code no longer typechecks where it calls a draw `rng()`, after taking `sim/rng.ts`. | Its `Rng` was the function type, and `export *` now brings the class. | Re-export `type RngFn as Rng` by name from the game's barrel. |
 | A replay or a seeded level comes out different after a game takes `sim/rng.ts` over its own copy. | Its copy swapped a seed of 0 for `0x9e3779b9`, or its `pick` returned `undefined` on an empty list. | Construct with `{ zeroSeed: GOLDEN_SEED, emptyPick: 'undefined' }` (see "Adopting it over a game's own copy"). |
 | A game's code no longer typechecks where it calls a draw `rng()`, after taking `sim/rng.ts`. | Its `Rng` was the function type, and `export *` now brings the class. | Re-export `type RngFn as Rng` by name from the game's barrel. |
 | `portal-sdk.ts` or `build-target.ts` says `no longer shipped`. | 0.2.0 removed `runtime/portal/`. | Nothing: the copy is the game's now. Delete its line 1 header if drift should stop listing it. |
