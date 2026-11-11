@@ -1,8 +1,9 @@
 # Runtime code: copy and drift
 
 Code that ships inside a game's build lives in `runtime/`, as TypeScript: the perf HUD, the dev
-command bar, the gamepad profiles, the loading splash, the pure core of a procedural music
-sequencer. It is **copied**, not linked. `umm-dev copy` writes a file into the game with a header on line 1, and from then on
+command bar, the gamepad profiles and stick shaping, the loading splash, the pure core of a
+procedural music sequencer and its instruments, a sim's seeded random numbers, deterministic math
+and fixed step, and the security headers a site Worker sends. It is **copied**, not linked. `umm-dev copy` writes a file into the game with a header on line 1, and from then on
 the copy is the game's to change. `umm-dev drift` reports how far each copy has moved from the
 version it came from, and how far the installed version has moved since. Reach for it when a game
 wants one of these files, and when the game bumps the kit's tag.
@@ -836,168 +837,6 @@ call: `advanceSteps(cursor, 0, stepLen, seconds, onStep, Infinity)`.
 `createTicker(fn, ms)` wraps `setInterval(fn, ms)`. `start()` does nothing while it is running
 and `stop()` nothing while it is stopped, so neither needs a check first. `running` says which.
 
-## `runtime/sim/`
-
-The deterministic core of a sim that replays from a seed and its inputs: seeded random numbers,
-math that gives the same float on every engine, and the fixed-step clock that runs it. A replay
-recorded in one browser plays the same in another, in a desktop build and on a server only if the
-sim draws from `rng.ts`, does its trig through `det.ts`, and steps at a fixed rate. No file
-imports another.
-
-| File | Imports | What it decides |
-|---|---|---|
-| `rng.ts` | nothing | Every random draw, from a seed. |
-| `det.ts` | nothing | Trig, `exp`, `ln` and powers, to the last bit. |
-| `fixed-step.ts` | nothing | How many sim steps a display frame runs, and the blend between the last two. |
-
-**Keep the engine out of the sim.** A test in the game that greps its sim folder for
-`Math.random`, `Date.now`, `performance.now`, `Math.sin(`, `Math.cos(`, `Math.atan2(`,
-`Math.exp(`, `Math.pow(` and `**` keeps it that way. `Math.sqrt`, `Math.floor`, `Math.abs`,
-`Math.min` and `Math.max` are exact everywhere and fine to use.
-
-### `rng.ts`
-
-**Exports:** `Rng`, `mulberry32(seed)`, `range(rng, lo, hi)`, `pick(rng, items)`,
-`pickWeighted(rng, items)`, `hash3(a, b, c, seed)`, `hashSeed(...parts)`,
-`seedFromString(text)` (also as `seedFromText`), `GOLDEN_SEED`, and the types `RngFn`,
-`RngOptions`.
-
-One generator, mulberry32, whose whole state is one 32-bit number, in two styles. For the same
-seed both give the same draws.
-
-```ts
-import { hashSeed, mulberry32, pick, Rng } from './sim/rng'
-
-const rng = new Rng(hashSeed(runSeed, level, 7)) // a stream of its own per level
-const x = rng.range(-4, 4)
-const lane = rng.int(0, 2) // 0, 1 or 2
-if (rng.chance(0.25)) spawn(rng.pick(KINDS))
-save.rng = rng.state // and later: rng.state = save.rng
-
-const draw = mulberry32(seed) // the function style: draw() is in [0, 1)
-const kind = pick(draw, KINDS)
-```
-
-| `Rng` member | What it does |
-|---|---|
-| `new Rng(seed, options?)` | Starts from `seed >>> 0`. A seed of 0 starts at `options.zeroSeed` (default 0). |
-| `next()` | Uniform in [0, 1). Every other member is built on it. |
-| `range(lo, hi)` | In [lo, hi). One draw. |
-| `int(n)` | 0 to n - 1: `Math.floor(next() * n)`. One draw. |
-| `int(lo, hi)` | lo to hi, both included. One draw. |
-| `chance(p)` | True with probability `p`. One draw. |
-| `pick(list)` | One item, uniformly. One draw. Throws when the draw lands on `undefined` (an empty list), unless `options.emptyPick` is `'undefined'`. |
-| `weighted(weights)` | An index by weight; negative weights count as 0. One draw, or -1 and no draw when no weight is over 0. |
-| `shuffle(list)` | Shuffles in place (Fisher-Yates from the end) and returns the list. `length - 1` draws. |
-| `unit(out)` | A uniform direction on the unit sphere, into `out`. Two draws. Uses `Math.cos` and `Math.sin`, so the last bit can differ between engines. |
-| `state` | The whole generator. Read it to save; set it (taken `>>> 0`) to carry on from there. |
-
-| `RngOptions` | Default | What it does |
-|---|---|---|
-| `zeroSeed` | `0` | Where a seed of 0 starts. mulberry32 handles 0 like any other seed; pass `GOLDEN_SEED` (`0x9e3779b9`) for a sim that has always swapped 0 out. |
-| `emptyPick` | `'throw'` | `'undefined'` makes `pick` return `undefined` (typed as the item) instead of throwing, for a sim that has always carried on. |
-
-| Function | What it does |
-|---|---|
-| `mulberry32(seed)` | A bare generator, `() => number` in [0, 1) (an `RngFn`). The same draws as `new Rng(seed)`. |
-| `range(rng, lo, hi)`, `pick(rng, items)` | As the members, on an `RngFn`. `pick` throws on an empty list. |
-| `pickWeighted(rng, items)` | One of `[item, weight]` pairs by weight, which need not sum to 1. One draw; the last item is the fallback. Throws on an empty list. |
-| `hash3(a, b, c, seed)` | A stateless hash of three integers and a seed to [0, 1): the same cell of a grid always gets the same value, in any order of visiting. |
-| `hashSeed(...parts)` | Mixes numbers (each floored) into one 32-bit seed: FNV-1a over their four low bytes. For a stream per level, per room, per wave. |
-| `seedFromString(text)` | A 32-bit seed from text, such as a `?seed=` or a daily date: FNV-1a over its UTF-16 code units. `seedFromText` is the same function. |
-
-**Adopting it over a game's own copy.** Every function here gives the draws of the copies it
-came from, held by golden tests (`tests/runtime/sim-goldens.mjs`). Where those copies differed,
-the difference is an option, not a fix:
-- **A copy whose constructor swaps a seed of 0** (`seed >>> 0 || 0x9e3779b9`) keeps that with
-  `zeroSeed: GOLDEN_SEED`, and one whose `pick` returns `undefined` on an empty list keeps that
-  with `emptyPick: 'undefined'`. Pass them from a small subclass in the game, so its call sites
-  stay `new Rng(seed)`:
-  ```ts
-  import { GOLDEN_SEED, Rng as KitRng } from './rng-kit'
-  export class Rng extends KitRng {
-    constructor(seed: number) {
-      super(seed, { zeroSeed: GOLDEN_SEED, emptyPick: 'undefined' })
-    }
-  }
-  ```
-- **A copy whose `Rng` is the function type** (`type Rng = () => number`) re-exports `RngFn` under
-  that name from its barrel: `export { type RngFn as Rng, mulberry32, pick } from './rng'`.
-  `export *` would bring the class `Rng` instead.
-- **`state` is an accessor,** not an own property, so `JSON.stringify(rng)` and a spread do not
-  carry it. Save `rng.state` itself.
-
-### `det.ts`
-
-**Exports:** `M` (`sin`, `cos`, `tan`, `atan`, `atan2`, `asin`, `acos`, `exp`, `ln`, `hypot`,
-`tanh`), `sq(x)`, `powi(x, n)`, `powf(x, p)`.
-
-The language leaves `Math.sin` and the rest to each engine, and engines differ: two of them
-disagreed on about 3% of sines, enough to turn the same inputs into a different run within
-seconds. These use only `+ - * /` and `Math.sqrt`, which IEEE 754 fixes exactly, so they return
-the same float everywhere. The kernels are FreeBSD msun's (from Sun's fdlibm), cut down for the
-small angles a sim uses.
-
-```ts
-import { M, powf } from './sim/det'
-
-const heading = M.atan2(dy, dx)
-x += M.cos(heading) * speed * dt
-const dist = M.hypot(dx, dy, dz)
-const ease = powf(t, 2.2)
-```
-
-| Export | What it does |
-|---|---|
-| `M.sin`, `M.cos`, `M.tan` | Reduced by whole quarter turns against a two-part pi/2, then fdlibm's kernels. `tan` is `sin / cos`. Keep angles small: there is no big-number reduction. |
-| `M.atan`, `M.atan2(y, x)` | fdlibm's atan. `atan2` keeps the signs of zero as `Math.atan2` does. |
-| `M.asin`, `M.acos` | Through `atan2` and `Math.sqrt`. |
-| `M.exp` | Clamped to -700..700, then fdlibm's kernel and an exact power of two. |
-| `M.ln` | For a finite `x` over 0. At 0, below it or at `Infinity` it never returns: guard the input. |
-| `M.hypot(x, y, z?)` | `Math.sqrt(x * x + y * y + z * z)`. No overflow guard, unlike `Math.hypot`. |
-| `M.tanh` | Through `exp`. |
-| `sq(x)`, `powi(x, n)` | `x * x`; `x` multiplied `n` times (a whole `n`, 0 or more). |
-| `powf(x, p)` | `exp(p * ln(x))` for `x` over 0, and 0 for `x` at 0 or below. For curves; engines disagree on `**`. |
-
-**Bit for bit, not close.** The golden tests compare exact floats over chosen inputs, and a
-fingerprint of every output over a sweep of thousands of inputs per function, so a change of one
-ulp anywhere fails. They were taken from the games' copies before the kit had this file. Never
-"improve" a constant here: every replay recorded against it would change.
-
-### `fixed-step.ts`
-
-**Exports:** `createFixedStepper(options?)`, `SIM_HZ` (120), `SIM_DT` (`1 / 120`), and the types
-`FixedStepper`, `FixedStepperOptions`, `FrameAdvance`.
-
-The sim advances in exact steps; the display draws once a frame and blends the last two sim
-states by `alpha`. It is pure: the caller passes each frame's elapsed seconds.
-
-```ts
-import { createFixedStepper } from './sim/fixed-step'
-
-const stepper = createFixedStepper()
-let last = performance.now()
-function frame(now: number) {
-  const { steps, alpha } = stepper.advance((now - last) / 1000)
-  last = now
-  for (let i = 0; i < steps; i++) sim.step(readInput())
-  render(sim, alpha)
-  requestAnimationFrame(frame)
-}
-// when the tab comes back: stepper.reset()
-```
-
-`advance(seconds)` returns `{ steps, alpha, dropped }`, the same object every frame. A `NaN`,
-negative or infinite frame counts as 0. A tolerance of `1e-9` of a step makes a 60 Hz frame run
-exactly two 120 Hz steps, not one and three in turn. `alpha` stays under 1. `reset()` forgets
-the time carried over, and `stepSeconds` reads the step length back.
-
-| Option | Default | What it does |
-|---|---|---|
-| `stepSeconds` | `SIM_DT` | Seconds per sim step. |
-| `maxStepsPerFrame` | `8` | Most steps in one frame. Past it the backlog is dropped, not carried, and `dropped` is true. |
-| `maxFrameSeconds` | `0.25` | Longest frame counted. A longer one (a tab switch, a breakpoint) is clamped to it, and `dropped` is true. |
-
 ### `synth.ts`
 
 **Exports:** `createKit(ctx, noise)`, `noiseBuffer(ctx, seconds?)`, `impulse(ctx, seconds, decay)`,
@@ -1210,6 +1049,51 @@ the time carried over, and `stepSeconds` reads the step length back.
 | `maxStepsPerFrame` | `8` | Most steps in one frame. Past it the backlog is dropped, not carried, and `dropped` is true. |
 | `maxFrameSeconds` | `0.25` | Longest frame counted. A longer one (a tab switch, a breakpoint) is clamped to it, and `dropped` is true. |
 
+## `runtime/worker/`
+
+### `security-headers.ts`
+
+**Exports:** `securityHeaders(options?)`, `withSecurityHeaders(res, headers?)`, `NOINDEX`,
+`HSTS`, `REFERRER_POLICY`, `PERMISSIONS_POLICY`, and the type `SecurityHeaderOptions`.
+
+The security headers for what a site Worker answers itself. The `headers()` Vite plugin
+([build.md](build.md#headersoptions-_headers)) writes them into `_headers`, but `_headers` only
+reaches the static assets: a route the Worker's script answers (`/privacy`, `/api/*`, a
+redirect) goes out without them. `securityHeaders` takes the same `framedBy` and `rules` as
+`headers()` and returns every header its `/*` rules write, in the same order. Give both the same
+options and the two cannot drift.
+
+```ts
+// worker/site/src/site-headers.ts, read by the Worker and by vite.config.ts
+import { NOINDEX, securityHeaders } from './security-headers'
+
+export const SITE_HEADERS = { framedBy: ['https://tv.example.com'], rules: { '/*': NOINDEX } }
+export const SECURITY_HEADERS = securityHeaders(SITE_HEADERS)
+
+// vite.config.ts
+plugins: [headers({ immutableAssets: true, ...SITE_HEADERS })]
+
+// the Worker, on everything its script answers
+return withSecurityHeaders(await route(req), SECURITY_HEADERS)
+```
+
+| Export | What it does |
+|---|---|
+| `securityHeaders(options?)` | Header name to value: `nosniff`, the referrer policy, HSTS, framing, the Permissions-Policy, then the `/*` rule from `rules`, which replaces a built-in header of the same name. With no options, exactly the plugin's `securityHeaders()`. Throws, as `headers()` does, on an origin that is not an exact `https://` origin and on a newline in a header. |
+| `withSecurityHeaders(res, headers?)` | A new `Response` over `res`'s body, with every header in `headers` (default `securityHeaders()`) that `res` does not already set. A header the route set is kept. Works on a redirect, whose own headers are immutable. |
+| `NOINDEX` | `{ 'X-Robots-Tag': 'noindex' }`, for a site that is not listed yet: `rules: { '/*': NOINDEX }`, given to both. Drop it on release. |
+| `HSTS`, `REFERRER_POLICY`, `PERMISSIONS_POLICY` | The values, as the plugin exports them. |
+
+| Option | Default | What it does |
+|---|---|---|
+| `framedBy` | `[]` | Exact `https://` origins that may frame the site beside its own. They join `frame-ancestors 'self'`, and `X-Frame-Options` is left out. |
+| `rules` | `{}` | As `headers()` takes them. Only `rules['/*']` is read here; a rule for another path is the static files' alone. |
+
+**The kit holds the two together.** `tests/runtime/worker.test.mjs` compares this file with
+`headersFile()` for every combination of options a game uses, so a change to the plugin's set
+fails the kit's check until this file matches. It imports nothing, so it runs in a Worker, a
+browser or Node.
+
 ## `runtime/board/`
 
 The shared core of a leaderboard server on a Cloudflare Worker over D1: capped body reads,
@@ -1319,8 +1203,6 @@ and `runtime/env.d.ts` are the folder's own tooling and are never listed.
 | `(the original at <tag> is not available: UMM_DEV_REPO has no <tag>:<path>; ...)` | The clone lacks that tag. | `git -C $UMM_DEV_REPO fetch --tags`. |
 | `no runtime copies in <root>`, though there are copies. | Their line 1 was edited, or git ignores them. | Restore the header (take the file again with `--to <file> --force`), or stop ignoring the folder. |
 | A merged copy still says `changed here and upstream`. | Its header still names the old tag and hash. | Take the new version with `--to <file> --force`, then apply the game's changes again. |
-| A replay or a seeded level comes out different after a game takes `sim/rng.ts` over its own copy. | Its copy swapped a seed of 0 for `0x9e3779b9`, or its `pick` returned `undefined` on an empty list. | Construct with `{ zeroSeed: GOLDEN_SEED, emptyPick: 'undefined' }` (see "Adopting it over a game's own copy"). |
-| A game's code no longer typechecks where it calls a draw `rng()`, after taking `sim/rng.ts`. | Its `Rng` was the function type, and `export *` now brings the class. | Re-export `type RngFn as Rng` by name from the game's barrel. |
 | A replay or a seeded level comes out different after a game takes `sim/rng.ts` over its own copy. | Its copy swapped a seed of 0 for `0x9e3779b9`, or its `pick` returned `undefined` on an empty list. | Construct with `{ zeroSeed: GOLDEN_SEED, emptyPick: 'undefined' }` (see "Adopting it over a game's own copy"). |
 | A game's code no longer typechecks where it calls a draw `rng()`, after taking `sim/rng.ts`. | Its `Rng` was the function type, and `export *` now brings the class. | Re-export `type RngFn as Rng` by name from the game's barrel. |
 | `portal-sdk.ts` or `build-target.ts` says `no longer shipped`. | 0.2.0 removed `runtime/portal/`. | Nothing: the copy is the game's now. Delete its line 1 header if drift should stop listing it. |

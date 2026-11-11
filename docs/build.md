@@ -113,6 +113,12 @@ which cannot name another origin; every browser that reads `frame-ancestors` pre
 exact `https://` origins are taken: no path, no wildcard, no `http://`. Do not use it to keep one
 `/*` rule of your own beside the kit's, since Cloudflare drops an earlier rule with the same pattern.
 
+**What the Worker answers itself.** `_headers` reaches only the static files. A page or API route
+the site Worker's script answers goes out without these headers unless the script adds them: copy
+`worker/security-headers.ts` ([runtime.md](runtime.md#security-headersts)), give its
+`securityHeaders()` the same `framedBy` and `rules`, and wrap each response in
+`withSecurityHeaders`. The kit's tests hold that file to this plugin's `/*` rules.
+
 **For the site build only.** A build another origin frames, such as one a web portal shows in an
 iframe, needs its own `_headers`, and this plugin does not write one. Until 0.2.0 that was
 `target: 'portal'` and `frameAncestors`; both now throw when the config loads, so an old config

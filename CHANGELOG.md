@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **New runtime files a game copies: `sim/rng.ts`, `sim/det.ts`, `sim/fixed-step.ts`,
+  `input/stick.ts`, `audio/synth.ts` and `worker/security-headers.ts`.** Each was a file several
+  games held their own copies of. The kit's file gives the same outputs as those copies: the same
+  draws for a seed, the same floats to the bit, the same headers in the same order. Golden tests
+  taken from the copies hold it there (`tests/runtime/sim-goldens.mjs`). Where copies differed, the
+  difference is an option, not a fix: `new Rng(seed, { zeroSeed: GOLDEN_SEED, emptyPick:
+  'undefined' })` keeps a copy that swapped a seed of 0 and returned `undefined` from an empty
+  `pick`. `securityHeaders()` takes `headers()`'s `framedBy` and `rules` and returns exactly its
+  `/*` set, for what a site Worker's script answers, which `_headers` never reaches; a kit test
+  fails if the two differ. `audio/synth.ts` imports `audio/pitch.ts`. Nothing changes for a game
+  until it takes a copy. docs/runtime.md, "`runtime/sim/`" and the other new sections, including
+  how a game moves onto each.
+
 - **`umm-dev copy --from <source>`: copy from the game's own sources.** Code that several games
   share but that cannot be public now copies like a runtime file. A game names each source in
   `runtime.sources` (`{ <name>: { repo, ref } }`), a git checkout on the same machine. Copy reads
