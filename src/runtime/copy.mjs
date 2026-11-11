@@ -20,6 +20,7 @@ import {
 import { PACKAGE_ROOT, packageVersion, readRuntime, resolveRuntime, toPosix } from './source.mjs'
 import {
   getSource,
+  isSafeRef,
   lastCommit,
   normalizeSourceSpec,
   readSource,
@@ -131,6 +132,8 @@ export function copyRuntime({
  * Copy files from one of the game's own sources (`runtime.sources`), each stamped with the source's
  * name, the commit that last changed it, its path there and its hash. The same rules as a kit
  * copy: an untouched copy is replaced, a changed one or a file that is not a copy needs `force`.
+ * `ref` reads at another commit-ish than the source's own, such as a branch not merged yet; drift
+ * still compares with the source's own ref.
  *
  * @param {{
  *   name: string,
@@ -141,6 +144,7 @@ export function copyRuntime({
  *   to?: string | undefined,
  *   force?: boolean,
  *   dryRun?: boolean,
+ *   ref?: string | undefined,
  * }} p
  * @returns {CopyResult[]}
  */
@@ -153,8 +157,14 @@ export function copySource({
   to,
   force = false,
   dryRun = false,
+  ref,
 }) {
-  const src = getSource(sources, name)
+  const own = sources[name]
+  if (ref !== undefined && !isSafeRef(ref)) throw new Error(`not a ref: ${ref}`)
+  const src = getSource(
+    own && ref !== undefined ? { ...sources, [name]: { ...own, ref } } : sources,
+    name,
+  )
   const files = resolveSourceSpec(spec, src)
   if (files.length === 0)
     throw new Error(`no file or folder "${spec}" in source "${name}" at ${src.ref}`)

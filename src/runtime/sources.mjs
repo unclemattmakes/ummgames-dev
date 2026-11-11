@@ -71,6 +71,13 @@ export function resolveSources(sources, root) {
 }
 
 /**
+ * A commit-ish given on the command line: letters, digits, `.`, `_`, `/`, `-`, `^`, `~`, not
+ * starting with `-`, so git never reads it as an option.
+ * @param {string} ref
+ */
+export const isSafeRef = (ref) => /^[\w./^~][\w./^~-]*$/.test(ref) && !ref.includes('..')
+
+/**
  * One source by name, checked to be a git checkout on this machine.
  * @param {Record<string, Source>} sources
  * @param {string} name

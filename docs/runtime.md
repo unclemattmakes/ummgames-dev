@@ -47,7 +47,7 @@ says `written`, and exits 0. Run with `--dry-run` first whenever the game alread
 
 ```
 umm-dev copy <runtime path> [--to <path in game>] [--force] [--dry-run]
-umm-dev copy --from <source> <path> [--to <path in game>] [--force] [--dry-run]
+umm-dev copy --from <source> <path> [--ref <commit-ish>] [--to <path in game>] [--force] [--dry-run]
 umm-dev copy [--from <source>] --list
 ```
 
@@ -60,6 +60,7 @@ umm-dev copy [--from <source>] --list
 | `--force` | | off | Overwrite a copy that was changed here. Overwrite a file that is not a copy only when `<runtime path>` names that one file. |
 | `--dry-run` | | off | Say what would be written; write nothing. Refusals still show. |
 | `--from` | a name in `runtime.sources` | | Copy from that source instead of `runtime/`. `<path>` is a file or folder in the source's checkout, read at its `ref`. The default destination is `<runtime.into>/<path>`. |
+| `--ref` | a commit-ish | the source's `ref` | With `--from`: read at this instead, such as a branch not merged yet. Drift still compares with the source's `ref`, so the copy shows as `changed upstream` until the branch lands and it is copied again. |
 | `--list` | | | List the runtime files this version ships, and exit. With `--from`, list the files the source has at its `ref`. |
 | `-h`, `--help` | | | Print the usage. |
 

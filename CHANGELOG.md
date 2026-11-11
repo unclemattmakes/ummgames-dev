@@ -10,7 +10,8 @@
   copy with the source at `ref`, diffs against the file at the header's commit, and calls a copy
   whose source is not on this machine `source not found`. A relative `repo` is read from the
   game's main checkout, so it works from every worktree. Nothing changes for a game without
-  sources. docs/runtime.md, "Copying from the game's own sources".
+  sources. `--ref` reads one copy at another commit-ish, such as a branch not merged yet.
+  docs/runtime.md, "Copying from the game's own sources".
 
 - **`headers()` sends `nosniff` and a referrer policy.** The set left both to Cloudflare Pages,
   which sends them itself, but every game site is on Workers static assets, which sends neither, so

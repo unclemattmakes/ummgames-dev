@@ -98,10 +98,12 @@ export async function run(argv, ctx) {
   }
   console.log(`${copies.length} runtime copies in ${root}; installed @ummgames/dev ${installed}\n`)
   const w = Math.max(...copies.map((c) => c.file.length))
+  // A source copy's version is a 12-digit commit, longer than a tag.
+  const vw = Math.max(8, ...copies.map((c) => c.version.length + 1))
   for (const c of copies) {
-    console.log(`  ${c.file.padEnd(w)}  ${c.version.padEnd(8)} ${STATUS_TEXT[c.status]}`)
+    console.log(`  ${c.file.padEnd(w)}  ${c.version.padEnd(vw)} ${STATUS_TEXT[c.status]}`)
     const next = advice(c)
-    if (next) console.log(`  ${''.padEnd(w)}  ${''.padEnd(8)} ${next}`)
+    if (next) console.log(`  ${''.padEnd(w)}  ${''.padEnd(vw)} ${next}`)
   }
 
   if (values.diff) {

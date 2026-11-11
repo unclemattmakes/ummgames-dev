@@ -163,6 +163,23 @@ describe('copySource', () => {
     })
     expect(parseSourceCopy(read(root, 'a.ts'))?.body).toBe(A_TS)
   })
+
+  it('reads at --ref for one copy, and drift still compares with the configured ref', () => {
+    const { repo } = makeSource()
+    git(repo, 'checkout', '-q', '-b', 'trial')
+    const trial = commit(repo, { 'client/a.ts': 'export const trial = 1\n' }, 'trial')
+    git(repo, 'checkout', '-q', 'main')
+    const root = makeGame()
+    const sources = resolveSources({ net: { repo, ref: 'main' } }, root)
+    copySource({ name: 'net', spec: 'client/a.ts', root, sources, to: 'a.ts', ref: 'trial' })
+    const copy = parseSourceCopy(read(root, 'a.ts'))
+    expect(copy?.body).toBe('export const trial = 1\n')
+    expect(copy?.commit).toBe(trial.slice(0, 12))
+    expect(scanDrift({ root, sources })[0]?.status).toBe('changed-upstream')
+    expect(() =>
+      copySource({ name: 'net', spec: 'client/a.ts', root, sources, ref: '--output=x' }),
+    ).toThrow(/not a ref/)
+  })
 })
 
 describe('drift on source copies', () => {

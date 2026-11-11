@@ -19,7 +19,7 @@ import { getSource, listSource, resolveSources } from '../runtime/sources.mjs'
 export const describe = 'copy a runtime/ file into the game, stamped for drift'
 
 const HELP = `usage: umm-dev copy <runtime path> [--to <path in game>] [--force] [--dry-run]
-       umm-dev copy --from <source> <path> [--to <path in game>] [--force] [--dry-run]
+       umm-dev copy --from <source> <path> [--ref <commit-ish>] [--to <path in game>] [--force] [--dry-run]
        umm-dev copy [--from <source>] --list
 
   <runtime path>  a file or folder under runtime/ (dev/fuzzy.ts, runtime/dev, input)
@@ -34,7 +34,9 @@ const HELP = `usage: umm-dev copy <runtime path> [--to <path in game>] [--force]
                   named in runtime.sources, read at its ref (committed work only).
                   <path> is the file or folder in that checkout; default
                   destination <runtime.into>/<path>
-  --list          list the runtime files this version ships, or with --from,
+  --ref <ref>     with --from: read at this commit-ish instead of the source's ref
+                  (a branch not merged yet); drift still compares with the source's ref
+  --list         list the runtime files this version ships, or with --from,
                   the files the source has at its ref
 
 Over an existing file it writes only an untouched copy, unless --force.
@@ -59,6 +61,7 @@ export async function run(argv, ctx) {
         'dry-run': { type: 'boolean', default: false },
         list: { type: 'boolean', default: false },
         from: { type: 'string' },
+        ref: { type: 'string' },
         help: { type: 'boolean', short: 'h', default: false },
       },
     })
@@ -73,6 +76,11 @@ export async function run(argv, ctx) {
   }
   const cfg = await loadConfig('runtime', { into: 'src', sources: {} }, ctx.cwd)
   const from = /** @type {string | undefined} */ (values.from)
+  const ref = /** @type {string | undefined} */ (values.ref)
+  if (ref !== undefined && from === undefined) {
+    console.error(`umm-dev copy: --ref needs --from\n\n${HELP}`)
+    return 2
+  }
   /** @type {Record<string, import('../runtime/sources.mjs').Source>} */
   let sources = {}
   if (from !== undefined) {
@@ -116,7 +124,7 @@ export async function run(argv, ctx) {
   let results
   try {
     results =
-      from === undefined ? copyRuntime(common) : copySource({ ...common, name: from, sources })
+      from === undefined ? copyRuntime(common) : copySource({ ...common, name: from, sources, ref })
   } catch (e) {
     const list = from === undefined ? 'umm-dev copy --list' : `umm-dev copy --from ${from} --list`
     console.error(`umm-dev copy: ${e instanceof Error ? e.message : e}. ${list} shows them.`)
