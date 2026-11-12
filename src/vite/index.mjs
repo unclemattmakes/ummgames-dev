@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * `@ummgames/dev/vite`: the build plugins every game shares. Each is configured by its options
- * and reads nothing from the game itself. See docs/build.md.
+ * and reads nothing from the game itself. See docs/build.md and docs/portal.md.
  */
 export {
   HEADERS_FILE,
@@ -37,6 +37,23 @@ export {
 } from './licences.mjs'
 export { NOT_FOUND_FILE, notFoundHtml, notFoundPage } from './not-found.mjs'
 export { encodePng } from './png.mjs'
+export {
+  CRAZYGAMES_LIMITS,
+  CRAZYGAMES_MOBILE_BYTES,
+  CRAZYGAMES_SDK_URL,
+  checkPortalBuild,
+  orphanChunks,
+  overLimits,
+  PORTAL_MODE,
+  portalAssets,
+  portalCheck,
+  portalPrune,
+  portalSdk,
+  portalSiteOnly,
+  publicFiles,
+  SITE_FILES,
+  stripSiteOnly,
+} from './portal.mjs'
 export {
   devSplash,
   injectSplash,

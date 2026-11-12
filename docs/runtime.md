@@ -3,7 +3,8 @@
 Code that ships inside a game's build lives in `runtime/`, as TypeScript: the perf HUD, the dev
 command bar, the gamepad profiles and stick shaping, the loading splash, the pure core of a
 procedural music sequencer and its instruments, a sim's seeded random numbers, deterministic math
-and fixed step, and the security headers a site Worker sends. It is **copied**, not linked. `umm-dev copy` writes a file into the game with a header on line 1, and from then on
+and fixed step, the security headers a site Worker sends, and a web portal's SDK adapter. It is
+**copied**, not linked. `umm-dev copy` writes a file into the game with a header on line 1, and from then on
 the copy is the game's to change. `umm-dev drift` reports how far each copy has moved from the
 version it came from, and how far the installed version has moved since. Reach for it when a game
 wants one of these files, and when the game bumps the kit's tag.
@@ -1108,6 +1109,14 @@ admin log and the bearer-token admin door. The game keeps its runs table, valida
 and meets the core through `defineBoard`. Copy the folder (`umm-dev copy board`). It has its own
 page: [board.md](board.md).
 
+## `runtime/portal/`
+
+A web portal's SDK behind one interface: CrazyGames' HTML5 SDK v3 in the portal build, a stub
+that does nothing everywhere else, and a game that plays on when the SDK is missing, blocked or
+slow. `build-target.ts` is the `PORTAL` flag the bundler drops code on. Copy the folder
+(`umm-dev copy portal`); `portal-sdk.ts` imports `./build-target`. It has its own page:
+[portal.md](portal.md).
+
 ## `runtime/making-of/`
 
 A making-of site's toy host, its controls, a 2D canvas, what a page's script calls, and a base
@@ -1211,7 +1220,7 @@ and `runtime/env.d.ts` are the folder's own tooling and are never listed.
 | A merged copy still says `changed here and upstream`. | Its header still names the old tag and hash. | Take the new version with `--to <file> --force`, then apply the game's changes again. |
 | A replay or a seeded level comes out different after a game takes `sim/rng.ts` over its own copy. | Its copy swapped a seed of 0 for `0x9e3779b9`, or its `pick` returned `undefined` on an empty list. | Construct with `{ zeroSeed: GOLDEN_SEED, emptyPick: 'undefined' }` (see "Adopting it over a game's own copy"). |
 | A game's code no longer typechecks where it calls a draw `rng()`, after taking `sim/rng.ts`. | Its `Rng` was the function type, and `export *` now brings the class. | Re-export `type RngFn as Rng` by name from the game's barrel. |
-| `portal-sdk.ts` or `build-target.ts` says `no longer shipped`. | 0.2.0 removed `runtime/portal/`. | Nothing: the copy is the game's now. Delete its line 1 header if drift should stop listing it. |
+| A `portal-sdk.ts` or `build-target.ts` copied before 0.2.0 says `changed upstream` or `changed here and upstream`. | 0.2.0 removed `runtime/portal/` and 0.11.0 brought it back, grown. | Read the diff (`drift --diff`), then take the new file with `copy portal/<file> --to <its path> --force` ([portal.md](portal.md#where-the-adapter-goes)). |
 
 ## For agents
 

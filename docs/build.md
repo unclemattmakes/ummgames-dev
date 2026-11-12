@@ -119,10 +119,10 @@ the site Worker's script answers goes out without these headers unless the scrip
 `securityHeaders()` the same `framedBy` and `rules`, and wrap each response in
 `withSecurityHeaders`. The kit's tests hold that file to this plugin's `/*` rules.
 
-**For the site build only.** A build another origin frames, such as one a web portal shows in an
-iframe, needs its own `_headers`, and this plugin does not write one. Until 0.2.0 that was
-`target: 'portal'` and `frameAncestors`; both now throw when the config loads, so an old config
-fails rather than ships headers that refuse the frame.
+**For the site build only.** Leave `headers()` out of a portal build: the portal hosts the files
+and sends its own headers, and `portalCheck` fails a build that carries a `_headers`
+([portal.md](portal.md)). `target: 'portal'` and `frameAncestors`, removed in 0.2.0, still throw
+when the config loads, so an old config fails rather than ships headers that refuse the frame.
 
 **The cache rule.** `immutableAssets: true` adds
 `/assets/* Cache-Control: public, max-age=31536000, immutable`. The build fails if any file under

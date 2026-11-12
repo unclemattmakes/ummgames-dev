@@ -23,5 +23,10 @@
     "tests/**/*",
     "vitest.config.mjs"
   ],
-  "exclude": ["node_modules", "runtime", "tests/making-of/host-page"]
+  "exclude": [
+    "node_modules",
+    "runtime",
+    "tests/making-of/host-page",
+    "tests/vite/fixtures/portal-game"
+  ]
 }

@@ -7,6 +7,8 @@ is there for the next. It covers:
 - **Video:** cut trailers and store previews from an edit list.
 - **Store art:** make covers and icons.
 - **Site builds:** headers, a 404 page, licences and the app icon for a game's own site.
+- **Portal builds:** a CrazyGames build checked against the upload rules, and an SDK adapter that
+  plays on without the SDK.
 - **3D assets:** shrink GLB files, and read meshopt-compressed ones.
 - **Agent sessions:** share one GPU between parallel sessions.
 - **Configs:** start every game from one set of lint, type and test configs.
@@ -50,7 +52,8 @@ public, so installing needs no credentials.
   palette and perf HUD, the gamepad profiles and stick shaping, the pure core of a procedural music
   sequencer (pitch, form, conductor, step clock) and its instruments, a sim's seeded random
   numbers, deterministic math and fixed step, a site Worker's security headers, the core of a
-  leaderboard server ([docs/board.md](docs/board.md)).
+  leaderboard server ([docs/board.md](docs/board.md)), a web portal's SDK adapter
+  ([docs/portal.md](docs/portal.md)).
   - `umm-dev copy <path>` writes one of those files into the game. Line 1 is a header naming this
     repo, the version and the path, plus a hash of the body. From then on the game owns its copy.
   - `umm-dev drift` shows, for each copy, whether the game changed it and whether the installed
@@ -131,8 +134,10 @@ Pages would send from a build's `_headers`. See [docs/build.md](docs/build.md). 
 `createD1()`, a D1 binding over `node:sqlite` for testing a board server
 ([docs/board.md](docs/board.md)).
 
-**Web portals are not covered.** Since 0.2.0 the kit has no portal build plugins, SDK adapter
-or fake portal. A game that ships to a portal keeps that code itself.
+**Web portals.** `vite build --mode portal` with `portalSdk`, `portalPrune`, `portalSiteOnly`
+and `portalCheck` makes a folder CrazyGames takes as it is. `runtime/portal/` is the SDK adapter
+the game calls, and `fakePortal` in `@ummgames/dev/testing` runs the build in Playwright as the
+portal does. See [docs/portal.md](docs/portal.md).
 
 ## Presets
 

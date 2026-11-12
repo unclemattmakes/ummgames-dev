@@ -1,5 +1,110 @@
 import type { Plugin } from 'vite'
 
+// ── The portal build (docs/portal.md) ────────────────────────────────────────
+
+/** The Vite mode the runtime's `build-target.ts` reads as the portal build: `'portal'`. */
+export declare const PORTAL_MODE: 'portal'
+/** CrazyGames' HTML5 SDK v3 script: `https://sdk.crazygames.com/crazygames-sdk-v3.js`. */
+export declare const CRAZYGAMES_SDK_URL: string
+/** CrazyGames' upload limits: 1,500 files and 50 MB (`50000000` bytes). */
+export declare const CRAZYGAMES_LIMITS: Readonly<{ files: number; bytes: number }>
+/** The first download that fits CrazyGames' mobile homepage: 20 MB (`20000000` bytes). */
+export declare const CRAZYGAMES_MOBILE_BYTES: number
+/** `['_headers', '_redirects', '_routes.json']`: site files a portal build leaves out. */
+export declare const SITE_FILES: readonly string[]
+
+export interface PortalSdkPluginOptions {
+  /** The SDK script's `src`. Default `CRAZYGAMES_SDK_URL`. */
+  url?: string
+}
+/** Add the portal SDK's `<script>` as the first element of `<head>`. Build only. */
+export declare function portalSdk(options?: PortalSdkPluginOptions): Plugin
+
+/** One file of a build, as `orphanChunks` reads it. */
+export interface EmittedFile {
+  /** The file's path in the build output. */
+  fileName: string
+  /** A chunk's code or a text asset's source; null for binaries. */
+  text: string | null
+  /** An entry chunk, always kept. */
+  entry: boolean
+  /** A JS chunk, as opposed to an asset. Only chunks are dropped. */
+  isChunk: boolean
+}
+/** File names of the non-entry chunks no other emitted file mentions, chains included. */
+export declare function orphanChunks(files: readonly EmittedFile[]): string[]
+
+export interface PortalPruneOptions {
+  /** Print one line per dropped chunk. Default true. */
+  log?: boolean
+}
+/** Drop the chunks nothing in the build loads. Nothing drops while source maps are on. Build only. */
+export declare function portalPrune(options?: PortalPruneOptions): Plugin
+
+/** `html` without the elements carrying `attribute` (default `data-site-only`). */
+export declare function stripSiteOnly(html: string, attribute?: string): string
+
+export interface PortalSiteOnlyOptions {
+  /** The marker attribute: letters, digits and `-`. Default `data-site-only`. */
+  attribute?: string
+}
+/** Strip the elements marked `data-site-only` (or `attribute`) from index.html. Build only. */
+export declare function portalSiteOnly(options?: PortalSiteOnlyOptions): Plugin
+
+/** What breaks a limit, in the words of the build error; empty when the sizes fit. */
+export declare function overLimits(
+  sizes: readonly number[],
+  limits?: { files: number; bytes: number },
+): string[]
+
+/**
+ * Every file under `dir`, relative with `/`, sorted: no dotfiles or dot folders, no
+ * `SITE_FILES` at the top, nothing starting with an `exclude` prefix. `[]` when `dir` is missing.
+ */
+export declare function publicFiles(
+  dir: string,
+  options?: { exclude?: readonly string[] },
+): string[]
+
+export interface PortalAssetsOptions {
+  /** Files under `publicDir` the portal build needs, relative to it; or a function of the root. */
+  paths?: readonly string[] | ((root: string) => readonly string[] | Promise<readonly string[]>)
+  /** Where `paths` are read from, relative to the root. Default `public`. */
+  publicDir?: string
+  /** Added to the error naming a missing file. Default none. */
+  missingHint?: string
+}
+/** Copy the listed `public/` files into the build. Throws on the `limits` option (now `portalCheck`). Build only. */
+export declare function portalAssets(options?: PortalAssetsOptions): Plugin
+
+export interface PortalCheckOptions {
+  /** Default `CRAZYGAMES_LIMITS`; `false` checks none. */
+  limits?: { files: number; bytes: number } | false
+  /** The marker `portalSiteOnly` strips; one left in `index.html` fails. Default `data-site-only`. */
+  attribute?: string
+}
+/** What `checkPortalBuild` found. */
+export interface PortalReport {
+  /** How many files the folder holds. */
+  files: number
+  /** Their total size in bytes. */
+  bytes: number
+  /** Whether `bytes` fits `CRAZYGAMES_MOBILE_BYTES`. */
+  mobile: boolean
+  /** One line per broken rule; empty when none. */
+  problems: string[]
+}
+/**
+ * Read a written portal build: the limits, `index.html` at the top, no root-absolute `src` or
+ * `href` in it, no marked element left, no source map, dotfile or site file.
+ */
+export declare function checkPortalBuild(dir: string, options?: PortalCheckOptions): PortalReport
+/**
+ * Run `checkPortalBuild` on the folder Vite wrote, print its size, and fail the build on any
+ * problem. Build only.
+ */
+export declare function portalCheck(options?: PortalCheckOptions & { log?: boolean }): Plugin
+
 // ── Cloudflare Pages files (docs/build.md) ───────────────────────────────────
 
 /** `'_headers'`, the file Cloudflare Pages reads. */

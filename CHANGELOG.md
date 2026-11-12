@@ -1,6 +1,50 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 (2026-11-12)
+
+The web portal tools are back, checked against CrazyGames' rules as they read on 2026-11-12, and
+the shared sim, input, audio and Worker runtime files (under "Also in 0.11.0"). Nothing in a game
+must change. See [docs/portal.md](docs/portal.md).
+
+**Why they came back.** 0.2.0 removed them, and each game that ships to a portal then kept its
+own copy. One copy here is easier to keep right. The plugins and the fake portal are 0.1.2's, the
+adapter is 0.1.2's with its late-ad mute fix, and what the games' copies grew since (a size line
+on every build, a public folder listed by rule) is folded in.
+
+- **`@ummgames/dev/vite`:** `portalSdk`, `portalPrune`, `portalSiteOnly` and `portalAssets` as in
+  0.1.x, and `PORTAL_MODE`, `CRAZYGAMES_SDK_URL`, `CRAZYGAMES_LIMITS`, `orphanChunks`,
+  `stripSiteOnly`, `overLimits`.
+- **New: `portalCheck()`.** It reads the folder Vite wrote, `publicDir` copies included, and fails
+  the build on more than 1,500 files or 50 MB, no `index.html` at the top, a root-absolute `src`
+  or `href` in `index.html`, a source map, a dotfile, a `_headers`, or a `data-site-only` element
+  left in. It prints the size on every build, and whether it fits the 20 MB mobile homepage.
+  `checkPortalBuild(dir)` is the same check as a function.
+- **New: `publicFiles(dir, { exclude })`**, every file in `public/` but dotfiles, site files and
+  the excluded prefixes, for `portalAssets({ paths })`. `SITE_FILES` and
+  `CRAZYGAMES_MOBILE_BYTES` are exported too.
+- **Changed from 0.1.x:** `portalAssets` no longer checks limits; `limits` there throws when the
+  config loads, pointing at `portalCheck`. The limits are decimal: 50 MB is 50,000,000 bytes, not
+  52,428,800, the stricter reading of CrazyGames' "50MB". `CRAZYGAMES_ORIGINS` is not back: the
+  portal hosts the files, so the portal build carries no `_headers`.
+- **`runtime/portal/`** (`umm-dev copy portal`): `build-target.ts` (`PORTAL`) and
+  `portal-sdk.ts`. The adapter keeps 0.1.2's calls and adds `rewardedAd()` (true only when the ad
+  played to the end), `hasAdblock()`, `progress(percent)`, `setContext()`, `settings()` and
+  `onSettings()`, `device`, `locale`, and `storage`, which saves through the SDK's data module and
+  falls back to `localStorage`. The portal's `muteAudio` setting now mutes the game through the
+  same `setMuted` an ad uses, from boot. With the SDK missing, blocked, slow or disabled, every
+  call is a no-op and the game plays on: a Basic Launch needs no SDK.
+- **`@ummgames/dev/testing`:** `fakePortal`, `fakeSdkScript`, `PORTAL_HOST` and
+  `CRAZYGAMES_SDK_URL`. The fake SDK gains rewarded ads, settings, the data module, system info
+  and `hasAdblock`; the portal gains `data()` and `setSettings()`. `applyHeaders` is gone with
+  the portal's `_headers`.
+- docs/portal.md is back, rewritten for the above.
+
+**What a game must change:** nothing. A game that kept a copy of 0.1.x's portal code can drop it
+for these: the 0.1.x calls are unchanged, but move `portalAssets({ limits })` to `portalCheck()`.
+A game that takes the new `sim/rng.ts` calls `unitOnSphere(rng, out)` where it called
+`rng.unit(out)` (below).
+
+### Also in 0.11.0
 
 - **`runtime/sim/sphere.ts`: `unitOnSphere(rng, out)`, out of `rng.ts`.** `Rng.unit` called
   `Math.cos` and `Math.sin`, so a sim whose guard test bans engine trig could not copy `rng.ts`. The

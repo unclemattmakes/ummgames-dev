@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * `@ummgames/dev/testing`: helpers for a game's own specs. See docs/build.md.
+ * `@ummgames/dev/testing`: helpers for a game's own specs. See docs/build.md and docs/portal.md.
  *
  *   expect(headersFor('dist', '/')['x-frame-options']).toBe('SAMEORIGIN')
  */
@@ -37,5 +37,12 @@ export function headersFor(dist, pathname) {
 }
 
 export { createD1, parameterCount } from './d1.mjs'
+
+export {
+  CRAZYGAMES_SDK_URL,
+  fakePortal,
+  fakeSdkScript,
+  PORTAL_HOST,
+} from './fake-portal.mjs'
 
 export { createImportGraph } from './import-graph.mjs'

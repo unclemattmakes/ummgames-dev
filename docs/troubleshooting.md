@@ -71,7 +71,9 @@ current bugs with workarounds.
 |---|---|---|
 | `/assets/* is cached immutable but these have no content hash: <file>` | `headers({ immutableAssets: true })` found a file under `assets/` without a hash | Give it a hashed name, move it out of `assets/`, or list `headers()` after the plugin that writes it |
 | `headers: target was removed in 0.2.0; _headers is for the site build only` | A portal build's config from before 0.2.0 | Drop `headers()` from that build and write its `_headers` yourself ([build.md](build.md#troubleshooting)) |
-| `does not provide an export named 'portalSdk'` (or `fakePortal`, `PORTAL_MODE`) | 0.2.0 removed the portal tools | Keep the game on 0.1.x, or move the portal code into the game ([CHANGELOG.md](../CHANGELOG.md), 0.2.0) |
+| `does not provide an export named 'portalSdk'` (or `fakePortal`, `PORTAL_MODE`, `portalCheck`) | The installed kit is from 0.2.0 to 0.10.x, which had no portal tools | `pnpm update @ummgames/dev`: 0.11.0 brings them back ([portal.md](portal.md)) |
+| `portalAssets: limits moved to portalCheck() in 0.11.0` | A portal config from 0.1.x | Drop `limits` from `portalAssets` and add `portalCheck({ limits })` ([portal.md](portal.md#portalcheckoptions)) |
+| `the portal build breaks the portal's rules:` and a list | `portalCheck` found the written folder over a limit, or not upload-ready | Fix each line as it says ([portal.md](portal.md#troubleshooting)) |
 
 ## Agents, GPU and git
 

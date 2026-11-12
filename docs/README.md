@@ -18,6 +18,7 @@
 |---|---|---|
 | Capture, trailers, store art, site loops | [media.md](media.md) | linked: `umm-dev capture`, `cut`, `store`, `loop`; `@ummgames/dev/media` |
 | Headers, 404, licences, app icon, the splash's markup and portrait | [build.md](build.md) | linked: `@ummgames/dev/vite`, `@ummgames/dev/testing` |
+| A web portal build (CrazyGames): build plugins, the SDK adapter, a fake portal for Playwright | [portal.md](portal.md) | linked: `@ummgames/dev/vite`, `fakePortal` in `@ummgames/dev/testing`; copied: `runtime/portal/` |
 | GPU lease, worktrees, merge drivers | [agent.md](agent.md) | linked: `umm-dev gpu`, `worktree`, `merge` |
 | Repo guards and git hooks | [guard.md](guard.md) | linked: `umm-dev guard` |
 | Runtime copies and drift; the dev palette, splash, pad profiles, music sequencer core | [runtime.md](runtime.md) | copied: `umm-dev copy`, `drift`; `runtime/` |
