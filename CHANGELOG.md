@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.1 (2026-11-12)
+
+- **`runtime/portal/portal-sdk.ts`: the two top-level `Object.freeze` calls are marked
+  `/* @__PURE__ */`.** A game that imports the adapter and calls it only under `if (PORTAL)` kept a
+  bare `Object.freeze({...})` statement in its site bundle, because the bundler treats the call as a
+  side effect. That shifted minified names, so the site build was no longer byte for byte the same.
+  With the marks, the site bundle drops both. Re-copy with `umm-dev copy portal`.
+
 ## 0.11.0 (2026-11-12)
 
 The web portal tools are back, checked against CrazyGames' rules as they read on 2026-11-12, and

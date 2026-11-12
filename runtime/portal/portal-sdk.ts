@@ -188,7 +188,10 @@ export const AD_START_WAIT_MS = 6000
 /** The default room code: 4 to 12 letters or digits. */
 export const ROOM_CODE = /^[A-Z0-9]{4,12}$/
 
-const NO_SETTINGS: PortalSettings = Object.freeze({ muteAudio: false, disableChat: false })
+const NO_SETTINGS: PortalSettings = /* @__PURE__ */ Object.freeze({
+  muteAudio: false,
+  disableChat: false,
+})
 
 /** A room code from invite parameters (`{ room: 'ABCD' }`), upper-cased, or null. */
 export function roomFromParams(
@@ -245,7 +248,7 @@ export function localStore(warn: (message: string, error?: unknown) => void): Po
 const quietWarn = (m: string, e?: unknown) => console.warn(`[portal] ${m}`, e)
 
 /** The stub: what the game gets off the portal, or when the SDK fails. */
-export const NO_PORTAL: PortalSdk = Object.freeze({
+export const NO_PORTAL: PortalSdk = /* @__PURE__ */ Object.freeze({
   name: 'none',
   loadingStop() {},
   setGameplay() {},
