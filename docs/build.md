@@ -214,6 +214,39 @@ import { LICENCES } from 'virtual:licences'
 | `page` | `string` or `false` | `false` | Also emit the list as a static page with this file name, such as `licences.html`. |
 | `pageTitle` | `string` | `'Licences'` | The page's `<title>` and `<h1>`. |
 | `pageIntro` | `string` | none | A line of text above the list. |
+| `text` | `string` or `false` | `false` | Also emit the list as plain text with this file name, such as `notices.txt`. Build only. |
+| `textHeader` | `string` | none | The text file's first lines: the game's name and copyright. |
+| `textIntro` | `string` | `'This game uses these packages.'` | The line after the header; `''` for none. |
+
+**A notices file beside the game.** Some licences ask that their notice travel with every copy.
+three.js's MIT licence is one: its notice is a comment in the source, and the minifier drops
+it from the bundle. `text` writes every shipped package's notice into one plain file at the top of
+the build, read from `node_modules` like the rest, so three.js's comes with it whenever `three`
+is a dependency. Put the plugin in both builds, the site's and the portal's, so both ship it.
+
+```js
+// Both builds: notices.txt at the top of dist/ and of dist-portal/.
+licences({ text: 'notices.txt', textHeader: 'My Game\nCopyright (c) 2026 My Studio. All rights reserved.' })
+```
+
+```
+My Game
+Copyright (c) 2026 My Studio. All rights reserved.
+
+This game uses these packages.
+
+------------------------------------------------------------------------
+three 0.185.1 (MIT)
+
+The MIT License
+
+Copyright © 2010-2026 three.js authors
+...
+```
+
+**Code copied from the kit** (`runtime/`, through `umm-dev copy`) ships too, under the kit's MIT
+licence. The kit is a devDependency, so list it by hand: `include: ['@ummgames/dev']` adds its
+`LICENSE`.
 
 **A package with no licence file.** Add the text yourself as
 `<fallbackDir>/<scope>-<name>.LICENSE`: `@scope/pkg` is `licences/scope-pkg.LICENSE`. A
@@ -372,6 +405,7 @@ Each plugin's logic is exported for tests and scripts.
 | `collectLicences(root, options?)` | The licence list for the game at `root`. Throws on a dependency with no notice. |
 | `fallbackName(pkg)` | `@scope/name` to `scope-name.LICENSE`. |
 | `licencesHtml(list, { title?, intro? })`, `LICENCES_MODULE` | The licences page's text, and `'virtual:licences'`. |
+| `licencesText(list, { header?, intro? })` | The notices file's text. |
 | `parseIconSvg(svg)`, `pathPoints(d)` | The SVG reader, and one path's points. |
 | `rasterize(icon, size)`, `rasterizeCard(icon, width, height, mark)` | RGB pixels, row by row. |
 | `appleTouchIconPng(svg, size?)`, `shareCardPng(svg, size?)` | The PNGs as `Buffer`s. |

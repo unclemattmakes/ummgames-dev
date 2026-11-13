@@ -8,7 +8,8 @@
  * licence and the text of every LICENSE, LICENCE, COPYING and NOTICE file in its folder. A
  * package whose tarball leaves its licence out takes it from the game's fallback folder
  * (`licences/<scope>-<name>.LICENSE`); a dependency with neither fails the build, so a new one
- * cannot ship without its notice. With `page`, the same list is also written as a static page.
+ * cannot ship without its notice. With `page`, the same list is also written as a static page;
+ * with `text`, as a plain-text notices file.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -113,19 +114,39 @@ ${intro ? `<p>${escapeHtml(intro)}</p>\n` : ''}${items}</main>
 }
 
 /**
+ * The list as plain text, for a `notices.txt` beside the game: `header` first (the game's own
+ * copyright), then each package's name, version and licence, and its notice files in full. A
+ * licence such as three.js's MIT asks that its notice travel with every copy, and a minifier
+ * drops the comment that carried it in the source, so the file is what keeps it with the build.
+ * @param {readonly Licence[]} list
+ * @param {{ header?: string, intro?: string }} [options]
+ * @returns {string}
+ */
+export function licencesText(list, { header = '', intro = 'This game uses these packages.' } = {}) {
+  const rule = '-'.repeat(72)
+  const head = [header.trim(), intro.trim()].filter(Boolean).join('\n\n')
+  const items = list.map((l) => `${rule}\n${l.name} ${l.version} (${l.licence})\n\n${l.text}\n`)
+  return `${head ? `${head}\n\n` : ''}${items.join('\n')}`
+}
+
+/**
  * @typedef {CollectOptions & {
  *   module?: string,
  *   page?: string | false,
  *   pageTitle?: string,
  *   pageIntro?: string,
+ *   text?: string | false,
+ *   textHeader?: string,
+ *   textIntro?: string,
  * }} LicencesOptions
  *   `module`: the virtual module's id. `page`: a file name to also emit the list as HTML
- *   (`licences.html`); off by default.
+ *   (`licences.html`); off by default. `text`: a file name to also emit it as plain text
+ *   (`notices.txt`), headed by `textHeader`; off by default.
  */
 
 /**
  * `import { LICENCES } from 'virtual:licences'` gives the game the list; `page` writes it as a
- * page too. The root is Vite's.
+ * page too, and `text` as a plain-text file. The root is Vite's.
  * @param {LicencesOptions} [options]
  * @returns {import('vite').Plugin}
  */
@@ -151,12 +172,20 @@ export function licences(options = {}) {
       return `export const LICENCES = ${JSON.stringify(list())}`
     },
     generateBundle() {
-      if (!page) return
-      /** @type {{ title?: string, intro?: string }} */
-      const o = {}
-      if (options.pageTitle) o.title = options.pageTitle
-      if (options.pageIntro) o.intro = options.pageIntro
-      this.emitFile({ type: 'asset', fileName: page, source: licencesHtml(list(), o) })
+      if (page) {
+        /** @type {{ title?: string, intro?: string }} */
+        const o = {}
+        if (options.pageTitle) o.title = options.pageTitle
+        if (options.pageIntro) o.intro = options.pageIntro
+        this.emitFile({ type: 'asset', fileName: page, source: licencesHtml(list(), o) })
+      }
+      if (options.text) {
+        /** @type {{ header?: string, intro?: string }} */
+        const o = {}
+        if (options.textHeader) o.header = options.textHeader
+        if (options.textIntro !== undefined) o.intro = options.textIntro
+        this.emitFile({ type: 'asset', fileName: options.text, source: licencesText(list(), o) })
+      }
     },
   }
 }

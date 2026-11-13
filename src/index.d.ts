@@ -3,6 +3,7 @@ import type { LoudnessConfig } from './audio/index.js'
 import type { GuardConfig } from './guard/config.js'
 import type { CaptureConfig, LoopConfig, StoreConfig } from './media/index.js'
 import type { RuntimeConfig, RuntimeSource } from './runtime/config.js'
+import type { PortalCheckConfig } from './testing/index.js'
 
 export type {
   CaptureConfig,
@@ -10,6 +11,7 @@ export type {
   GuardConfig,
   LoopConfig,
   LoudnessConfig,
+  PortalCheckConfig,
   RuntimeConfig,
   RuntimeSource,
   StoreConfig,
@@ -38,6 +40,8 @@ export interface UmmDevConfig {
   runtime?: RuntimeConfig
   /** `umm-dev loudness`. docs/audio.md */
   loudness?: LoudnessConfig
+  /** `umm-dev portal check`. docs/portal.md */
+  portal?: PortalCheckConfig
 }
 
 /**

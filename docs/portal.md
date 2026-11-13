@@ -335,6 +335,34 @@ const report = checkPortalBuild('dist-portal')
 console.log(report.files, report.bytes, report.mobile, report.problems)
 ```
 
+## `portalNoSelect(options)`
+
+```ts
+portalNoSelect(options?: { selector?: string }): Plugin
+```
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `selector` | `string` | `'body'` | The element text selection is turned off on. A selector holding `{`, `}` or `<` throws. |
+
+It adds one `<style>` to `<head>` of the portal build:
+
+```html
+<style>body{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}</style>
+```
+
+**Why.** CrazyGames' technical rules ask a game to turn text selection off, with every prefix.
+On a phone, a long press or a drag over the page otherwise selects text and pops up the copy menu
+over play. Many games set the plain and `-webkit-` rules in `index.html` already. This adds all
+four, in the portal build only, so the site build stays byte for byte.
+
+**A text field still selects.** The rule is a type selector, so any rule of the game's with a
+class or an id (`.name-entry { user-select: text }`) wins over it.
+
+```js
+plugins: [portalSdk(), portalNoSelect(), portalPrune(), portalSiteOnly(), portalCheck()]
+```
+
 ## Constants and pure functions
 
 | Export | What it is |
@@ -349,6 +377,8 @@ console.log(report.files, report.bytes, report.mobile, report.problems)
 | `overLimits(sizes, limits?)` | What breaks a limit, in the words of the error; `[]` when the sizes fit. |
 | `publicFiles(dir, { exclude? })` | Every file under `dir`, relative with `/`, sorted; no dotfiles or dot folders, no `SITE_FILES` at the top, nothing starting with an `exclude` prefix. `[]` when `dir` is missing. |
 | `checkPortalBuild(dir, options?)` | `{ files, bytes, mobile, problems }` for a written folder; takes `portalCheck`'s `limits` and `attribute`. |
+| `NO_SELECT_CSS` | The rule `portalNoSelect` adds, for `body`. |
+| `noSelectCss(selector?)` | The same rule for another selector. |
 
 ## Runtime: `runtime/portal/`
 
@@ -679,13 +709,174 @@ pnpm exec playwright test -c playwright.portal.config.mjs
 `fakePortal` takes any Playwright `Page`. Its types are structural, so a game needs only
 `@playwright/test`.
 
+## `umm-dev portal check`: the build in Chrome, with a verdict
+
+```sh
+pnpm exec umm-dev gpu run --name portal-check -- umm-dev portal check
+```
+
+One command that runs the portal build the way CrazyGames does and says whether it passes. Run
+it before each upload. A fake-portal spec checks what one game does; this checks what every
+portal build must do, and runs the game's own steps in the middle.
+
+**What it does, in order:**
+1. Runs `portal.build` (`pnpm build:portal`), unless `--no-build` is given or none is set.
+2. Reads the folder with `checkPortalBuild`: the limits, `index.html` at the top, relative URLs,
+   no source maps, no site files. Then it scans every `.js`, `.mjs`, `.html` and `.css` file for
+   the words in `portal.forbidden` (a relay's host, `WebSocket`, the game's own site). Case
+   matters.
+3. Opens the build in the fake portal in Chrome, once per run. Each run waits for
+   `portal.ready`, waits `settleMs`, and shoots the title. Then it calls `portal.play` with the
+   page and the game frame.
+4. Fails a run on:
+   - a console error or an uncaught exception;
+   - a request to any other host;
+   - a missing file;
+   - a WebSocket dial;
+   - a load over `loadLimitMs` (20 s, CrazyGames' limit for desktop Chrome);
+   - SDK calls out of order: `init` not first, no `loadingStart` then `loadingStop`, a
+     `gameplayStart` before `loadingStop`, `gameplayStart` or `gameplayStop` twice in a row,
+     or no `gameplayStart` once the play steps ran;
+   - with `noAds`, any `requestAd` call. A Basic Launch build is checked with ads off.
+5. Writes the stills and `report.json` to `out`, and exits 1 on any failure.
+
+**The runs.** There are two by default, both in CrazyGames' smallest desktop frame, 907 x 510 at
+devicePixelRatio 1. `desktop` has the fake SDK. `nosdk` has the SDK script blocked, as an ad
+blocker does: the blocked script is not a failure there, and no SDK call is due. Console lines
+about blocked requests (`ERR_BLOCKED_BY_CLIENT`) are never counted as errors, because each
+blocked request is already reported once, under other hosts.
+
+| Option | What it does |
+|---|---|
+| `--no-build` | Skip `portal.build`: check the folder as it is. |
+| `--dir <dir>` | The built portal folder. Default `portal.dir`, `dist-portal`. |
+| `--out <dir>` | Where the stills and `report.json` go. Default `portal.out`, `test-results/portal-check`. |
+| `--only <run,...>` | Only these runs, by name. An unknown name exits 2. |
+| `--cpu` | Draw in software (SwiftShader). Needs no GPU lease, and runs far slower. |
+| `--headed` | Show the browser. |
+
+**The GPU.** Chrome draws on the GPU, through Direct3D 11 on Windows. Take the lease with
+`umm-dev gpu run` ([agent.md](agent.md)). `--cpu` needs no lease and proves the same things,
+more slowly.
+
+**When it works:**
+
+```
+== files
+  ok   31 files, 12.4 MB, within the limits and the mobile homepage size
+  ok   none of WebSocket wss:// in the code
+== desktop
+  ok   Enter starts a run
+  ok   desktop: loaded in 3120 ms, clean
+== nosdk
+  ok   Enter starts a run
+  ok   nosdk: loaded in 2980 ms, clean
+portal check: ok. Stills in /home/me/my-game/test-results/portal-check
+```
+
+The stills are the game's frame alone, at its own size, named `<run>-<nn>-<step>.png`
+(`desktop-01-title.png`): what a player in that frame sees.
+
+### The game's own steps: `portal.play`
+
+`play` is an async function in `umm-dev.config.mjs`. It runs once per run, after the title
+still, and gets one argument:
+
+| Field | What it is |
+|---|---|
+| `run` | The run: `{ name, frame, sdk, touch, ... }`. Branch on `run.name` or `run.sdk`. |
+| `page` | The Playwright page holding the portal. Keys go to `page.keyboard`. |
+| `game()` | The game's frame, looked up again each call, so a reload is followed. |
+| `portal` | What `fakePortal` returned: `calls()`, `elsewhere`, `setSettings()` and the rest. |
+| `context` | The browser context, for a CDP session (raw touches). |
+| `still(name)` | Shoot the game's frame as the next still. |
+| `ok(what)`, `fail(why)` | Print a passed check; record a failed one and go on. |
+| `log(line)` | Print a line. |
+
+Throw to stop the run: the error becomes a `stopped:` failure, with a `stopped` still.
+
+```js
+// umm-dev.config.mjs
+// @ts-check
+import { defineConfig } from '@ummgames/dev'
+
+export default defineConfig({
+  portal: {
+    build: 'pnpm build:portal',
+    forbidden: ['WebSocket', 'wss://'],
+    noAds: true,
+    // The loading plate is gone: the first frame is drawn.
+    ready: () => !document.getElementById('loading'),
+    async play({ page, game, still, ok, fail }) {
+      await game().locator('body').click({ position: { x: 5, y: 5 } })
+      await page.keyboard.press('Enter')
+      await game().waitForFunction(() => window.__game?.mode === 'run', null, { timeout: 10_000 })
+      ok('Enter starts a run')
+      await page.keyboard.press('KeyP')
+      if (!(await game().evaluate(() => window.__game.mode === 'paused'))) fail('P does not pause')
+      await still('paused')
+    },
+  },
+})
+```
+
+**A phone.** Add a run with `touch: true`: an emulated touch phone, its viewport the frame's
+size, at 2x. Give the SDK's device too, so the game's touch mode follows it:
+
+```js
+runs: [
+  { name: 'desktop' },
+  { name: 'nosdk', sdk: false },
+  { name: 'phone', frame: { width: 667, height: 375 }, sdk: { device: 'mobile' }, touch: true },
+],
+```
+
+**From a script of the game's own,** call the same check with options in place of config:
+
+```js
+import { runPortalCheck } from '@ummgames/dev/testing'
+
+const result = await runPortalCheck({ dir: 'dist-portal', play: myPlay })
+process.exit(result.ok ? 0 : 1)
+```
+
+| Export (`@ummgames/dev/testing`) | What it is |
+|---|---|
+| `runPortalCheck(options?)` | The whole check. Takes the Config keys below, plus `root`, `only`, `cpu`, `headed` and `log`. Resolves `{ ok, problems, files, runs, out }`. |
+| `runProblems(seen, rules)` | What one run broke, from what it saw. The rules above, as a pure function. |
+| `forbiddenHits(dir, words)` | Each word found in the build's code, with the files holding it. |
+| `portalChromeArgs({ cpu? })` | Chrome's flags for the GPU, or for SwiftShader. |
+| `DEFAULT_PORTAL_RUNS`, `CRAZYGAMES_SMALLEST_FRAME`, `PORTAL_LOAD_LIMIT_MS` | The defaults: the two runs, `{ width: 907, height: 510 }`, `20000`. |
+
+## Config: `portal`
+
+| Key | Default | What it does |
+|---|---|---|
+| `dir` | `'dist-portal'` | The built portal folder, relative to the game root. |
+| `build` | `null` | A shell command run in the game root first (`'pnpm build:portal'`). None: the folder is checked as it is. |
+| `out` | `'test-results/portal-check'` | Where the stills and `report.json` go. |
+| `forbidden` | `[]` | Words the build's `.js`, `.mjs`, `.html` and `.css` files must not hold. Case matters. |
+| `limits` | CrazyGames': `{ files: 1500, bytes: 50000000 }` | `checkPortalBuild`'s limits; `false` checks none. |
+| `ready` | `null`, which waits for `document.readyState === 'complete'` | A function run in the game frame until it returns true: the game has loaded. The load time runs from opening the portal page to this. |
+| `readyTimeoutMs` | `60000` | How long `ready` may take before the run stops. |
+| `loadLimitMs` | `20000` | A load slower than this fails. |
+| `settleMs` | `1000` | The wait between `ready` and the title still. |
+| `play` | `null` | The game's own steps; see above. |
+| `runs` | `[{ name: 'desktop' }, { name: 'nosdk', sdk: false }]` | The runs. Each has a `name`, and optionally `frame` (907 x 510), `sdk` (`{}`; `false` blocks it), `touch`, `viewport` (the frame plus 40 px each way), `deviceScaleFactor` (1, or 2 with `touch`), `query`, `play` (`false` skips the steps) and `calls` (the exact SDK calls, in place of the order rules). |
+| `noAds` | `false` | Any `requestAd` call fails the run. |
+| `hideGamepads` | `true` | `navigator.getGamepads()` returns none, so a pad plugged into the machine moves nothing. |
+| `gamePath` | `'/games/game/'` | The game's folder on the fake portal. |
+| `channel` | none: Chrome, then Edge, then Playwright's Chromium | The Chromium to run. |
+
+`umm-dev portal check` needs `playwright` in the game: `pnpm add -D playwright`.
+
 ## How it works
 
-- **Build only.** All five plugins set `apply: 'build'`. The dev server has no SDK script, keeps
+- **Build only.** All six plugins set `apply: 'build'`. The dev server has no SDK script, keeps
   every marked element, copies nothing and checks nothing.
 - **The mode is the switch.** The Vite config adds the plugins when `mode === PORTAL_MODE`, and
   `build-target.ts` reads the same mode. Any other mode gives a site build with the stub adapter.
-- **`portalSdk` and `portalSiteOnly`** are `transformIndexHtml` hooks. `portalSiteOnly` is one
+- **`portalSdk`, `portalNoSelect` and `portalSiteOnly`** are `transformIndexHtml` hooks. `portalSiteOnly` is one
   regular expression over the HTML text.
 - **`portalPrune`** runs in `generateBundle`. A chunk counts as loaded when any other emitted
   text file contains its base file name.
@@ -699,6 +890,9 @@ pnpm exec playwright test -c playwright.portal.config.mjs
 - **The fake portal** is one `page.route('**/*')` and one `page.routeWebSocket(/.*/)`. The fake
   SDK keeps its record in the game frame's `window.__fakePortal`; `calls()`, `rooms()` and
   `data()` read it from there.
+- **`umm-dev portal check`** is `runPortalCheck` with the game's `portal` config. Each run gets a
+  fresh browser context, so no save or setting carries from one run to the next. The verdict on
+  a run is `runProblems` over what the fake portal recorded once the play steps end.
 
 ## Troubleshooting
 
@@ -728,6 +922,11 @@ pnpm exec playwright test -c playwright.portal.config.mjs
 | `bad attribute name: <name>` | `portalSiteOnly({ attribute })` has a character other than letters, digits or `-`. | Use a plain attribute name. |
 | The game has two adapters, one in `src/portal/` | `umm-dev copy portal` ran without `--to` in a game that keeps its adapter elsewhere. | Delete `src/portal/`, then copy again with `--to`. See [Where the adapter goes](#where-the-adapter-goes). |
 | `refused  <file>: exists and is not a copy; --force overwrites` | The target is the game's own adapter, not a copy. | Add `--force`, naming that one file. |
+| `the portal check needs Playwright: pnpm add -D playwright` | The game has `@playwright/test` only, or no Playwright. | `pnpm add -D playwright`. |
+| `stopped: Timeout 60000ms exceeded` on every run | `portal.ready` never turns true, or the build never boots. | Look at the `stopped` still. Check `ready` against the game's own boot flag. |
+| `the SDK heard init, loadingStart: no loadingStart then loadingStop` | The game never called `loadingStop()`, or the run stopped before boot ended. | Follow [the call order](#the-call-order). |
+| `the SDK heard ...: no gameplayStart after the play steps` | The play steps never reached play, or the game does not send `gameplayStart`. | Look at the last still. A Basic Launch needs `gameplayStart`. |
+| A run fails on a console error only on this machine | A gamepad plugged in, with `hideGamepads: false`, or a GPU driver message. | Leave `hideGamepads` on. Try `--cpu` to rule the GPU out. |
 
 ## For agents
 
@@ -746,8 +945,10 @@ pnpm exec playwright test -c playwright.portal.config.mjs
     `true`.
   - `happytime` is for big moments only.
   - The game plays the same with an ad blocker on.
-- **Rules no code here checks:** English text, readable at 800 x 450, `user-select: none` on the
-  body, physics the same at 144 Hz, the iOS audio unlock on a tap, PEGI 12 content, landing in
+  - Text selection is off on the page, every prefix (`portalNoSelect`).
+  - The game loads within 20 s in desktop Chrome, and plays the same with the SDK blocked
+    (`umm-dev portal check`).
+- **Rules no code here checks:** English text, readable at 800 x 450, physics the same at 144 Hz, the iOS audio unlock on a tap, PEGI 12 content, landing in
   play within one click for a Full Launch. Check them by playing the build.
 - **Never edit line 1 of a runtime copy** (`portal-sdk.ts`, `build-target.ts`). It is the header
   `umm-dev drift` reads. Below line 1 the file is the game's. To take a newer version, run
@@ -762,6 +963,7 @@ pnpm exec playwright test -c playwright.portal.config.mjs
   1. `vite build --mode portal` exits 0, prints a `dropped` line for each dev-only chunk, and
      prints the size line.
   2. `dist-portal/index.html` starts `<head>` with the SDK script and holds no `data-site-only`.
-  3. The fake-portal spec passes, with `elsewhere` empty.
+  3. `umm-dev portal check` ends `portal check: ok`, inside `umm-dev gpu run`, and its stills
+     show the game, not a blank frame. The fake-portal spec passes, with `elsewhere` empty.
   4. `umm-dev drift` lists one copy of each adapter file.
   5. The upload is the folder's contents, `index.html` at the top.

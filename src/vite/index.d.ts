@@ -51,6 +51,17 @@ export interface PortalSiteOnlyOptions {
 /** Strip the elements marked `data-site-only` (or `attribute`) from index.html. Build only. */
 export declare function portalSiteOnly(options?: PortalSiteOnlyOptions): Plugin
 
+/** `body{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}`. */
+export declare const NO_SELECT_CSS: string
+/** `NO_SELECT_CSS` for `selector` (default `body`). Throws on a selector holding `{`, `}` or `<`. */
+export declare function noSelectCss(selector?: string): string
+export interface PortalNoSelectOptions {
+  /** The element text selection is turned off on. Default `body`. */
+  selector?: string
+}
+/** Add a `<style>` turning text selection off on `body`, every prefix, as CrazyGames asks. Build only. */
+export declare function portalNoSelect(options?: PortalNoSelectOptions): Plugin
+
 /** What breaks a limit, in the words of the build error; empty when the sizes fit. */
 export declare function overLimits(
   sizes: readonly number[],
@@ -215,8 +226,19 @@ export interface LicencesOptions extends CollectOptions {
   pageTitle?: string
   /** A line of text above the list. Default none. */
   pageIntro?: string
+  /** A file name to also emit the list as plain text (`notices.txt`). Default false. Build only. */
+  text?: string | false
+  /** The text file's first lines: the game's own copyright. Default none. */
+  textHeader?: string
+  /** The line after the header. Default `This game uses these packages.`; `''` for none. */
+  textIntro?: string
 }
-/** `import { LICENCES } from 'virtual:licences'`, and optionally a licences page. Dev and build. */
+/** The list as plain text: `header`, `intro`, then each package and its notices in full. */
+export declare function licencesText(
+  list: readonly Licence[],
+  options?: { header?: string; intro?: string },
+): string
+/** `import { LICENCES } from 'virtual:licences'`, and optionally a licences page and a notices file. Dev and build. */
 export declare function licences(options?: LicencesOptions): Plugin
 
 // ── The app icon and the share card ──────────────────────────────────────────

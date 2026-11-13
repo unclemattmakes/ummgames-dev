@@ -46,3 +46,13 @@ export {
 } from './fake-portal.mjs'
 
 export { createImportGraph } from './import-graph.mjs'
+
+export {
+  CRAZYGAMES_SMALLEST_FRAME,
+  DEFAULT_PORTAL_RUNS,
+  forbiddenHits,
+  PORTAL_LOAD_LIMIT_MS,
+  portalChromeArgs,
+  runPortalCheck,
+  runProblems,
+} from './portal-check.mjs'

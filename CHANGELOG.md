@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.12.0 (2026-11-12)
+
+Three things each game's CrazyGames build had grown a copy of are in the kit now. Nothing in a
+game must change; each is opt-in. See [docs/portal.md](docs/portal.md).
+
+- **New: `umm-dev portal check`** (`runPortalCheck` in `@ummgames/dev/testing`). It builds the
+  portal folder if `portal.build` is set, holds it to `checkPortalBuild`, scans its code for the
+  game's `portal.forbidden` words, then opens it in the fake portal in Chrome once per run: by
+  default CrazyGames' smallest desktop frame, 907 x 510, with the SDK and with the SDK blocked.
+  Each run waits for `portal.ready`, shoots the title, runs the game's `portal.play` steps, and
+  fails on a console error, another host, a missing file, a socket, a load over 20 s, or SDK
+  calls out of order (`init` first, `loadingStart` then `loadingStop`, no `gameplayStart` before
+  it or twice in a row, a `gameplayStart` once play ran). `noAds` fails any ad request, for a
+  Basic Launch. A run with `touch: true` is an emulated phone. `--cpu` draws in software with no
+  GPU lease. Stills and `report.json` go to `test-results/portal-check/`. A new `portal` section
+  in `umm-dev.config.mjs` holds the settings.
+- **New: `portalNoSelect()`** in `@ummgames/dev/vite`. It adds
+  `body{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}` to
+  the portal build's `<head>`, as CrazyGames' technical rules ask. `NO_SELECT_CSS` and
+  `noSelectCss(selector)` are exported too.
+- **New: `licences({ text: 'notices.txt', textHeader })`** writes every shipped package's notice
+  into one plain-text file at the top of the build, under the game's own copyright lines. It is
+  read from `node_modules` like the rest, so three.js's MIT notice, which the minifier drops from
+  the bundle, ships whenever `three` is a dependency. Use it in the site build as well as the
+  portal build. `licencesText(list, { header, intro })` is the same text as a function.
+- **To switch a game over:** replace its own portal runner with a `portal` section and
+  `umm-dev portal check`, its hand-written `user-select` style with `portalNoSelect()`, and its
+  hand-written `notices.txt` with `licences({ text: 'notices.txt', textHeader })`. Pass
+  `include: ['@ummgames/dev']` to list the kit's own licence for its copied runtime code.
+
 ## 0.11.3 (2026-11-12)
 
 - **The copyright holder is UMM LLC.** `LICENSE` and `package.json`'s `author` named "Uncle Matt

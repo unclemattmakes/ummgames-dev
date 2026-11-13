@@ -7,6 +7,7 @@
  * - `portalPrune` drops chunks nothing in the build loads any more.
  * - `portalSiteOnly` strips the elements marked as pointing at the game's own site.
  * - `portalAssets` copies a listed set of `public/` files into a build with `publicDir: false`.
+ * - `portalNoSelect` turns text selection off on the page, as CrazyGames' rules ask.
  * - `portalCheck` reads the written folder and fails the build when it breaks the portal's
  *   upload rules: the file and size limits, `index.html` at the top, relative URLs, no source
  *   maps and no site-only files.
@@ -48,6 +49,39 @@ export function portalSdk({ url = CRAZYGAMES_SDK_URL } = {}) {
     name: 'umm:portal-sdk',
     apply: 'build',
     transformIndexHtml: () => [{ tag: 'script', attrs: { src: url }, injectTo: 'head-prepend' }],
+  }
+}
+
+/**
+ * The style `portalNoSelect` adds: no text selection on `body`, with the `-webkit-`, `-moz-` and
+ * `-ms-` prefixes. CrazyGames' technical rules ask a game to stop a long press or a drag from
+ * selecting the page, which on a phone pops up the copy menu over play.
+ */
+export const NO_SELECT_CSS =
+  'body{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}'
+
+/**
+ * The `user-select: none` rule for `selector`, prefixed.
+ * @param {string} [selector]
+ */
+export function noSelectCss(selector = 'body') {
+  if (!selector.trim() || /[{}<]/.test(selector)) throw new Error(`bad selector: ${selector}`)
+  return NO_SELECT_CSS.replace(/^body/, selector.trim())
+}
+
+/**
+ * Add a `<style>` to `<head>` that turns text selection off on `body` (or `selector`), with every
+ * prefix. A game whose own CSS turns it back on for a text field keeps that: the rule is a plain
+ * type selector, so any class or id rule wins over it.
+ * @param {{ selector?: string }} [options]
+ * @returns {import('vite').Plugin}
+ */
+export function portalNoSelect({ selector = 'body' } = {}) {
+  const css = noSelectCss(selector)
+  return {
+    name: 'umm:portal-no-select',
+    apply: 'build',
+    transformIndexHtml: () => [{ tag: 'style', children: css, injectTo: 'head' }],
   }
 }
 

@@ -11,6 +11,7 @@ import {
   fallbackName,
   licences,
   licencesHtml,
+  licencesText,
   notFoundHtml,
   notFoundPage,
   parseIconSvg,
@@ -130,7 +131,48 @@ describe('licences', () => {
       plugins: [licences()],
     })
     expect(files).not.toContain('licences.html')
+    expect(files).not.toContain('notices.txt')
     expect(licencesHtml([], { intro: 'a & b' })).toContain('<p>a &amp; b</p>')
+  })
+
+  it('writes a plain-text notices file, three.js MIT notice and all, under the game header', async () => {
+    const root = licencedProject()
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
+    pkg.dependencies.three = '0.185.1'
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(pkg))
+    fs.mkdirSync(path.join(root, 'node_modules/three'), { recursive: true })
+    fs.writeFileSync(
+      path.join(root, 'node_modules/three/package.json'),
+      JSON.stringify({ version: '0.185.1', license: 'MIT' }),
+    )
+    const mit =
+      'The MIT License\n\nCopyright © 2010-2026 three.js authors\n\nPermission is hereby granted'
+    fs.writeFileSync(path.join(root, 'node_modules/three/LICENSE'), mit)
+    const { files, read } = await buildFixture({
+      root,
+      publicDir: false,
+      plugins: [licences({ text: 'notices.txt', textHeader: 'My Game\nCopyright (c) 2026 Me' })],
+    })
+    expect(files).toContain('notices.txt')
+    expect(files).not.toContain('licences.html')
+    const text = read('notices.txt')
+    expect(
+      text.startsWith('My Game\nCopyright (c) 2026 Me\n\nThis game uses these packages.\n'),
+    ).toBe(true)
+    expect(text).toContain('three 0.185.1 (MIT)\n\nThe MIT License')
+    expect(text).toContain('Copyright © 2010-2026 three.js authors')
+    expect(text).toContain('dep-a 1.2.3 (MIT)')
+    expect(text).not.toContain('dev-only')
+    // Sorted by name, each under a rule, and plain text: nothing is escaped.
+    expect(text.indexOf('@scope/dep-b')).toBeLessThan(text.indexOf('three 0.185.1'))
+    expect(text).toContain('for dep-a <ok>')
+    expect(text.match(/^-{72}$/gm)?.length).toBe(3)
+  })
+
+  it('licencesText leaves out an empty header and intro', () => {
+    const list = [{ name: 'a', version: '1.0.0', licence: 'MIT', text: 'T' }]
+    expect(licencesText(list, { intro: '' })).toBe(`${'-'.repeat(72)}\na 1.0.0 (MIT)\n\nT\n`)
+    expect(licencesText([], { header: 'H' })).toBe('H\n\nThis game uses these packages.\n\n')
   })
 })
 

@@ -6,11 +6,14 @@ import {
   CRAZYGAMES_LIMITS,
   CRAZYGAMES_SDK_URL,
   checkPortalBuild,
+  NO_SELECT_CSS,
+  noSelectCss,
   orphanChunks,
   overLimits,
   PORTAL_MODE,
   portalAssets,
   portalCheck,
+  portalNoSelect,
   portalPrune,
   portalSdk,
   portalSiteOnly,
@@ -266,5 +269,28 @@ describe('the portal build of the fixture', () => {
 
   it('refuses the old limits option on portalAssets', () => {
     expect(() => portalAssets(/** @type {any} */ ({ limits: false }))).toThrow(/portalCheck/)
+  })
+})
+
+describe('portalNoSelect', () => {
+  it('adds the prefixed user-select rule to the head of the portal build', async () => {
+    const { read } = await buildFixture({
+      root: GAME,
+      mode: PORTAL_MODE,
+      base: './',
+      publicDir: false,
+      plugins: [portalSiteOnly(), portalNoSelect()],
+    })
+    const html = read('index.html')
+    const head = html.slice(html.indexOf('<head>'), html.indexOf('</head>'))
+    expect(head).toContain(`<style>${NO_SELECT_CSS}</style>`)
+    for (const p of ['-webkit-', '-moz-', '-ms-', ''])
+      expect(NO_SELECT_CSS).toContain(`${p}user-select:none`)
+  })
+
+  it('takes another selector, and refuses one that would break out of the rule', () => {
+    expect(noSelectCss('#game')).toBe(NO_SELECT_CSS.replace('body', '#game'))
+    expect(() => noSelectCss('body}*{color:red')).toThrow(/bad selector/)
+    expect(() => portalNoSelect({ selector: '' })).toThrow(/bad selector/)
   })
 })

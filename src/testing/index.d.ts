@@ -269,3 +269,150 @@ export declare function fakePortal<P extends PageLike>(
   page: P,
   options?: FakePortalOptions,
 ): Promise<FakePortal<FrameOf<P>>>
+
+// ── The portal check (docs/portal.md) ────────────────────────────────────────
+
+/** `20000`: CrazyGames asks that a game loads within 20 s in desktop Chrome. */
+export declare const PORTAL_LOAD_LIMIT_MS: number
+/** `{ width: 907, height: 510 }`: CrazyGames' smallest desktop frame. */
+export declare const CRAZYGAMES_SMALLEST_FRAME: Readonly<{ width: number; height: number }>
+/** `[{ name: 'desktop' }, { name: 'nosdk', sdk: false }]`. */
+export declare const DEFAULT_PORTAL_RUNS: readonly PortalCheckRun[]
+
+/** One opening of the build in the fake portal. */
+export interface PortalCheckRun {
+  /** Names its stills (`desktop-01-title.png`) and its lines; `--only` picks runs by it. */
+  name: string
+  /** The iframe's size. Default `CRAZYGAMES_SMALLEST_FRAME`, 907 x 510. */
+  frame?: { width: number; height: number }
+  /** The fake SDK's behaviour; `false` blocks the script as an ad blocker would. Default `{}`. */
+  sdk?: FakeSdkOptions | false
+  /** An emulated touch phone: `isMobile`, `hasTouch`, the viewport the frame's size, 2x. */
+  touch?: boolean
+  /** The page's size. Default the frame plus 40 px each way; the frame itself with `touch`. */
+  viewport?: { width: number; height: number }
+  /** Default 1, or 2 with `touch`. */
+  deviceScaleFactor?: number
+  /** Appended to the game's `index.html` (`?debug=1`). */
+  query?: string
+  /** `false` skips the game's `play` steps in this run. Default true. */
+  play?: boolean
+  /** The exact SDK calls the run must make, in place of the order rules. */
+  calls?: readonly string[]
+}
+
+/** What the game's `play` steps get, once per run, after the title still. */
+export interface PortalCheckStep {
+  run: PortalCheckRun
+  page: import('playwright').Page
+  context: import('playwright').BrowserContext
+  portal: FakePortal<import('playwright').Frame>
+  /** The game's frame, looked up again each call, so a reload is followed. */
+  game(): import('playwright').Frame
+  /** Shoot the game's frame alone as `<run>-<nn>-<name>.png`. */
+  still(name: string): Promise<void>
+  /** Print a passed check. */
+  ok(what: string): void
+  /** Record a failed check and go on. Throw instead to stop the run. */
+  fail(why: string): void
+  log(line: string): void
+}
+
+export interface PortalCheckOptions {
+  /** The game root; relative paths here are read from it. Default the working directory. */
+  root?: string
+  /** The built portal folder. Default `dist-portal`. */
+  dir?: string
+  /** A shell command run in the root first (`pnpm build:portal`). Default none. */
+  build?: string | null
+  /** Where the stills and `report.json` go. Default `test-results/portal-check`. */
+  out?: string
+  /** Words the build's `.js`, `.mjs`, `.html` and `.css` must not hold. Case matters. */
+  forbidden?: readonly string[]
+  /** The upload limits for `checkPortalBuild`; `false` skips them. Default CrazyGames'. */
+  limits?: { files: number; bytes: number } | false
+  /** Run in the game's frame until it returns true: the game has loaded. Default `document.readyState === 'complete'`. */
+  ready?: (() => unknown) | null
+  /** How long `ready` may take before the run stops. Default 60000. */
+  readyTimeoutMs?: number
+  /** A load slower than this fails. Default `PORTAL_LOAD_LIMIT_MS`, 20000. */
+  loadLimitMs?: number
+  /** The wait between `ready` and the title still. Default 1000. */
+  settleMs?: number
+  /** The game's own steps, run in each run after the title still. */
+  play?: ((step: PortalCheckStep) => Promise<void> | void) | null
+  /** Default `DEFAULT_PORTAL_RUNS`. */
+  runs?: readonly PortalCheckRun[]
+  /** Only the runs with these names. */
+  only?: readonly string[] | null
+  /** Any `requestAd` call fails a run (a Basic Launch build asks for none). Default false. */
+  noAds?: boolean
+  /** Stub `navigator.getGamepads` to none, so a pad on the machine moves nothing. Default true. */
+  hideGamepads?: boolean
+  /** The game's folder on the fake portal. Default `fakePortal`'s, `/games/game/`. */
+  gamePath?: string
+  /** Draw in software (SwiftShader): no GPU lease, far slower. Default false. */
+  cpu?: boolean
+  /** Show the browser. Default false. */
+  headed?: boolean
+  /** A Chromium channel. Default the installed Chrome, then Edge, then Playwright's. */
+  channel?: string
+  /** Where the lines go. Default `console.log`. */
+  log?: (line: string) => void
+}
+
+/** One run's record. */
+export interface PortalRunReport {
+  name: string
+  loadMs: number
+  calls: string[]
+  errors: string[]
+  elsewhere: string[]
+  missing: string[]
+  sockets: string[]
+  /** How many files the fake portal served. */
+  served: number
+  /** The stills, relative to `out`. */
+  stills: string[]
+  problems: string[]
+}
+
+/** What `runPortalCheck` found; also written to `<out>/report.json`. */
+export interface PortalCheckResult {
+  ok: boolean
+  /** Every failure, one line each. */
+  problems: string[]
+  /** `checkPortalBuild`'s report; null when the build failed. */
+  files: import('../vite/index.js').PortalReport | null
+  runs: PortalRunReport[]
+  out: string
+}
+
+/** The game's `portal` section in `umm-dev.config.mjs`: `runPortalCheck`'s options, less the per-call ones. */
+export type PortalCheckConfig = Omit<PortalCheckOptions, 'root' | 'only' | 'cpu' | 'headed' | 'log'>
+
+/**
+ * Open the portal build in the fake portal once per run, in Chrome, and fail on a console
+ * error, another host, a missing file, a socket, a slow load or SDK calls out of order. See
+ * docs/portal.md.
+ */
+export declare function runPortalCheck(options?: PortalCheckOptions): Promise<PortalCheckResult>
+/** What a run broke, one line each. Blocked-request console lines are left out. */
+export declare function runProblems(
+  seen: Pick<PortalRunReport, 'loadMs' | 'calls' | 'errors' | 'elsewhere' | 'missing' | 'sockets'>,
+  rules: {
+    sdk: boolean
+    sdkUrl?: string
+    loadLimitMs?: number
+    played?: boolean
+    noAds?: boolean
+    calls?: readonly string[] | null
+  },
+): string[]
+/** Each forbidden word in the build's code, with the files holding it. */
+export declare function forbiddenHits(
+  dir: string,
+  words: readonly string[],
+): { word: string; files: string[] }[]
+/** Chrome's flags for the real GPU, or SwiftShader with `cpu`. */
+export declare function portalChromeArgs(options?: { cpu?: boolean; platform?: string }): string[]

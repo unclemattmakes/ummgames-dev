@@ -34,6 +34,7 @@ export {
   LICENCES_MODULE,
   licences,
   licencesHtml,
+  licencesText,
 } from './licences.mjs'
 export { NOT_FOUND_FILE, notFoundHtml, notFoundPage } from './not-found.mjs'
 export { encodePng } from './png.mjs'
@@ -42,11 +43,14 @@ export {
   CRAZYGAMES_MOBILE_BYTES,
   CRAZYGAMES_SDK_URL,
   checkPortalBuild,
+  NO_SELECT_CSS,
+  noSelectCss,
   orphanChunks,
   overLimits,
   PORTAL_MODE,
   portalAssets,
   portalCheck,
+  portalNoSelect,
   portalPrune,
   portalSdk,
   portalSiteOnly,

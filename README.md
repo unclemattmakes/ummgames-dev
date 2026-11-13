@@ -71,6 +71,7 @@ Run `pnpm exec umm-dev help` for the list, and `umm-dev <command> --help` for a 
 | `umm-dev loop` | Make a site loop: a silent 720p faststart mp4 and a poster, from a cut or a store preview | [media](docs/media.md) |
 | `umm-dev loudness` | Meter audio: integrated LUFS, true peak, momentary max, checked against a target | [audio](docs/audio.md) |
 | `umm-dev gltf` | Shrink GLB files in place: dedup, weld, prune, meshopt. Never joins meshes, so node extras survive | [gltf](docs/gltf.md) |
+| `umm-dev portal` | Check a portal build in Chrome: the upload rules, other hosts, missing files, sockets, load time, SDK call order, and the game's own play steps | [portal](docs/portal.md) |
 | `umm-dev making-of` | Check a making-of site in a real browser: shoot each toy, fail on a blank toy, a console error or an element past the screen's edge | [making-of](docs/making-of.md) |
 | `umm-dev copy` | Copy a `runtime/` file or folder into the game, stamped with its version and hash | [runtime](docs/runtime.md) |
 | `umm-dev drift` | Report how far each copy has moved, here and upstream (`--diff`, `--strict`) | [runtime](docs/runtime.md) |
@@ -134,10 +135,11 @@ Pages would send from a build's `_headers`. See [docs/build.md](docs/build.md). 
 `createD1()`, a D1 binding over `node:sqlite` for testing a board server
 ([docs/board.md](docs/board.md)).
 
-**Web portals.** `vite build --mode portal` with `portalSdk`, `portalPrune`, `portalSiteOnly`
-and `portalCheck` makes a folder CrazyGames takes as it is. `runtime/portal/` is the SDK adapter
-the game calls, and `fakePortal` in `@ummgames/dev/testing` runs the build in Playwright as the
-portal does. See [docs/portal.md](docs/portal.md).
+**Web portals.** `vite build --mode portal` with `portalSdk`, `portalNoSelect`, `portalPrune`,
+`portalSiteOnly` and `portalCheck` makes a folder CrazyGames takes as it is. `runtime/portal/` is
+the SDK adapter the game calls, and `fakePortal` in `@ummgames/dev/testing` runs the build in
+Playwright as the portal does. `umm-dev portal check` runs it in Chrome with the game's own
+steps and gives a verdict. See [docs/portal.md](docs/portal.md).
 
 ## Presets
 
