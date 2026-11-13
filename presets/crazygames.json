@@ -5,7 +5,7 @@
     "https://docs.crazygames.com/requirements/game-covers/",
     "https://docs.crazygames.com/requirements/quality/"
   ],
-  "checked": "2026-10-20",
+  "checked": "2026-11-12",
   "assets": {
     "cover-landscape": {
       "kind": "image",
@@ -32,7 +32,7 @@
       "audio": false,
       "maxMB": 50,
       "codecs": ["h264"],
-      "required": false
+      "required": true
     },
     "preview-portrait": {
       "kind": "video",
@@ -41,7 +41,7 @@
       "audio": false,
       "maxMB": 50,
       "codecs": ["h264"],
-      "required": false
+      "required": true
     }
   },
   "rules": [

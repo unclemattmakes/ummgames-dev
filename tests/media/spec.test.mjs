@@ -112,7 +112,7 @@ describe('checkKit', () => {
       'ok       cover-portrait: c-800.png',
       'MISSING  cover-square (required)',
       'ok       preview-landscape: p.mp4',
-      'skipped  preview-portrait',
+      'MISSING  preview-portrait (required)',
       '??       extra: the preset has no spec of that id',
     ])
   })

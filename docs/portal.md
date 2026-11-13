@@ -272,6 +272,11 @@ portalAssets({
 })
 ```
 
+**index.html is not rebased.** With `publicDir` off, Vite leaves a root-absolute link to a
+public file as written, so `href="/icon.svg"` stays, and `portalCheck` fails it as
+root-absolute. Write such links relative (`href="icon.svg"`), or rewrite them in the game's
+portal config with a small `transformIndexHtml` hook.
+
 **When to use it.** A game that needs all of `public/` keeps `publicDir` on and skips this
 plugin. A game whose `public/` holds files the portal build must not carry (a dev-only model, raw
 art, the site's `_headers`) turns `publicDir` off and lists what it needs.
@@ -367,6 +372,12 @@ console.log(report.files, report.bytes, report.mobile, report.problems)
 
 **Without `--to`, a game that already has an adapter gets a second one** in `src/portal/`.
 Delete it, and copy again with `--to`.
+
+**Keep the game's glue as plain functions.** The site build drops the adapter only when nothing
+outside `if (PORTAL)` keeps it alive. An exported object whose method writes to it (for example
+`portal.silent = m`) counts as a side effect, so the adapter stays in the site bundle even with
+the `/* @__PURE__ */` marks. Exported functions that call the adapter under `if (PORTAL)` drop
+cleanly.
 
 `copy`, `--to`, `--force` and `drift` are in [runtime.md](runtime.md).
 
@@ -707,6 +718,8 @@ pnpm exec playwright test -c playwright.portal.config.mjs
 | `portalAssets: limits moved to portalCheck() in 0.11.0` | A config from 0.1.x. | Drop `limits` there and add `portalCheck({ limits })`. |
 | `<n> files (limit 1500)` or `<x> MB (limit 50.0 MB)` | The folder breaks CrazyGames' limits. `dist-portal/` is still written. | Cut files or bytes. Do not upload that build. |
 | `index.html: /assets/... is root-absolute (set base: './')` | The portal build has `base: '/'`. | `base: portal ? './' : '/'`. |
+| `index.html: /<file> is root-absolute` with `base: './'` set | `publicDir` is off, so Vite leaves a link to a public file as written. | Write the link relative, or rewrite it with `transformIndexHtml` in the portal config. See [`portalAssets`](#portalassetsoptions). |
+| The site bundle still holds the adapter | The game's glue is an object the code writes to, so the bundler keeps it. | Make the glue plain exported functions. See [Where the adapter goes](#where-the-adapter-goes). |
 | `<file>.map: a source map (set build.sourcemap: false)` | Source maps are on in the portal build. | `sourcemap: !portal`. |
 | `_headers: a site file the portal ignores`, or `<file>: a dotfile` | `publicDir` is on and `public/` holds site files, or `headers()` is in the portal build. | Drop `headers()` from the portal build; turn `publicDir` off and list files with `portalAssets` and `publicFiles`. |
 | `index.html: an element marked data-site-only is still there` | `portalSiteOnly` is missing, or the marked element is void or nested. | Add the plugin; wrap the element in a marked `<span>` or `<div>`. |

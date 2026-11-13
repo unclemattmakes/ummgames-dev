@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.2 (2026-11-12)
+
+- **`presets/crazygames.json`: both preview videos are required.** CrazyGames' covers page, read
+  2026-11-12, marks the landscape (1080p, 16:9) and portrait (1080p, 2:3) videos mandatory at
+  submission. `umm-dev store` now fails a kit without them.
+- **docs/portal.md:** with `publicDir` off, Vite does not rebase a root-absolute link to a public
+  file in `index.html`, so `portalCheck` fails it; write it relative. And keep a game's adapter
+  glue as plain functions, since an object the code writes to keeps the adapter in the site
+  bundle. Both found by a game adopting 0.11.1.
+
 ## 0.11.1 (2026-11-12)
 
 - **`runtime/portal/portal-sdk.ts`: the two top-level `Object.freeze` calls are marked
