@@ -385,7 +385,7 @@ plugins: [portalSdk(), portalNoSelect(), portalPrune(), portalSiteOnly(), portal
 | File | Exports |
 |---|---|
 | `build-target.ts` | `PORTAL`, `PORTAL_MODE` |
-| `portal-sdk.ts` | `createPortalSdk`, `NO_PORTAL`, `localStore`, `roomFromParams`, `INIT_WAIT_MS`, `AD_START_WAIT_MS`, `ROOM_CODE`, and the types `PortalSdk`, `PortalSdkOptions`, `PortalSettings`, `PortalStorage`, `CrazySdk`, `CrazyAdError` |
+| `portal-sdk.ts` | `createPortalSdk`, `latePortal`, `NO_PORTAL`, `localStore`, `roomFromParams`, `INIT_WAIT_MS`, `AD_START_WAIT_MS`, `ROOM_CODE`, and the types `PortalSdk`, `PortalSdkOptions`, `PortalSettings`, `PortalStorage`, `CrazySdk`, `CrazyAdError` |
 
 `portal-sdk.ts` imports `./build-target`, so the two files live in the same folder.
 
@@ -434,9 +434,17 @@ Guard with it whatever the portal build must not ship:
 createPortalSdk(audio: { setMuted(muted: boolean): void }, options?: PortalSdkOptions): Promise<PortalSdk>
 ```
 
-**It never rejects.** It resolves to one of two things:
+**It never rejects.** It resolves to one of three things:
 - **CrazyGames' SDK, wrapped,** when `enabled` is true, `window.CrazyGames.SDK` exists, `init()`
   resolves within `initWaitMs`, and `environment` is not `'disabled'`.
+- **A stand-in that joins the SDK late,** when `init()` is still running at `initWaitMs`. Boot
+  plays on at once. The stand-in acts as the stub until `init()` resolves, then hands every call
+  to the SDK and replays what it missed: `loadingStart`, `loadingStop` if boot already sent it,
+  `gameplayStart` if the player is playing, the feedback context, and the listeners. Ads asked
+  for before then are no-shows, and saves stay in `localStorage` for the session. If `init()`
+  then fails, it stays the stub. `latePortal(ready, warn)` is this stand-in on its own.
+  CrazyGames' own QA preview took 7 to 9 s to init on 2026-11-13, with an ad blocker on; before
+  0.12.1 a 5 s cut-off dropped the SDK, and the portal heard no event at all.
 - **`NO_PORTAL`,** a frozen stub that does nothing, otherwise. That covers dev, the site build,
   Vitest, a page with the SDK blocked, and any domain that is not CrazyGames'.
 
@@ -444,7 +452,7 @@ createPortalSdk(audio: { setMuted(muted: boolean): void }, options?: PortalSdkOp
 |---|---|---|---|
 | `enabled` | `boolean` | `PORTAL` | Use the SDK at all. |
 | `sdk` | `CrazySdk` | `window.CrazyGames.SDK`, read when `createPortalSdk` is called | The SDK object. Pass a fake in a unit test. |
-| `initWaitMs` | `number` | `5000` (`INIT_WAIT_MS`) | How long boot waits on `init()` before taking the stub. |
+| `initWaitMs` | `number` | `5000` (`INIT_WAIT_MS`) | How long boot waits on `init()` before playing on with the stand-in that joins the SDK late. |
 | `adStartWaitMs` | `number` | `6000` (`AD_START_WAIT_MS`) | How long an ad call waits for an ad to start before resolving. |
 | `roomParam` | `string` | `'room'` | The invite parameter that names a room. |
 | `roomCode` | `RegExp` | `ROOM_CODE`: `/^[A-Z0-9]{4,12}$/` | What a room code looks like, tested after upper-casing. |

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.12.1 (2026-11-13)
+
+- **Fix: a slow CrazyGames SDK init no longer silences the portal.** `createPortalSdk` gave up on
+  `init()` after `initWaitMs` (5 s) and returned the stub for good, so the portal heard no
+  `loadingStart`, `loadingStop` or `gameplayStart`. In CrazyGames' own QA preview on 2026-11-13,
+  init took 7 to 9 s (with an ad blocker on), and the QA checklist read "First gameplay start: No"
+  for Bitto's First Job. Now boot still plays on at `initWaitMs`, but with a stand-in that joins
+  the SDK when `init()` ends and replays `loadingStart`, `loadingStop`, `gameplayStart`, the
+  feedback context and the listeners. A fast init and a failed init behave as before.
+  `latePortal(ready, warn)` is exported for a game that builds its own. The fake portal answers
+  `init()` at once, which is why `portalCheck` never saw this.
+- **To take it:** copy `runtime/portal/portal-sdk.ts` again (`umm-dev copy`), rebuild the portal
+  build, and check it in CrazyGames' QA preview: its Log tab should list `gameplayStart`.
+
 ## 0.12.0 (2026-11-12)
 
 Three things each game's CrazyGames build had grown a copy of are in the kit now. Nothing in a

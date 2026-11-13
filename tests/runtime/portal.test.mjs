@@ -108,8 +108,12 @@ describe('init', () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(done).toBe(false)
     await vi.advanceTimersByTimeAsync(1)
-    expect(await made).toBe(mod.NO_PORTAL)
-    expect(quiet.warn).toHaveBeenCalledWith(expect.stringMatching(/unavailable/), expect.any(Error))
+    const p = await made
+    expect(p.name).toBe('none')
+    p.loadingStop()
+    p.setGameplay(true)
+    await expect(p.midgameAd()).resolves.toBeUndefined()
+    expect(quiet.warn).toHaveBeenCalledWith(expect.stringMatching(/taking over/))
   })
 
   it('takes its own wait', async () => {
@@ -117,7 +121,53 @@ describe('init', () => {
     const { sdk } = fakeSdk({ init: () => new Promise(() => {}) })
     const made = mod.createPortalSdk(audio(), { sdk, enabled: true, initWaitMs: 50, ...quiet })
     await vi.advanceTimersByTimeAsync(50)
-    expect(await made).toBe(mod.NO_PORTAL)
+    expect((await made).name).toBe('none')
+  })
+
+  it('joins a slow SDK when its init ends, and replays loading and gameplay', async () => {
+    // CrazyGames' QA preview, 2026-11-13: init took 7 to 9 s and the portal heard nothing.
+    vi.useFakeTimers()
+    /** @type {() => void} */
+    let finish = () => {}
+    const { sdk, log } = fakeSdk({
+      init: () =>
+        new Promise((ok) => {
+          finish = () => ok(undefined)
+        }),
+    })
+    const made = mod.createPortalSdk(audio(), { sdk, enabled: true, initWaitMs: 50, ...quiet })
+    await vi.advanceTimersByTimeAsync(50)
+    const p = await made
+    p.loadingStop()
+    p.setGameplay(true)
+    expect(log).toEqual([])
+    finish()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(p.name).toBe('crazygames')
+    expect(log).toEqual(['loadingStart', 'loadingStop', 'gameplayStart'])
+    p.setGameplay(false)
+    expect(log.at(-1)).toBe('gameplayStop')
+  })
+
+  it('stays the stub when a slow init then fails', async () => {
+    vi.useFakeTimers()
+    /** @type {(e: Error) => void} */
+    let fail = () => {}
+    const { sdk, log } = fakeSdk({
+      init: () =>
+        new Promise((_, no) => {
+          fail = no
+        }),
+    })
+    const made = mod.createPortalSdk(audio(), { sdk, enabled: true, initWaitMs: 50, ...quiet })
+    await vi.advanceTimersByTimeAsync(50)
+    const p = await made
+    p.setGameplay(true)
+    fail(new Error('blocked'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(p.name).toBe('none')
+    expect(log).toEqual([])
+    expect(quiet.warn).toHaveBeenCalledWith(expect.stringMatching(/unavailable/), expect.any(Error))
   })
 
   it('plays on when init rejects, or the SDK says it is disabled', async () => {

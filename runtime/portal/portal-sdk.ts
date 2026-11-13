@@ -278,7 +278,107 @@ function readSettings(raw: Partial<PortalSettings> | null | undefined): PortalSe
 }
 
 /**
- * The portal SDK, initialised, or the stub. Never rejects. `audio.setMuted(true)` runs when the
+ * The stand-in for an SDK whose init outlasted boot's wait. It acts as the stub until `ready`
+ * gives the live portal, then hands every call over. At the hand-over it replays what the portal
+ * missed: `loadingStop` if boot already sent it, `gameplayStart` if the player is playing, the
+ * feedback context, and the settings and join-room listeners. Ads before then are no-shows.
+ * Saves stay in `localStorage` for the whole session, so nothing written early is lost by a switch.
+ * `ready` resolving null (init failed, or the SDK is disabled) leaves it the stub for good.
+ */
+export function latePortal(
+  ready: Promise<PortalSdk | null>,
+  warn: (message: string, error?: unknown) => void = quietWarn,
+): PortalSdk {
+  let live: PortalSdk | null = null
+  let loaded = false
+  let playing = false
+  let context: Record<string, unknown> | null | undefined
+  const settingsFns: ((s: PortalSettings) => void)[] = []
+  const joinFns: ((room: string) => void)[] = []
+  const storage = localStore(warn)
+  void ready.then(
+    (p) => {
+      if (!p) return
+      live = p
+      if (loaded) p.loadingStop()
+      if (playing) p.setGameplay(true)
+      if (context !== undefined) p.setContext(context)
+      for (const fn of settingsFns) p.onSettings(fn)
+      for (const fn of joinFns) p.onJoinRoom(fn)
+      const s = p.settings()
+      if (s.muteAudio || s.disableChat) {
+        for (const fn of settingsFns) {
+          try {
+            fn(s)
+          } catch (e) {
+            warn('settings listener failed', e)
+          }
+        }
+      }
+    },
+    (e) => warn('late SDK hand-over failed', e),
+  )
+  return {
+    get name() {
+      return live ? live.name : 'none'
+    },
+    loadingStop() {
+      loaded = true
+      live?.loadingStop()
+    },
+    setGameplay(on) {
+      playing = on
+      live?.setGameplay(on)
+    },
+    midgameAd: () => (live ? live.midgameAd() : Promise.resolve()),
+    rewardedAd: () => (live ? live.rewardedAd() : Promise.resolve(false)),
+    hasAdblock: () => (live ? live.hasAdblock() : Promise.resolve(false)),
+    happytime() {
+      live?.happytime()
+    },
+    progress(percent) {
+      live?.progress(percent)
+    },
+    setContext(c) {
+      context = c
+      live?.setContext(c)
+    },
+    settings: () => (live ? live.settings() : NO_SETTINGS),
+    onSettings(fn) {
+      settingsFns.push(fn)
+      live?.onSettings(fn)
+    },
+    get device() {
+      return live ? live.device : null
+    },
+    get locale() {
+      return live ? live.locale : null
+    },
+    storage,
+    get instantMultiplayer() {
+      return live ? live.instantMultiplayer : false
+    },
+    get inviteRoom() {
+      return live ? live.inviteRoom : null
+    },
+    onJoinRoom(fn) {
+      joinFns.push(fn)
+      live?.onJoinRoom(fn)
+    },
+    updateRoom(code, joinable) {
+      live?.updateRoom(code, joinable)
+    },
+    leftRoom() {
+      live?.leftRoom()
+    },
+    inviteLink: (code) => (live ? live.inviteLink(code) : Promise.resolve(null)),
+    username: () => (live ? live.username() : Promise.resolve(null)),
+  }
+}
+
+/**
+ * The portal SDK, initialised, or the stub. Never rejects. An init slower than `initWaitMs`
+ * gives `latePortal`'s stand-in, which joins the SDK when init ends. `audio.setMuted(true)` runs when the
  * portal wants the game silent (an ad is playing, or its `muteAudio` setting is on) and
  * `setMuted(false)` when neither holds, whatever the player chose, so keep it apart from the
  * player's own mute. Only changes are sent.
@@ -297,229 +397,246 @@ export async function createPortalSdk(
   const adWait = options.adStartWaitMs ?? AD_START_WAIT_MS
   const roomParam = options.roomParam ?? 'room'
   const roomCode = options.roomCode ?? ROOM_CODE
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    await Promise.race([
-      sdk.init(),
-      new Promise((_, no) => {
-        timer = setTimeout(() => no(new Error('init timed out')), initWait)
-      }),
-    ])
-  } catch (e) {
-    warn('CrazyGames SDK unavailable, playing on without it', e)
-    return NO_PORTAL
-  } finally {
-    clearTimeout(timer)
-  }
-  let disabled = true
-  try {
-    disabled = sdk.environment === 'disabled'
-  } catch (e) {
-    warn('environment failed', e)
-  }
-  if (disabled) return NO_PORTAL
-
-  const safe = (what: string, f: () => void) => {
+  // Boot waits on init up to `initWait`. An init that is only slow is not dropped: the game plays
+  // on with a stand-in that hands over to the SDK when init ends and replays the loading and
+  // gameplay state, so the portal still hears both. CrazyGames' QA preview took 7 to 9 s to init
+  // with an ad blocker on (2026-11-13), and a 5 s cut-off sent no event at all.
+  const attach = (): PortalSdk | null => {
+    let disabled = true
     try {
-      f()
+      disabled = sdk.environment === 'disabled'
     } catch (e) {
-      warn(`${what} failed`, e)
+      warn('environment failed', e)
+    }
+    if (disabled) return null
+
+    const safe = (what: string, f: () => void) => {
+      try {
+        f()
+      } catch (e) {
+        warn(`${what} failed`, e)
+      }
+    }
+
+    // Silence is wanted while an ad plays or while the portal's muteAudio is on. One flag goes to
+    // the game, sent only when it changes.
+    let adsPlaying = 0
+    let settings = NO_SETTINGS
+    let silent = false
+    const applyMute = () => {
+      const want = adsPlaying > 0 || settings.muteAudio
+      if (want === silent) return
+      silent = want
+      safe(want ? 'mute' : 'unmute', () => audio.setMuted(want))
+    }
+    const settingsListeners: ((s: PortalSettings) => void)[] = []
+    safe('settings', () => {
+      settings = readSettings(sdk.game.settings)
+    })
+    applyMute()
+    safe('addSettingsChangeListener', () =>
+      sdk.game.addSettingsChangeListener?.((raw) => {
+        settings = readSettings(raw)
+        applyMute()
+        for (const fn of settingsListeners) safe('settings listener', () => fn(settings))
+      }),
+    )
+
+    safe('loadingStart', () => sdk.game.loadingStart())
+    let playing = false
+    let instant = false
+    let invited: string | null = null
+    let device: PortalSdk['device'] = null
+    let locale: string | null = null
+    safe('isInstantMultiplayer', () => {
+      instant = sdk.game.isInstantMultiplayer === true
+    })
+    safe('inviteParams', () => {
+      invited = roomFromParams(sdk.game.inviteParams, roomParam, roomCode)
+    })
+    safe('systemInfo', () => {
+      const info = sdk.user?.systemInfo
+      const type = info?.device?.type
+      if (type === 'desktop' || type === 'tablet' || type === 'mobile') device = type
+      if (typeof info?.locale === 'string' && info.locale) locale = info.locale
+    })
+
+    /**
+     * One ad. Resolves true when it played to the end. An ad can end after play resumed (it
+     * started past the no-show wait), so unmuting is separate from resolving: the sound comes back
+     * whenever the ad that took it ends.
+     */
+    const requestAd = (kind: 'midgame' | 'rewarded') =>
+      new Promise<boolean>((resolve) => {
+        let started = false
+        let playingNow = false
+        let over = false
+        const end = (finished: boolean) => {
+          if (playingNow) {
+            playingNow = false
+            adsPlaying -= 1
+            applyMute()
+          }
+          if (over) return
+          over = true
+          clearTimeout(noShow)
+          resolve(finished)
+        }
+        const noShow = setTimeout(() => end(false), adWait)
+        try {
+          sdk.ad.requestAd(kind, {
+            adStarted: () => {
+              // One ad per request. A start after the no-show wait still plays over the game,
+              // so it still mutes the game.
+              if (started) return
+              started = true
+              clearTimeout(noShow)
+              playingNow = true
+              adsPlaying += 1
+              applyMute()
+            },
+            adFinished: () => end(true),
+            adError: () => end(false),
+          })
+        } catch (e) {
+          warn('requestAd failed', e)
+          end(false)
+        }
+      })
+
+    const fallback = localStore(warn)
+    const storage: PortalStorage = {
+      getItem(key) {
+        if (!sdk.data) return fallback.getItem(key)
+        try {
+          return sdk.data.getItem(key)
+        } catch (e) {
+          warn('data.getItem failed', e)
+          return fallback.getItem(key)
+        }
+      },
+      setItem(key, value) {
+        if (!sdk.data) return fallback.setItem(key, value)
+        try {
+          sdk.data.setItem(key, value)
+        } catch (e) {
+          warn('data.setItem failed', e)
+          fallback.setItem(key, value)
+        }
+      },
+      removeItem(key) {
+        if (!sdk.data) return fallback.removeItem(key)
+        try {
+          sdk.data.removeItem(key)
+        } catch (e) {
+          warn('data.removeItem failed', e)
+          fallback.removeItem(key)
+        }
+      },
+    }
+
+    return {
+      name: 'crazygames',
+      loadingStop: () => safe('loadingStop', () => sdk.game.loadingStop()),
+      setGameplay(on) {
+        if (on === playing) return
+        playing = on
+        safe(on ? 'gameplayStart' : 'gameplayStop', () =>
+          on ? sdk.game.gameplayStart() : sdk.game.gameplayStop(),
+        )
+      },
+      midgameAd: () => requestAd('midgame').then(() => undefined),
+      rewardedAd: () => requestAd('rewarded'),
+      async hasAdblock() {
+        try {
+          return (await sdk.ad.hasAdblock?.()) === true
+        } catch (e) {
+          warn('hasAdblock failed', e)
+          return false
+        }
+      },
+      happytime: () => safe('happytime', () => sdk.game.happytime()),
+      progress(percent) {
+        if (!Number.isFinite(percent)) return
+        const p = Math.round(Math.min(100, Math.max(0, percent)))
+        safe('reportGameCompletedPercentage', () => sdk.game.reportGameCompletedPercentage?.(p))
+      },
+      setContext(context) {
+        safe(context ? 'setGameContext' : 'clearGameContext', () =>
+          context ? sdk.game.setGameContext?.(context) : sdk.game.clearGameContext?.(),
+        )
+      },
+      settings: () => settings,
+      onSettings(fn) {
+        settingsListeners.push(fn)
+      },
+      device,
+      locale,
+      storage,
+      instantMultiplayer: instant,
+      inviteRoom: invited,
+      onJoinRoom(fn) {
+        safe('addJoinRoomListener', () =>
+          sdk.game.addJoinRoomListener?.((params) => {
+            const room = roomFromParams(params, roomParam, roomCode)
+            if (room) fn(room)
+          }),
+        )
+      },
+      updateRoom(code, joinable) {
+        safe('updateRoom', () =>
+          sdk.game.updateRoom?.({
+            roomId: code,
+            isJoinable: joinable,
+            inviteParams: { [roomParam]: code },
+          }),
+        )
+      },
+      leftRoom: () => safe('leftRoom', () => sdk.game.leftRoom?.()),
+      async inviteLink(code) {
+        try {
+          const link = await sdk.game.inviteLink?.({ [roomParam]: code })
+          return typeof link === 'string' && link ? link : null
+        } catch (e) {
+          warn('inviteLink failed', e)
+          return null
+        }
+      },
+      async username() {
+        if (!sdk.user) return null
+        try {
+          const u = await sdk.user.getUser()
+          return typeof u?.username === 'string' ? u.username : ''
+        } catch (e) {
+          warn('getUser failed', e)
+          return null
+        }
+      },
     }
   }
 
-  // Silence is wanted while an ad plays or while the portal's muteAudio is on. One flag goes to
-  // the game, sent only when it changes.
-  let adsPlaying = 0
-  let settings = NO_SETTINGS
-  let silent = false
-  const applyMute = () => {
-    const want = adsPlaying > 0 || settings.muteAudio
-    if (want === silent) return
-    silent = want
-    safe(want ? 'mute' : 'unmute', () => audio.setMuted(want))
-  }
-  const settingsListeners: ((s: PortalSettings) => void)[] = []
-  safe('settings', () => {
-    settings = readSettings(sdk.game.settings)
-  })
-  applyMute()
-  safe('addSettingsChangeListener', () =>
-    sdk.game.addSettingsChangeListener?.((raw) => {
-      settings = readSettings(raw)
-      applyMute()
-      for (const fn of settingsListeners) safe('settings listener', () => fn(settings))
-    }),
-  )
-
-  safe('loadingStart', () => sdk.game.loadingStart())
-  let playing = false
-  let instant = false
-  let invited: string | null = null
-  let device: PortalSdk['device'] = null
-  let locale: string | null = null
-  safe('isInstantMultiplayer', () => {
-    instant = sdk.game.isInstantMultiplayer === true
-  })
-  safe('inviteParams', () => {
-    invited = roomFromParams(sdk.game.inviteParams, roomParam, roomCode)
-  })
-  safe('systemInfo', () => {
-    const info = sdk.user?.systemInfo
-    const type = info?.device?.type
-    if (type === 'desktop' || type === 'tablet' || type === 'mobile') device = type
-    if (typeof info?.locale === 'string' && info.locale) locale = info.locale
-  })
-
-  /**
-   * One ad. Resolves true when it played to the end. An ad can end after play resumed (it
-   * started past the no-show wait), so unmuting is separate from resolving: the sound comes back
-   * whenever the ad that took it ends.
-   */
-  const requestAd = (kind: 'midgame' | 'rewarded') =>
-    new Promise<boolean>((resolve) => {
-      let started = false
-      let playingNow = false
-      let over = false
-      const end = (finished: boolean) => {
-        if (playingNow) {
-          playingNow = false
-          adsPlaying -= 1
-          applyMute()
-        }
-        if (over) return
-        over = true
-        clearTimeout(noShow)
-        resolve(finished)
-      }
-      const noShow = setTimeout(() => end(false), adWait)
-      try {
-        sdk.ad.requestAd(kind, {
-          adStarted: () => {
-            // One ad per request. A start after the no-show wait still plays over the game,
-            // so it still mutes the game.
-            if (started) return
-            started = true
-            clearTimeout(noShow)
-            playingNow = true
-            adsPlaying += 1
-            applyMute()
-          },
-          adFinished: () => end(true),
-          adError: () => end(false),
-        })
-      } catch (e) {
-        warn('requestAd failed', e)
-        end(false)
-      }
-    })
-
-  const fallback = localStore(warn)
-  const storage: PortalStorage = {
-    getItem(key) {
-      if (!sdk.data) return fallback.getItem(key)
-      try {
-        return sdk.data.getItem(key)
-      } catch (e) {
-        warn('data.getItem failed', e)
-        return fallback.getItem(key)
-      }
-    },
-    setItem(key, value) {
-      if (!sdk.data) return fallback.setItem(key, value)
-      try {
-        sdk.data.setItem(key, value)
-      } catch (e) {
-        warn('data.setItem failed', e)
-        fallback.setItem(key, value)
-      }
-    },
-    removeItem(key) {
-      if (!sdk.data) return fallback.removeItem(key)
-      try {
-        sdk.data.removeItem(key)
-      } catch (e) {
-        warn('data.removeItem failed', e)
-        fallback.removeItem(key)
-      }
-    },
-  }
-
-  return {
-    name: 'crazygames',
-    loadingStop: () => safe('loadingStop', () => sdk.game.loadingStop()),
-    setGameplay(on) {
-      if (on === playing) return
-      playing = on
-      safe(on ? 'gameplayStart' : 'gameplayStop', () =>
-        on ? sdk.game.gameplayStart() : sdk.game.gameplayStop(),
-      )
-    },
-    midgameAd: () => requestAd('midgame').then(() => undefined),
-    rewardedAd: () => requestAd('rewarded'),
-    async hasAdblock() {
-      try {
-        return (await sdk.ad.hasAdblock?.()) === true
-      } catch (e) {
-        warn('hasAdblock failed', e)
+  const init: Promise<boolean> = Promise.resolve()
+    .then(() => sdk.init())
+    .then(
+      () => true,
+      (e) => {
+        warn('CrazyGames SDK unavailable, playing on without it', e)
         return false
-      }
-    },
-    happytime: () => safe('happytime', () => sdk.game.happytime()),
-    progress(percent) {
-      if (!Number.isFinite(percent)) return
-      const p = Math.round(Math.min(100, Math.max(0, percent)))
-      safe('reportGameCompletedPercentage', () => sdk.game.reportGameCompletedPercentage?.(p))
-    },
-    setContext(context) {
-      safe(context ? 'setGameContext' : 'clearGameContext', () =>
-        context ? sdk.game.setGameContext?.(context) : sdk.game.clearGameContext?.(),
-      )
-    },
-    settings: () => settings,
-    onSettings(fn) {
-      settingsListeners.push(fn)
-    },
-    device,
-    locale,
-    storage,
-    instantMultiplayer: instant,
-    inviteRoom: invited,
-    onJoinRoom(fn) {
-      safe('addJoinRoomListener', () =>
-        sdk.game.addJoinRoomListener?.((params) => {
-          const room = roomFromParams(params, roomParam, roomCode)
-          if (room) fn(room)
-        }),
-      )
-    },
-    updateRoom(code, joinable) {
-      safe('updateRoom', () =>
-        sdk.game.updateRoom?.({
-          roomId: code,
-          isJoinable: joinable,
-          inviteParams: { [roomParam]: code },
-        }),
-      )
-    },
-    leftRoom: () => safe('leftRoom', () => sdk.game.leftRoom?.()),
-    async inviteLink(code) {
-      try {
-        const link = await sdk.game.inviteLink?.({ [roomParam]: code })
-        return typeof link === 'string' && link ? link : null
-      } catch (e) {
-        warn('inviteLink failed', e)
-        return null
-      }
-    },
-    async username() {
-      if (!sdk.user) return null
-      try {
-        const u = await sdk.user.getUser()
-        return typeof u?.username === 'string' ? u.username : ''
-      } catch (e) {
-        warn('getUser failed', e)
-        return null
-      }
-    },
-  }
+      },
+    )
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const first = await Promise.race([
+    init,
+    new Promise<'slow'>((ok) => {
+      timer = setTimeout(() => ok('slow'), initWait)
+    }),
+  ])
+  clearTimeout(timer)
+  if (first === false) return NO_PORTAL
+  if (first === true) return attach() ?? NO_PORTAL
+  warn(`CrazyGames SDK init is taking over ${initWait} ms; playing on, it joins when ready`)
+  return latePortal(
+    init.then((ok) => (ok ? attach() : null)),
+    warn,
+  )
 }
