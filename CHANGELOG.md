@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.3 (2026-11-12)
+
+- **The copyright holder is UMM LLC.** `LICENSE` and `package.json`'s `author` named "Uncle Matt
+  Makes"; Matt formed UMM LLC on 2026-11-12 and asked for the games' copyright to name it, and the
+  kit's runtime code ships inside every game. The licence stays MIT. "Uncle Matt Makes" stays the
+  brand: the splash, the descriptions and the docs keep it.
+
 ## 0.11.2 (2026-11-12)
 
 - **`presets/crazygames.json`: both preview videos are required.** CrazyGames' covers page, read

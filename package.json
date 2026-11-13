@@ -1,9 +1,9 @@
 {
   "name": "@ummgames/dev",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "description": "Shared dev tools for Uncle Matt Makes Games: capture, trailer and store art, site build plugins, agent tooling and configs.",
   "license": "MIT",
-  "author": "Uncle Matt Makes",
+  "author": "UMM LLC",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/unclemattmakes/ummgames-dev.git"
