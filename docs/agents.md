@@ -42,6 +42,11 @@ each copy has moved. Docs: `node_modules/@ummgames/dev/docs/README.md`.
   capture `expect`. Fix the cause, or stop and ask.
 - Remove worktrees with `umm-dev worktree remove <name>`, never with rm -rf. It refuses when work
   would be lost; read why before passing --force.
+- Questions for the person go in `docs/QUESTIONS.md`, one list item each: a bold question, the
+  context, then a sentence starting "Recommend". They answer with `umm-dev questions`, which
+  writes `ANSWERS.md` beside it. At the start of a session, fold each entry there into the
+  decision log in its words, dated; remove the question; delete the entry; commit. Format and
+  rules: the kit's docs/questions.md.
 - The kit tracks `main`. Updating it is its own change: `pnpm update @ummgames/dev`, read the
   kit's CHANGELOG.md since the old version, then run `umm-dev drift` and follow docs/upgrading.md.
 ```

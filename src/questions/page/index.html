@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Questions</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">?</span>
+        <span class="title">Questions</span>
+      </div>
+      <div class="tally" id="tally" aria-live="polite"></div>
+      <div class="modes" role="tablist" aria-label="View">
+        <button type="button" role="tab" id="mode-card" aria-selected="true">One at a time</button>
+        <button type="button" role="tab" id="mode-list" aria-selected="false">List</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <nav class="projects" id="projects" aria-label="Projects"></nav>
+
+      <main id="main">
+        <section class="card" id="card" hidden>
+          <div class="meta" id="meta"></div>
+          <h1 class="headline" id="headline">Loading</h1>
+          <div class="context" id="context"></div>
+          <button type="button" class="more" id="more" hidden>Show all</button>
+          <div class="rec" id="rec">
+            <div class="rec-label">Recommendation</div>
+            <div class="rec-text" id="rec-text"></div>
+          </div>
+          <label class="note">
+            <span class="sr">Note or answer</span>
+            <textarea id="note" rows="2" placeholder="Add a note, or answer in your own words. Press / to type."></textarea>
+          </label>
+          <div class="actions">
+            <button type="button" class="act yes" id="act-yes"><kbd>Y</kbd> Go with the rec</button>
+            <button type="button" class="act no" id="act-no"><kbd>N</kbd> No</button>
+            <button type="button" class="act reply" id="act-reply" disabled><kbd>Enter</kbd> Reply</button>
+            <span class="spacer"></span>
+            <button type="button" class="act quiet" id="act-drop" title="The question is stale or no longer needed"><kbd>D</kbd> Drop</button>
+            <button type="button" class="act quiet" id="act-skip" title="Leave it for now"><kbd>S</kbd> Later</button>
+          </div>
+          <div class="where" id="where"></div>
+        </section>
+
+        <section class="list" id="list" hidden>
+          <div class="list-head">
+            <div class="list-title" id="list-title"></div>
+            <button type="button" class="act quiet" id="yes-all">Go with every rec shown</button>
+          </div>
+          <ol class="rows" id="rows"></ol>
+        </section>
+
+        <section class="empty" id="empty" hidden>
+          <div class="empty-mark" aria-hidden="true">&#10003;</div>
+          <h1>Nothing waiting</h1>
+          <p id="empty-text">Every question here has an answer. New ones show up when agents add them.</p>
+        </section>
+      </main>
+    </div>
+
+    <footer class="keys" id="keys">
+      <span><kbd>Y</kbd> yes</span><span><kbd>N</kbd> no</span><span><kbd>/</kbd> type</span>
+      <span><kbd>Enter</kbd> reply</span><span><kbd>D</kbd> drop</span><span><kbd>S</kbd> later</span>
+      <span><kbd>&larr;</kbd> back</span><span><kbd>U</kbd> undo</span><span><kbd>L</kbd> list</span>
+    </footer>
+
+    <div class="toast" id="toast" role="status" hidden>
+      <span id="toast-text"></span>
+      <button type="button" id="toast-undo">Undo</button>
+    </div>
+
+    <dialog id="confirm">
+      <form method="dialog">
+        <p id="confirm-text"></p>
+        <div class="confirm-actions">
+          <button type="submit" value="cancel" class="act quiet">Cancel</button>
+          <button type="submit" value="ok" class="act yes" id="confirm-ok">Go with them</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

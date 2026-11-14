@@ -21,6 +21,7 @@
 | A web portal build (CrazyGames): build plugins, the SDK adapter, a fake portal for Playwright | [portal.md](portal.md) | linked: `@ummgames/dev/vite`, `fakePortal` in `@ummgames/dev/testing`; copied: `runtime/portal/` |
 | GPU lease, worktrees, merge drivers | [agent.md](agent.md) | linked: `umm-dev gpu`, `worktree`, `merge` |
 | Repo guards and git hooks | [guard.md](guard.md) | linked: `umm-dev guard` |
+| Answering agents' questions files, and the answers file they read back | [questions.md](questions.md) | linked: `umm-dev questions` |
 | Runtime copies and drift; the dev palette, splash, pad profiles, music sequencer core | [runtime.md](runtime.md) | copied: `umm-dev copy`, `drift`; `runtime/` |
 | Leaderboard servers on a Worker and D1: rate limits, blocks, admin routes; a D1 test shim | [board.md](board.md) | copied: `runtime/board/`; linked: `createD1` in `@ummgames/dev/testing` |
 | A making-of site: pages, toys, numbers and code quoted from the source | [making-of.md](making-of.md) | linked: `umm-dev making-of`, `@ummgames/dev/making-of`, `createImportGraph` in `@ummgames/dev/testing`; copied: `runtime/making-of/` |

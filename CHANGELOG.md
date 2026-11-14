@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.14.0 (2026-11-14)
+
+- **New: `umm-dev questions`, a page for answering agents' questions.** It reads every
+  questions file (`docs/QUESTIONS.md`, `questions-for-<name>.md` and the like) in a repo, or in
+  every repo under a folder with `--root ..`, and shows one card at a time: the question, its
+  context and its recommendation. `Y` goes with the recommendation, `N` says no, `/` then
+  `Enter` answers in your own words, `D` drops a stale question, `S` puts one off, `U` undoes.
+  A list view answers rows with one click. Each answer is written at once to `ANSWERS.md`
+  beside the questions file, for the repo's next session to fold into its decision log.
+  `umm-dev questions list` prints the same as text or JSON. The parser reads the shapes these
+  files already have, so none needs rewriting. See [docs/questions.md](docs/questions.md).
+- **The agents' paste block** in [docs/agents.md](docs/agents.md) has a line on questions and
+  answers.
+- **To take it:** nothing to change. To have agents read answers back, paste the new line from
+  docs/agents.md into the game's CLAUDE.md.
+
 ## 0.13.1 (2026-11-14)
 
 - **Fix: a note's touch line keeps its row on a touch screen.** 0.13.0 showed a
