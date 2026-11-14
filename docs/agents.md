@@ -46,7 +46,7 @@ each copy has moved. Docs: `node_modules/@ummgames/dev/docs/README.md`.
   context, then a sentence starting "Recommend". They answer with `umm-dev questions`, which
   writes `ANSWERS.md` beside it. At the start of a session, fold each entry there into the
   decision log in its words, dated; remove the question; delete the entry; commit. Format and
-  rules: the kit's docs/questions.md.
+  rules: the kit's docs/answering.md.
 - The kit tracks `main`. Updating it is its own change: `pnpm update @ummgames/dev`, read the
   kit's CHANGELOG.md since the old version, then run `umm-dev drift` and follow docs/upgrading.md.
 ```

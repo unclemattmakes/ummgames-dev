@@ -6,8 +6,9 @@ import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { reposUnder, scan } from '../../src/questions/scan.mjs'
+import { filesIn, reposUnder, scan } from '../../src/questions/scan.mjs'
 import { HEADERS, serve } from '../../src/questions/server.mjs'
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'umm-dev-questions-'))
@@ -50,6 +51,11 @@ const post = (p, body, headers = {}) =>
   })
 
 describe('scan', () => {
+  it('finds no questions file in the kit itself, so its docs are never read as questions', () => {
+    const kit = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+    expect(filesIn(kit).map((f) => f.rel)).toEqual([])
+  })
+
   it('reads main checkouts only, urgent first', () => {
     expect(
       reposUnder([tmp])

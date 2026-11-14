@@ -4,7 +4,7 @@
  * `umm-dev questions list [--root <dir>]... [--json]`
  *
  * A page for answering the questions agents leave in a repo's questions file, one card at a time,
- * and a text list of the same. See src/questions/ and docs/questions.md.
+ * and a text list of the same. See src/questions/ and docs/answering.md.
  */
 import { spawn } from 'node:child_process'
 import path from 'node:path'
@@ -32,7 +32,7 @@ const HELP = `usage: umm-dev questions [serve] [options]
                      checkout one level down; linked worktrees are left out). Repeat for
                      more. Default: the current directory
   A questions file is docs/ or the repo root's QUESTIONS.md, questions-for-<name>.md and the
-  like. Format, the answers file and the rules for agents: docs/questions.md.
+  like. Format, the answers file and the rules for agents: docs/answering.md.
 
 exit: 0; 1 the port is taken by something else; 64 usage`
 

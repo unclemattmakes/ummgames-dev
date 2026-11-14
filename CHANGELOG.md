@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.14.1 (2026-11-14)
+
+- **Fix: the kit's own docs page is no longer read as a questions file.** The page was
+  `docs/questions.md`, a name `umm-dev questions` reads, so run over a folder holding the kit it
+  listed five of the page's format notes as open questions. The page is now
+  [docs/answering.md](docs/answering.md), and a test checks that the kit holds no file the
+  scan reads.
+- **To take it:** nothing. An `ANSWERS.md` written by 0.14.0 names the old page in its header;
+  read docs/answering.md instead.
+
 ## 0.14.0 (2026-11-14)
 
 - **New: `umm-dev questions`, a page for answering agents' questions.** It reads every
@@ -10,7 +20,7 @@
   A list view answers rows with one click. Each answer is written at once to `ANSWERS.md`
   beside the questions file, for the repo's next session to fold into its decision log.
   `umm-dev questions list` prints the same as text or JSON. The parser reads the shapes these
-  files already have, so none needs rewriting. See [docs/questions.md](docs/questions.md).
+  files already have, so none needs rewriting. See [docs/answering.md](docs/answering.md).
 - **The agents' paste block** in [docs/agents.md](docs/agents.md) has a line on questions and
   answers.
 - **To take it:** nothing to change. To have agents read answers back, paste the new line from

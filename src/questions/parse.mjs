@@ -6,7 +6,7 @@
  * question is one list item: a question, some context, and a sentence starting "Recommend". The
  * parser accepts the shapes that grew up in practice (numbered or bulleted, a bold lead-in or
  * none, wrapped lines, task-list boxes, sections) so no file has to be rewritten to be read.
- * docs/questions.md has the format and the rules.
+ * docs/answering.md has the format and the rules.
  */
 import { createHash } from 'node:crypto'
 
@@ -251,7 +251,7 @@ export const ANSWERS_HEADER = `# Answers
 Written by \`umm-dev questions\`. Each entry answers one open item in the questions file beside
 this one, in the words given. **For agents:** fold each entry into the decision log as the
 answer, in these words and dated; then remove or update the question, delete the entry here,
-and commit. Delete this file when it is empty. Format: docs/questions.md in \`@ummgames/dev\`.
+and commit. Delete this file when it is empty. Format: docs/answering.md in \`@ummgames/dev\`.
 `
 
 /**
