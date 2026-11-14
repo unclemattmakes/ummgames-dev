@@ -23,7 +23,8 @@ const HELP = `usage: umm-dev questions [serve] [options]
     --port <n>       the port (default 4646). If the page is already running there, opens it
                      and exits
     --no-open        do not open a browser
-    --idle <m>       stop after m minutes with no page open (default 0, never)
+    --idle <m>       stop after m minutes with no page open (default 0, never). An open
+                     page pings once a minute, even in a hidden tab, so use 2 or more
   list      print the open questions as text
     --json           as JSON: { open: [...], files: [...] }
 

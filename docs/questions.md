@@ -41,7 +41,8 @@ The list view answers a row with one click, and "Go with all N recs shown" answe
 question in view, each as its own entry. Links in a question open the linked file as text.
 
 The page reads the files again when its tab comes back into focus and once a minute, so a question
-an agent adds shows up without a restart.
+an agent adds shows up without a restart. If the server has stopped, the page says so in place of
+the cards.
 
 ## `umm-dev questions [serve]`
 
@@ -53,7 +54,7 @@ already running on the port, it opens that one and exits.
 | `--root <dir>` | the current directory | A repo, or a folder whose subfolders are repos. Repeat for more. |
 | `--port <n>` | `4646` | The port. |
 | `--no-open` | off | Do not open a browser. |
-| `--idle <m>` | `0` | Stop after `m` minutes with no request from a page. `0` never stops. |
+| `--idle <m>` | `0` | Stop after `m` minutes with no request from a page. `0` never stops. An open page pings once a minute, even in a hidden tab, so use 2 or more. |
 
 ## `umm-dev questions list`
 

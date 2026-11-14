@@ -343,7 +343,7 @@ function enqueue(fn) {
   const next = writes.then(fn).finally(() => {
     pending--
     // Once the writes settle, read the files again for anything an agent changed meanwhile.
-    if (pending === 0) void load()
+    if (pending === 0) void refresh()
   })
   writes = next.catch(() => {})
   return next
@@ -486,13 +486,23 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault()
 })
 
-// New questions appear when the tab comes back, and every minute while it is open.
-window.addEventListener('focus', () => void load())
+/** Show that the server is gone, in place of the cards. */
+function stopped() {
+  for (const id of ['card', 'list']) $(id).hidden = true
+  $('empty').hidden = false
+  $('empty').querySelector('h1')?.replaceChildren('The page has stopped')
+  $('empty-text').textContent =
+    'Its server is not running. Start it again with umm-dev questions; every answer given is saved.'
+}
+
+const refresh = () => load().catch(stopped)
+
+// New questions appear when the tab comes back, and every minute while it is open. A hidden tab
+// still pings, so a server started with --idle stays up while the page is open anywhere.
+window.addEventListener('focus', () => void refresh())
 setInterval(() => {
-  if (!document.hidden && pending === 0) void load()
+  if (!document.hidden && pending === 0) void refresh()
+  else fetch('/api/ping', { cache: 'no-store' }).catch(() => {})
 }, 60_000)
 
-load().catch((e) => {
-  $('empty').hidden = false
-  $('empty-text').textContent = `Could not read the questions: ${e.message}`
-})
+void refresh()
