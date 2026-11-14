@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.1 (2026-11-14)
+
+- **Fix: a note's touch line keeps its row on a touch screen.** 0.13.0 showed a
+  `dev-splash__touch` line with `display: revert`, which dropped `dev-splash__controls`' flex row,
+  so its items stacked. Each device's lines are now hidden on the other device instead.
+- **A short screen** (440 px tall or less, such as a phone on its side) sets the note closer and
+  smaller, so it keeps clear of the loading word.
+- **To take it:** copy `runtime/boot/dev-splash.css` again (`umm-dev copy`).
+
 ## 0.13.0 (2026-11-14)
 
 - **New: the splash can say what the game is, and that it is loading.** `devSplash` takes

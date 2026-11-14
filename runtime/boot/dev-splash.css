@@ -184,15 +184,22 @@
 }
 /* A note's lines for one kind of device: .dev-splash__keys with a mouse and keys,
    .dev-splash__touch on a touch screen. */
-.dev-splash__touch {
-  display: none;
+@media (hover: hover), (pointer: fine), (pointer: none) {
+  .dev-splash__touch {
+    display: none;
+  }
 }
 @media (hover: none) and (pointer: coarse) {
-  .dev-splash__touch {
-    display: revert;
-  }
   .dev-splash__keys {
     display: none;
+  }
+}
+/* A short screen, such as a phone on its side: the note sits closer and smaller. */
+@media (max-height: 440px) {
+  .dev-splash__note {
+    margin-top: 10px;
+    font-size: 14px;
+    line-height: 1.35;
   }
 }
 /* Optional: a word over the bar, so the bar reads as a load bar and not another underline. The
