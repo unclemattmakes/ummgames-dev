@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **New: `@ummgames/dev/voice`, the shared half of a game's voice tools.** `call` makes one
+  ElevenLabs request with the key read in one place (the environment, `.env.local`, then the
+  Windows user variables, never printed) and waits out a 429. `transcribe` returns Scribe's
+  words with times, `wordsOf` compares a take's text with what was heard, and `inPool` runs takes
+  a few at a time. `cut` cuts a spoken take to a mono piece and reports its length; `soundEnds`
+  and `shipSung` ship a sung take with its seconds to where its sound ends, optionally trimmed
+  there. See [docs/voice.md](docs/voice.md).
+- **To take it:** nothing. A game with its own copies of these helpers can import them instead;
+  its paths now resolve against the working directory.
+
 ## 0.14.1 (2026-11-14)
 
 - **Fix: the kit's own docs page is no longer read as a questions file.** The page was

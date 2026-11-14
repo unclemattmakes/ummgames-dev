@@ -45,6 +45,10 @@
       "types": "./src/making-of/index.d.ts",
       "default": "./src/making-of/index.mjs"
     },
+    "./voice": {
+      "types": "./src/voice/index.d.ts",
+      "default": "./src/voice/index.mjs"
+    },
     "./biome": "./config/biome.preset.json",
     "./tsconfig": "./config/tsconfig.json",
     "./vitest": {
