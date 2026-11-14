@@ -345,6 +345,8 @@ passes neither, so the game names itself once, here. See
 | `portraitPath` | `string` | `'brand/<its file name>'` | Where the portrait is served and emitted, under the base. `brand/uncle-matt-circle.webp` for the kit's. |
 | `css` | `string` or `false` | `'/src/boot/dev-splash.css'` | The href of the game's copy of the stylesheet, where `umm-dev copy boot` puts it. `false` links none. |
 | `url` | `string` | none | A line under the bar, such as the label's site, each `.` in amber. |
+| `note` | `string` | none | The game's own HTML under the lockup: what it is about, its controls. Written as given, unescaped, so it comes from the game's config, never from a player. Styled by `dev-splash.css` (below). |
+| `loading` | `string` | none | A word over the bar, such as `Loading`, with dots that count up, so the bar does not read as another underline. |
 | `page` | `string` | `'index.html'` | The page that gets the splash, relative to Vite's root. Other pages are left alone. |
 
 **A page that has its own splash keeps it.** If the page already has an element with
@@ -385,6 +387,25 @@ export default defineConfig({ plugins: [devSplash({ game: 'My Game', url: 'examp
 </div>
 ```
 
+**A note** fades in just after the lockup, and the page keeps clear of the bar while it shows.
+`dev-splash.css` styles what goes in it: `<p>` lines, `<kbd>` keycaps, and a
+`<ul class="dev-splash__controls">` whose `<li>` items wrap between items, never inside one. Mark a
+line `dev-splash__keys` to show it only with a mouse and keys, or `dev-splash__touch` to show it
+only on a touch screen (`hover: none` and `pointer: coarse`); the page has no script yet, so a
+gamepad can't be told apart. A game's copy of the stylesheet from before 0.13.0 has none of this:
+copy it again.
+
+```js
+// What the game is, its controls by device, and "Loading" over the bar.
+devSplash({
+  game: 'My Game',
+  loading: 'Loading',
+  note: `<p>A robot who loves games.</p>
+<ul class="dev-splash__controls dev-splash__keys"><li><kbd>Space</kbd> jump</li><li><kbd>Mouse</kbd> look</li></ul>
+<ul class="dev-splash__controls dev-splash__touch"><li>Tap JUMP</li></ul>`,
+})
+```
+
 ```js
 // The kit's words only, no portrait, the stylesheet linked by the page itself.
 plugins: [devSplash({ portrait: false, css: false })]
@@ -412,8 +433,8 @@ Each plugin's logic is exported for tests and scripts.
 | `encodePng(img, { level? })` | A minimal PNG encoder: 8-bit, no interlace. |
 | `APPLE_TOUCH_ICON`, `APPLE_TOUCH_SIZE`, `SHARE_CARD`, `SHARE_CARD_SIZE` | `'apple-touch-icon.png'`, `180`, `'share-card.png'`, `{ width: 1200, height: 630, mark: 420 }`. |
 | `splashWords(game, words?)` | The kit's words with `game` just before the last. The same rule as the runtime's. |
-| `splashMarkup({ words?, portraitSrc?, url? })` | The `#dev-splash` block. No `<img>` without `portraitSrc`. |
-| `injectSplash(html, { words?, portraitSrc?, url?, css? })` | The page with the link and the markup added, unless it has them. |
+| `splashMarkup({ words?, portraitSrc?, url?, note?, loading? })` | The `#dev-splash` block. No `<img>` without `portraitSrc`. |
+| `injectSplash(html, { words?, portraitSrc?, url?, note?, loading?, css? })` | The page with the link and the markup added, unless it has them. |
 | `SPLASH_WORDS`, `SPLASH_PORTRAIT`, `SPLASH_PORTRAIT_FILE`, `SPLASH_CSS` | The kit's words (the runtime's), `'brand/uncle-matt-circle.webp'`, the portrait's path on disk, `'/src/boot/dev-splash.css'`. |
 
 **Testing a D1 board.** `createD1(options?)` from `@ummgames/dev/testing` is a D1 binding over

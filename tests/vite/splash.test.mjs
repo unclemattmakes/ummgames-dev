@@ -74,6 +74,24 @@ describe('splashMarkup', () => {
     expect(html).toContain('<p class="dev-splash__url">example<span>.</span>com</p>')
   })
 
+  it('writes no note and no loading word unless asked', () => {
+    const html = splashMarkup()
+    expect(html).not.toContain('dev-splash__note')
+    expect(html).not.toContain('dev-splash__loading')
+  })
+
+  it('writes the game note as given under the lockup, and the loading word over the bar', () => {
+    const note =
+      '<p>A robot.</p><ul class="dev-splash__controls"><li><kbd>Space</kbd> jump</li></ul>'
+    const html = splashMarkup({ note, loading: 'Load & go' })
+    expect(html).toContain(`<div class="dev-splash__note">${note}</div>`)
+    expect(html).toContain('<p class="dev-splash__loading" aria-hidden="true">Load &amp; go</p>')
+    const at = (/** @type {string} */ s) => html.indexOf(s)
+    expect(at('dev-splash__lockup')).toBeLessThan(at('dev-splash__note'))
+    expect(at('dev-splash__note')).toBeLessThan(at('dev-splash__loading'))
+    expect(at('dev-splash__loading')).toBeLessThan(at('dev-splash__bar'))
+  })
+
   it('refuses an empty list or a blank word', () => {
     expect(() => splashMarkup({ words: [] })).toThrow(/empty/)
     expect(() => splashMarkup({ words: [' ', 'Games'] })).toThrow(/one line/)

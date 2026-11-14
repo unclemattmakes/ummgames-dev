@@ -10,6 +10,7 @@
   inset: 0;
   z-index: 100;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 16px;
@@ -128,6 +129,104 @@
 .dev-splash__url span {
   color: var(--ember);
 }
+/* Optional: the game's own note under the lockup, what it is about and its controls. It fades in
+   just after the lockup. The page keeps clear of the bar while it shows. */
+#dev-splash:has(.dev-splash__note) {
+  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+.dev-splash__note {
+  max-width: min(40em, 100%);
+  margin-top: clamp(18px, 4.5vh, 44px);
+  font:
+    700 clamp(15px, 1.8vw, 21px) / 1.45 Bitter,
+    Georgia,
+    "Times New Roman",
+    serif;
+  text-align: center;
+  color: rgba(42, 29, 18, 0.78);
+  opacity: 0;
+}
+#dev-splash.is-faced .dev-splash__note {
+  animation: dev-splash-in 450ms ease 250ms forwards;
+}
+.dev-splash__note p,
+.dev-splash__controls {
+  margin: 0 0 0.7em;
+}
+.dev-splash__note > :last-child {
+  margin-bottom: 0;
+}
+/* Controls as a row that wraps between items, never inside one: <li><kbd>Space</kbd> jump</li>. */
+.dev-splash__controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.2em 1.1em;
+  padding: 0;
+  list-style: none;
+}
+.dev-splash__controls li {
+  white-space: nowrap;
+}
+.dev-splash__note kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  margin: 0.15em 0.08em;
+  padding: 0.1em 0.42em;
+  border: 2px solid rgba(42, 29, 18, 0.28);
+  border-bottom-width: 4px;
+  border-radius: 7px;
+  background: #fbf6ec;
+  color: var(--walnut);
+  font: inherit;
+  font-size: 0.82em;
+  line-height: 1.25;
+}
+/* A note's lines for one kind of device: .dev-splash__keys with a mouse and keys,
+   .dev-splash__touch on a touch screen. */
+.dev-splash__touch {
+  display: none;
+}
+@media (hover: none) and (pointer: coarse) {
+  .dev-splash__touch {
+    display: revert;
+  }
+  .dev-splash__keys {
+    display: none;
+  }
+}
+/* Optional: a word over the bar, so the bar reads as a load bar and not another underline. The
+   dots after it count up. */
+.dev-splash__loading {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+  margin: 0;
+  padding-left: 1.3em;
+  font:
+    700 14px / 1 Bitter,
+    Georgia,
+    "Times New Roman",
+    serif;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-align: center;
+  color: rgba(42, 29, 18, 0.66);
+}
+.dev-splash__loading::after {
+  content: "...";
+  display: inline-block;
+  width: 1.3em;
+  text-align: left;
+  clip-path: inset(0 100% 0 0);
+  animation: dev-splash-dots 1.6s steps(4, jump-none) infinite;
+}
+@keyframes dev-splash-dots {
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
 #dev-splash .visually-hidden {
   position: absolute;
   width: 1px;
@@ -143,5 +242,13 @@
   }
   .dev-splash__caret {
     animation: none;
+  }
+  #dev-splash.is-faced .dev-splash__note {
+    animation: none;
+    opacity: 1;
+  }
+  .dev-splash__loading::after {
+    animation: none;
+    clip-path: none;
   }
 }

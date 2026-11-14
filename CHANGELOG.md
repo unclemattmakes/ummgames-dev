@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.13.0 (2026-11-14)
+
+- **New: the splash can say what the game is, and that it is loading.** `devSplash` takes
+  `note`, the game's own HTML under the lockup (what it is about, its controls), and `loading`,
+  a word over the bar with dots that count up, so the bar no longer reads as another underline
+  under the typed word. Both are off by default, so a game that passes neither looks the same.
+  `dev-splash.css` styles a note's `<p>` lines, `<kbd>` keycaps and a
+  `<ul class="dev-splash__controls">` row, and shows a line marked `dev-splash__keys` only with a
+  mouse and keys and one marked `dev-splash__touch` only on a touch screen. `#dev-splash` is now a
+  column, which changes nothing with the lockup alone. See [docs/build.md](docs/build.md).
+- **To take it:** copy `runtime/boot/dev-splash.css` again (`umm-dev copy`), then pass `note` or
+  `loading`. Without the new copy, the note shows unstyled.
+
 ## 0.12.1 (2026-11-13)
 
 - **Fix: a slow CrazyGames SDK init no longer silences the portal.** `createPortalSdk` gave up on

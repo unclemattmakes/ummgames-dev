@@ -79,6 +79,10 @@ const esc = (s) =>
  * @property {readonly string[]} [words] The blank's words, one sizer each. Default `SPLASH_WORDS`.
  * @property {string | null} [portraitSrc] The `<img>`'s `data-src`; null leaves the `<img>` out.
  * @property {string} [url] A line under the bar, each `.` in amber. None by default.
+ * @property {string} [note] The game's own HTML under the lockup: what it is about, its controls.
+ *   Written as given, so it must come from the game's config, never from a player.
+ * @property {string} [loading] A word over the bar, such as `Loading`, so the bar does not read as
+ *   another underline. None by default.
  */
 
 /**
@@ -99,6 +103,10 @@ export function splashMarkup(options = {}) {
   const url = options.url
     ? `\n  <p class="dev-splash__url">${options.url.split('.').map(esc).join('<span>.</span>')}</p>`
     : ''
+  const note = options.note ? `\n  <div class="dev-splash__note">${options.note}</div>` : ''
+  const loading = options.loading
+    ? `\n  <p class="dev-splash__loading" aria-hidden="true">${esc(options.loading)}</p>`
+    : ''
   return `<div id="dev-splash" role="status" aria-label="Uncle Matt Makes: ${last}. Loading.">
   <div class="dev-splash__lockup">${img}
     <h1 class="dev-splash__mark">
@@ -108,7 +116,7 @@ export function splashMarkup(options = {}) {
       </span>
       <span class="visually-hidden">${last}</span>
     </h1>
-  </div>
+  </div>${note}${loading}
   <div class="dev-splash__bar" aria-hidden="true"><div class="dev-splash__fill"></div></div>${url}
 </div>`
 }
@@ -126,6 +134,8 @@ function checkWords(words) {
  * @property {readonly string[]} [words]
  * @property {string | null} [portraitSrc]
  * @property {string} [url]
+ * @property {string} [note]
+ * @property {string} [loading]
  * @property {string | false} [css] The stylesheet's href; false links none. Default `SPLASH_CSS`.
  */
 
@@ -194,6 +204,8 @@ export function injectSplash(html, options = {}) {
  * @property {string | false} [css] The href of the game's copy of `dev-splash.css`, as
  *   index.html links it. Default `/src/boot/dev-splash.css`. false links none.
  * @property {string} [url] A line under the bar, such as the label's site. None by default.
+ * @property {string} [note] The game's own HTML under the lockup, written as given. None by default.
+ * @property {string} [loading] A word over the bar, such as `Loading`. None by default.
  * @property {string} [page] The HTML page that gets the splash, relative to Vite's root.
  *   Default `index.html`.
  */
@@ -267,6 +279,8 @@ export function devSplash(options = {}) {
           portraitSrc: portrait === false ? null : href(),
           css: options.css === undefined ? SPLASH_CSS : options.css,
           ...(options.url ? { url: options.url } : {}),
+          ...(options.note ? { note: options.note } : {}),
+          ...(options.loading ? { loading: options.loading } : {}),
         })
       },
     },

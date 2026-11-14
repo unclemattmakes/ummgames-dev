@@ -323,6 +323,13 @@ export interface SplashMarkupOptions {
   portraitSrc?: string | null
   /** A line under the bar, each `.` in amber. None by default. */
   url?: string
+  /**
+   * The game's own HTML under the lockup, such as what it is about and its controls. Written as
+   * given, unescaped: it must come from the game's config, never from a player. None by default.
+   */
+  note?: string
+  /** A word over the bar, such as `Loading`, so the bar does not read as an underline. None by default. */
+  loading?: string
 }
 /** The `#dev-splash` block, as `runtime/boot/dev-splash.ts` reads it. Throws on an empty word list. */
 export declare function splashMarkup(options?: SplashMarkupOptions): string
@@ -351,6 +358,10 @@ export interface DevSplashOptions {
   css?: string | false
   /** A line under the bar, such as the label's site. None by default. */
   url?: string
+  /** The game's own HTML under the lockup, written as given (see `SplashMarkupOptions.note`). */
+  note?: string
+  /** A word over the bar, such as `Loading`. None by default. */
+  loading?: string
   /** The page that gets the splash, relative to Vite's root. Default `index.html`. */
   page?: string
 }
