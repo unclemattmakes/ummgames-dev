@@ -11,13 +11,7 @@ const DIGITS = ['ZERO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', '
  * or a digit goes. A game with names of its own to say a set way changes the text before this.
  * @param {string} text
  */
-export const wordsOf = (text) =>
-  text
-    .toUpperCase()
-    .replace(/\.(COM|NET|ORG|TV|IO|GG|APP|DEV)\b/g, 'DOT$1')
-    .replace(/\b\d\b/g, (d) => DIGITS[Number(d)])
-    .replace(/\bN'/g, 'AND')
-    .replace(/[^A-Z0-9]+/g, '')
+export const wordsOf = (text) => wordList(text).join('')
 
 /**
  * Runs `f` over `items`, at most `n` at once, in order of starting. Rejects on the first failure;
