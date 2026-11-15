@@ -185,6 +185,22 @@ describe('transcribe', () => {
     expect(init.body.get('language_code')).toBe('eng')
     expect(init.headers['content-type']).toBeUndefined()
   })
+
+  it('takes bytes, more fields and a media type', async () => {
+    const fetch = vi.fn().mockResolvedValue(reply(200, { text: 'Hi', words: [] }))
+    vi.stubGlobal('fetch', fetch)
+    const r = await transcribe(Uint8Array.of(1, 2, 3), {
+      key: 'k',
+      type: 'audio/wav',
+      fields: { tag_audio_events: 'false' },
+    })
+    expect(r).toEqual({ heard: 'Hi', speechEnds: 0, words: [] })
+    const body = fetch.mock.calls[0][1].body
+    expect(body.get('tag_audio_events')).toBe('false')
+    const file = body.get('file')
+    expect(file.type).toBe('audio/wav')
+    expect([...new Uint8Array(await file.arrayBuffer())]).toEqual([1, 2, 3])
+  })
 })
 
 describe('wordList and misses', async () => {

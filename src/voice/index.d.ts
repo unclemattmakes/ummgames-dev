@@ -51,12 +51,19 @@ export interface HeardWord {
 }
 
 /**
- * What Scribe hears in an mp3 take: its text, its words with times, and when the last word ends.
- * `language` defaults to `eng`.
+ * What Scribe hears in a take: its text, its words with times, and when the last word ends.
+ * `file` is a path or the audio's bytes. `language` defaults to `eng`, `type` to `audio/mpeg`.
+ * `fields` are more form fields for the request, such as `{ tag_audio_events: 'false' }`.
  */
 export declare function transcribe(
-  file: string,
-  options?: { root?: string; key?: string; language?: string },
+  file: string | Uint8Array,
+  options?: {
+    root?: string
+    key?: string
+    language?: string
+    type?: string
+    fields?: Record<string, string>
+  },
 ): Promise<{ heard: string; speechEnds: number; words: HeardWord[] }>
 
 /**
