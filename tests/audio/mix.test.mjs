@@ -145,6 +145,18 @@ describe('encodeWav', () => {
     expect(b.readIntLE(44 + 3, 3)).toBe(-8388607)
     expect(b.readIntLE(44 + 6, 3)).toBe(8388607)
   })
+
+  it('writes 16-bit when asked, and refuses other depths', () => {
+    const b = encodeWav([Float32Array.of(0, 2, -2, 0.5)], { sampleRate: 48000, bits: 16 })
+    expect(b.readUInt16LE(22)).toBe(1)
+    expect(b.readUInt32LE(28)).toBe(96000)
+    expect(b.readUInt16LE(32)).toBe(2)
+    expect(b.readUInt16LE(34)).toBe(16)
+    expect(b.readUInt32LE(40)).toBe(8)
+    expect([0, 1, 2, 3].map((i) => b.readInt16LE(44 + i * 2))).toEqual([0, 32767, -32767, 16384])
+    // @ts-expect-error 8-bit is not offered
+    expect(() => encodeWav([Float32Array.of(0)], { bits: 8 })).toThrow(RangeError)
+  })
 })
 
 describe('gain', () => {

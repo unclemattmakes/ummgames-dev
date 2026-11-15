@@ -21,6 +21,12 @@
   words a take got wrong, `takeKey` keys a take by what made it, `bestTake` tries seeds until
   a take is clean and keeps the closest, and `packBins` and `writeBins` ship pieces in the
   player's format.
+- **The player, after three games moved onto it.** `VoiceBins` takes an `onError(bin, reason)`.
+  `say` takes `data`, handed to a game's own `schedule`, and `onStart({ when, ends })`. `hush`
+  now stops an overlap line still decoding. A line holds the floor until its `ends`, so a burst
+  after the words is faded with it. `VoiceContext` includes `createBuffer`, for a `board`.
+- **`packBins(pieces, { bin: false })`** leaves the bin off each cue. **`encodeWav(chans, { bits:
+  16 })`** writes 16-bit; 24 stays the default.
 - **To take them:** a game with a voice player copied from another game runs
   `umm-dev copy audio/voice.ts` and follows "Adopting the player in a game" in docs/voice.md.
 

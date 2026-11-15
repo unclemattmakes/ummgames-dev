@@ -115,7 +115,13 @@ export type PackedCue<R> = { bin: string; o: number; n: number } & Omit<R, 'bin'
  */
 export declare function packBins<R extends Record<string, unknown>>(
   pieces: Iterable<{ bin: string; key: string; bytes: Uint8Array } & R>,
+  options?: { bin?: true },
 ): { bins: Record<string, Buffer>; cues: Record<string, PackedCue<R>> }
+/** With `bin: false`, each cue leaves its bin out: for cues that name each speaker's bin elsewhere. */
+export declare function packBins<R extends Record<string, unknown>>(
+  pieces: Iterable<{ bin: string; key: string; bytes: Uint8Array } & R>,
+  options: { bin: false },
+): { bins: Record<string, Buffer>; cues: Record<string, Omit<PackedCue<R>, 'bin'>> }
 
 /**
  * Writes packed bins into `dir`, made if missing. With `clear`, every other `.bin` there goes

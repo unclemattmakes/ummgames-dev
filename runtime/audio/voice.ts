@@ -42,9 +42,14 @@ export class VoiceBins {
   private readonly bins = new Map<string, Promise<ArrayBuffer | null>>()
   private readonly ready = new Set<string>()
 
+  /**
+   * `fetcher` defaults to `fetch`. `onError(bin, reason)` hears a bin that will not load (a
+   * status that is not ok, or the fetch failing), such as to warn in the console.
+   */
   constructor(
     private readonly url: (bin: string) => string,
     private readonly fetcher: (url: string) => Promise<Response> = (u) => fetch(u),
+    private readonly onError?: (bin: string, reason: unknown) => void,
   ) {}
 
   /** The bin's bytes. The first call starts the fetch; later calls share it. */
@@ -52,8 +57,15 @@ export class VoiceBins {
     let b = this.bins.get(bin)
     if (b) return b
     b = this.fetcher(this.url(bin))
-      .then((r) => (r.ok ? r.arrayBuffer() : null))
-      .catch(() => null)
+      .then((r) => {
+        if (r.ok) return r.arrayBuffer()
+        this.onError?.(bin, new Error(`${r.status} ${r.statusText}`.trim()))
+        return null
+      })
+      .catch((err: unknown) => {
+        this.onError?.(bin, err)
+        return null
+      })
       .then((bytes) => {
         if (bytes) this.ready.add(bin)
         return bytes
@@ -117,10 +129,14 @@ export function voiceDue<T extends readonly [number, ...unknown[]]>(
 /** The parts of Web Audio the player uses, so a test can hand it a fake. */
 export type VoiceContext = Pick<
   BaseAudioContext,
-  'currentTime' | 'createGain' | 'createBufferSource' | 'decodeAudioData'
+  'currentTime' | 'createGain' | 'createBufferSource' | 'createBuffer' | 'decodeAudioData'
 >
 
-/** A line playing: what fades it, what stops it, and when it ends on the context's clock. */
+/**
+ * A line playing: what fades it, what stops it, and when it ends on the context's clock. A line
+ * holds the floor, and is faded by a cut, until `ends`, so a layout whose last sound is not a
+ * source of the line (a burst after the words) still goes when the line is cut.
+ */
 export interface VoiceLine {
   gains: GainNode[]
   sources: AudioBufferSourceNode[]
@@ -130,7 +146,8 @@ export interface VoiceLine {
 /**
  * Starts a line's buffers at context time `when`, `offset` seconds in. The default splices the
  * pieces into one gain on the line's output; a game with its own layout (bleeps between pieces,
- * a board per speaker) passes its own and keeps the floor, the cache and the late rule.
+ * a board per speaker) passes its own and keeps the floor, the cache and the late rule. `data`
+ * is whatever the game passed to `say` as `data`, such as the line it is laying out.
  */
 export type VoiceSchedule = (
   ctx: VoiceContext,
@@ -139,6 +156,7 @@ export type VoiceSchedule = (
   when: number,
   offset: number,
   into: AudioNode,
+  data: unknown,
 ) => VoiceLine
 
 export interface VoicePlayerOptions {
@@ -175,6 +193,10 @@ export interface VoiceSayOptions {
   rate?: number
   /** Seconds after it is ready that the line starts. Default 0. */
   delay?: number
+  /** Anything, handed to a game's own `schedule` as its last argument. */
+  data?: unknown
+  /** Called as the line starts, with when it starts and ends on the context's clock. */
+  onStart?: (line: { when: number; ends: number }) => void
 }
 
 interface Playing extends VoiceLine {
@@ -190,6 +212,8 @@ export class VoicePlayer {
   private readonly decoded = new Map<string, Promise<AudioBuffer>>()
   private readonly playing: Playing[] = []
   private turn = 0
+  /** Counts `hush()` calls, so a line still decoding through one never starts, overlap or not. */
+  private hushes = 0
   private readonly ctx: VoiceContext
   private readonly custom: VoiceSchedule | undefined
   private readonly opts: {
@@ -264,10 +288,11 @@ export class VoicePlayer {
     if (list.length === 0) return Promise.resolve(done('failed'))
     if (late > this.opts.late) return Promise.resolve(done('late'))
     const turn = overlap ? this.turn : ++this.turn
+    const hushes = this.hushes
     const asked = this.ctx.currentTime
     return Promise.all(list.map((p) => this.decode(bin, p)))
       .then((buffers) => {
-        if (!overlap && turn !== this.turn) return done('cut')
+        if (hushes !== this.hushes || (!overlap && turn !== this.turn)) return done('cut')
         const at = this.ctx.currentTime
         const behind = late + (at - asked)
         if (behind > this.opts.late) return done('late')
@@ -276,16 +301,11 @@ export class VoicePlayer {
         const offset = options.sync ? behind : 0
         const when = at + (options.delay ?? 0)
         const line = this.custom
-          ? this.custom(this.ctx, buffers, list, when, offset, into)
+          ? this.custom(this.ctx, buffers, list, when, offset, into, options.data)
           : splice(this.ctx, buffers, list, when, offset, into, options.rate ?? 1, this.opts.splice)
-        const entry: Playing = { ...line, overlap }
-        this.playing.push(entry)
-        const last = line.sources.at(-1)
-        if (last)
-          last.onended = () => {
-            const k = this.playing.indexOf(entry)
-            if (k >= 0) this.playing.splice(k, 1)
-          }
+        this.prune(at)
+        this.playing.push({ ...line, overlap })
+        options.onStart?.({ when, ends: line.ends })
         return done('said')
       })
       .catch(() => done('failed'))
@@ -294,6 +314,7 @@ export class VoicePlayer {
   /** Fades every line, the overlapping ones too, and takes the turn from any line still decoding. */
   hush(fade = this.opts.cut): void {
     this.turn++
+    this.hushes++
     const now = this.ctx.currentTime
     for (const p of this.playing.splice(0)) fadeLine(p, now, fade)
   }
@@ -301,6 +322,7 @@ export class VoicePlayer {
   /** When the line on the floor ends, on the context's clock; 0 when nothing holds it. */
   until(): number {
     const now = this.ctx.currentTime
+    this.prune(now)
     let t = 0
     for (const p of this.playing) if (!p.overlap && p.ends > now) t = Math.max(t, p.ends)
     return t
@@ -309,10 +331,18 @@ export class VoicePlayer {
   /** Lines still sounding, the overlapping ones too. */
   get sounding(): number {
     const now = this.ctx.currentTime
-    return this.playing.filter((p) => p.ends > now).length
+    this.prune(now)
+    return this.playing.length
+  }
+
+  /** Lets go of lines whose time is up. */
+  private prune(now: number): void {
+    for (let i = this.playing.length - 1; i >= 0; i--)
+      if ((this.playing[i]?.ends ?? 0) <= now) this.playing.splice(i, 1)
   }
 
   private fadeFloor(now: number): void {
+    this.prune(now)
     for (let i = this.playing.length - 1; i >= 0; i--) {
       const p = this.playing[i]
       if (!p || p.overlap) continue

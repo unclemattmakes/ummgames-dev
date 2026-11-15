@@ -379,3 +379,88 @@ describe('audio/voice VoicePlayer', () => {
     expect(gains[0].ramps.length).toBe(1)
   })
 })
+
+describe('audio/voice what the games asked for', () => {
+  it('tells onError which bin would not load, and why', async () => {
+    const heard = /** @type {[string, string][]} */ ([])
+    /** @param {string} bin @param {any} why */
+    const onError = (bin, why) => heard.push([bin, String(why?.message ?? why)])
+    const missing = new VoiceBins(
+      (/** @type {string} */ b) => b,
+      async () => /** @type {any} */ ({ ok: false, status: 404, statusText: 'Not Found' }),
+      onError,
+    )
+    expect(await missing.load('a.bin')).toBeNull()
+    const offline = new VoiceBins(
+      (/** @type {string} */ b) => b,
+      () => Promise.reject(new Error('offline')),
+      onError,
+    )
+    expect(await offline.load('b.bin')).toBeNull()
+    expect(heard).toEqual([
+      ['a.bin', '404 Not Found'],
+      ['b.bin', 'offline'],
+    ])
+  })
+
+  it('hush stops an overlap line that is still decoding', async () => {
+    const { ctx, sources, decodes } = fakeContext({ hold: true })
+    const { bins } = memoryBins()
+    const v = new VoicePlayer({ ctx, out: {}, bins })
+    const said = v.say('a.bin', { o: 0, n: 10 }, { overlap: true, label: 'aside' })
+    await tick()
+    v.hush()
+    decodes[0]?.go()
+    expect(await said).toBe('cut')
+    expect(sources).toEqual([])
+    expect(v.log).toEqual(['cut:aside'])
+  })
+
+  it('hands data to the schedule, and tells onStart when the line starts and ends', async () => {
+    const { ctx } = fakeContext()
+    const { bins } = memoryBins()
+    const seen = /** @type {any[]} */ ([])
+    const v = new VoicePlayer({
+      ctx,
+      out: {},
+      bins,
+      /** @type {(c: any, b: any[], p: any[], when: number, o: number, i: any, data: any) => any} */
+      schedule: (c, _b, _p, when, _o, _i, data) => {
+        seen.push(data)
+        return { gains: [c.createGain()], sources: [], ends: when + 3 }
+      },
+    })
+    ctx.currentTime = 1
+    const starts = /** @type {any[]} */ ([])
+    await v.say(
+      'a.bin',
+      { o: 0, n: 10 },
+      { data: { line: 'hello' }, delay: 0.5, onStart: (/** @type {any} */ l) => starts.push(l) },
+    )
+    expect(seen).toEqual([{ line: 'hello' }])
+    expect(starts).toEqual([{ when: 1.5, ends: 4.5 }])
+  })
+
+  it('holds the floor until the line ends, sounds or no sounds, then lets it go', async () => {
+    const { ctx, gains } = fakeContext()
+    const { bins } = memoryBins()
+    const v = new VoicePlayer({
+      ctx,
+      out: {},
+      bins,
+      // A burst after the words: the line ends at 5, past any source.
+      /** @type {(c: any, b: any[], p: any[], when: number) => any} */
+      schedule: (c, _b, _p, when) => ({ gains: [c.createGain()], sources: [], ends: when + 5 }),
+    })
+    await v.say('a.bin', { o: 0, n: 10 })
+    ctx.currentTime = 4
+    expect(v.until()).toBe(5)
+    await v.say('a.bin', { o: 10, n: 10 })
+    expect(gains[0].ramps.length).toBe(1) // the burst is faded with the line
+    ctx.currentTime = 20
+    expect(v.sounding).toBe(0)
+    expect(v.until()).toBe(0)
+    await v.say('a.bin', { o: 20, n: 10 })
+    expect(gains[1].ramps).toEqual([]) // over by then: nothing to fade
+  })
+})

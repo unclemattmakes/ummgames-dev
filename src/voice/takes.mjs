@@ -47,13 +47,15 @@ export async function bestTake(seeds, take, judge) {
  * Packs shipped pieces one bin a speaker. Each piece names its `bin` and its `key` (how the game
  * finds the line) and carries its `bytes`; anything else on it (its length in ticks, where its
  * words end) is kept on its cue. Returns each bin's bytes and each key's cue: `{ bin, o, n, ...rest }`,
- * `o` and `n` being the piece's offset and length in its bin. Pieces go in the order given. A key
- * given twice throws.
+ * `o` and `n` being the piece's offset and length in its bin. With `bin: false` a cue leaves the
+ * bin out, for cues that name each speaker's bin once elsewhere. Pieces go in the order given. A
+ * key given twice throws.
  * @template {Record<string, unknown>} R
  * @param {Iterable<{ bin: string, key: string, bytes: Uint8Array } & R>} pieces
- * @returns {{ bins: Record<string, Buffer>, cues: Record<string, { bin: string, o: number, n: number } & Omit<R, 'bin' | 'key' | 'bytes'>> }}
+ * @param {{ bin?: boolean }} [options]
+ * @returns {{ bins: Record<string, Buffer>, cues: Record<string, any> }}
  */
-export function packBins(pieces) {
+export function packBins(pieces, { bin: withBin = true } = {}) {
   /** @type {Record<string, Uint8Array[]>} */
   const parts = {}
   /** @type {Record<string, number>} */
@@ -67,7 +69,7 @@ export function packBins(pieces) {
     list.push(bytes)
     parts[bin] = list
     sizes[bin] = o + bytes.length
-    cues[key] = { bin, o, n: bytes.length, ...rest }
+    cues[key] = withBin ? { bin, o, n: bytes.length, ...rest } : { o, n: bytes.length, ...rest }
   }
   /** @type {Record<string, Buffer>} */
   const bins = {}

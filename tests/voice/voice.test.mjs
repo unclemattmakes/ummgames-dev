@@ -274,6 +274,10 @@ describe('takeKey, bestTake, packBins and writeBins', async () => {
     const cue = cues['host|Noted.']
     const o = cue?.o ?? 0
     expect(bins['host.bin']?.subarray(o, o + (cue?.n ?? 0)).toString()).toBe('cccc')
+    expect(
+      packBins([{ bin: 'host.bin', key: 'k', bytes: Buffer.from('ab'), ticks: 2 }], { bin: false })
+        .cues,
+    ).toEqual({ k: { o: 0, n: 2, ticks: 2 } })
     expect(() =>
       packBins([
         { bin: 'a.bin', key: 'k', bytes: Buffer.from('a') },

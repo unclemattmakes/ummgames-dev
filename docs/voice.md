@@ -106,7 +106,7 @@ if (cue) void voice.say(cue.bin, cue, { label: 'host: the clock' })
 | Export | What it does |
 |---|---|
 | `cut(src, from, to, filters?, options?)` | Cuts `from` to `to` seconds of a take to a mono mp3 piece, faded in over 0.006 s and out over 0.012 s, and returns its bytes. `filters` are ffmpeg audio filters run after the fades, such as a speaker's board, `silenceremove` or `loudnorm`. `cut.seconds` is then the piece's length. Options: `rate` (22050), `bitrate` (`32k`), `ffmpeg`, `ffprobe`. |
-| `packBins(pieces)` | Packs pieces `{ bin, key, bytes, ...rest }` one bin a speaker, in the order given. Returns `{ bins, cues }`: each bin's bytes, and for each `key` the cue `{ bin, o, n, ...rest }`. Anything else on a piece (its length in ticks, where its words end as `end`) stays on its cue. A key given twice throws. |
+| `packBins(pieces, { bin? })` | Packs pieces `{ bin, key, bytes, ...rest }` one bin a speaker, in the order given. Returns `{ bins, cues }`: each bin's bytes, and for each `key` the cue `{ bin, o, n, ...rest }`. Anything else on a piece (its length in ticks, where its words end as `end`) stays on its cue. With `bin: false` a cue leaves its bin out, for cues that name each speaker's bin once elsewhere. A key given twice throws. |
 | `writeBins(dir, bins, { clear? })` | Writes the bins into `dir`, made if missing, and returns the files. With `clear`, every other `.bin` in `dir` goes first, so a speaker cut from the cast leaves no stale bin. |
 | `soundEnds(file, { db?, window? })` | Seconds to where a take's sound ends: the end of the last 0.05 s window over -60 dBFS (RMS, the louder channel). 0 for silence. |
 | `shipSung(src, dest, { bitrate?, trim? })` | Ships a sung take: encodes it to `dest` at `96k` and returns `{ file, seconds }`, `seconds` being where its sound ends, for the game to time the take by. With `trim: true` the file is cut there too. |
@@ -124,13 +124,13 @@ and the types `VoicePiece`, `VoiceOutcome`, `VoicePart`, `VoiceContext`, `VoiceL
 
 | Member | What it does |
 |---|---|
-| `new VoiceBins(url, fetcher?)` | Where the bins are: `url(bin)` is each bin's address. `fetcher` defaults to `fetch`. |
+| `new VoiceBins(url, fetcher?, onError?)` | Where the bins are: `url(bin)` is each bin's address. `fetcher` defaults to `fetch`. `onError(bin, reason)` hears a bin that will not load, such as to warn in the console; without it the failure is silent. |
 | `bins.load(bin)` | The bin's bytes, fetched once and shared; `null` when it will not load. Needs no click, so start it as the title comes up. |
 | `bins.has(bin)` | Whether the bin has arrived. |
 | `new VoicePlayer(options)` | A player on `options.ctx`, into `options.out`. Options below. |
 | `voice.say(bin, pieces, options?)` | Says one piece, or several spliced as one line. Resolves with the outcome: `said`, `late`, `cut` or `failed`. Never rejects. |
 | `voice.decode(bin, piece)` | A piece decoded, from the cache when it is there. For a game that schedules sound of its own from the same takes. |
-| `voice.hush(fade?)` | Fades every line, overlaps too, over `fade` seconds (default `cut`), and takes the turn from any line still decoding. |
+| `voice.hush(fade?)` | Fades every line, overlaps too, over `fade` seconds (default `cut`). A line still decoding, overlap or not, then never starts: it resolves `cut`. |
 | `voice.until()` | When the line on the floor ends, on the context's clock; 0 when nothing holds it. |
 | `voice.sounding` | Lines still sounding, overlaps too. |
 | `voice.forget()` | Drops every decoded piece, such as after the board changes. |
@@ -142,7 +142,7 @@ and the types `VoicePiece`, `VoiceOutcome`, `VoicePart`, `VoiceContext`, `VoiceL
 
 | Option | Default | What it does |
 |---|---|---|
-| `ctx` | | The audio context, or anything with its `currentTime`, `createGain`, `createBufferSource` and `decodeAudioData`. |
+| `ctx` | | The audio context, or anything with its `currentTime`, `createGain`, `createBufferSource`, `createBuffer` and `decodeAudioData`. |
 | `out` | | Where lines go unless `say` names another node. |
 | `bins` | | The `VoiceBins` to read from. |
 | `keep` | 40 | Decoded pieces kept; the one used longest ago goes first. |
@@ -150,7 +150,7 @@ and the types `VoicePiece`, `VoiceOutcome`, `VoicePart`, `VoiceContext`, `VoiceL
 | `late` | 0.5 | Seconds late a line may start; later and it is dropped. |
 | `splice` | 0.03 | Seconds between one spliced piece's words and the next piece. |
 | `board` | none | `(ctx, buffer, bin) => buffer`, run once on each decoded piece before it is kept: a bit crusher baked into the samples. |
-| `schedule` | spliced, through one gain | `(ctx, buffers, pieces, when, offset, into) => { gains, sources, ends }`: a game's own layout of a line, such as a bleep between pieces. The player still keeps the floor, the cache and the late rule, and fades the gains it returns. |
+| `schedule` | spliced, through one gain | `(ctx, buffers, pieces, when, offset, into, data) => { gains, sources, ends }`: a game's own layout of a line, such as a bleep between pieces. `data` is what `say` was given as `data`. The player still keeps the floor, the cache and the late rule, and fades the gains it returns. The line holds the floor until `ends`, so return the end of its last sound, a trailing burst included. |
 
 **`VoiceSayOptions`.**
 
@@ -163,6 +163,8 @@ and the types `VoicePiece`, `VoiceOutcome`, `VoicePart`, `VoiceContext`, `VoiceL
 | `into` | `out` | Where this line goes, such as a speaker's chain or pan. |
 | `rate` | 1 | Playback rate, for the default layout. |
 | `delay` | 0 | Seconds after it is ready that the line starts. |
+| `data` | none | Anything, handed to a game's own `schedule`, such as the line it lays out. |
+| `onStart` | none | `({ when, ends })`, called as the line starts: when it starts and ends on the context's clock. For a game that times the next thing by this line. |
 
 A piece in the cues is `{ o, n, end? }`. `end` is the second its words end, where a spliced next
 piece comes in; without it the next piece comes in at the end of this one.
@@ -183,7 +185,8 @@ piece comes in; without it the next piece comes in at the end of this one.
   it checks how late it now is (the `late` it was asked with, plus the time it took to decode),
   drops itself as `late` past the limit, and only then fades the line on the floor and starts.
   So an old line keeps talking until the new one is ready, and a slow decode never plays a
-  stale line.
+  stale line. A line holds the floor until its `ends`, not until its last source stops, so a
+  sound laid after the words is faded with the line.
 - **Decoding.** A bin is fetched once. A piece is decoded from a copy of its bytes (decoding
   detaches what it is given), the first time a line says it, then kept in a cache of `keep`; a
   failed decode leaves the cache.

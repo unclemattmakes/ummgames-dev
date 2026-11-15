@@ -281,21 +281,24 @@ export function phone(chans, { sampleRate = 48000 } = {}) {
 }
 
 /**
- * A 24-bit PCM WAV.
+ * A PCM WAV, 24-bit unless `bits` is 16.
  * @param {Float32Array[]} chans
- * @param {{ sampleRate?: number }} [o]
+ * @param {{ sampleRate?: number, bits?: 16 | 24 }} [o]
  * @returns {Buffer}
  */
-export function encodeWav(chans, { sampleRate = 48000 } = {}) {
+export function encodeWav(chans, { sampleRate = 48000, bits = 24 } = {}) {
+  if (bits !== 16 && bits !== 24) throw new RangeError(`encodeWav: bits is 16 or 24, not ${bits}`)
   const n = chans[0]?.length ?? 0
   const ch = chans.length
-  const pcm = Buffer.alloc(n * ch * 3)
+  const bytes = bits / 8
+  const full = bits === 16 ? 32767 : 8388607
+  const pcm = Buffer.alloc(n * ch * bytes)
   let o = 0
   for (let i = 0; i < n; i++)
     for (const c of chans) {
-      const v = Math.round(/** @type {number} */ (c[i]) * 8388607)
-      pcm.writeIntLE(Math.max(-8388607, Math.min(8388607, v)), o, 3)
-      o += 3
+      const v = Math.round(/** @type {number} */ (c[i]) * full)
+      pcm.writeIntLE(Math.max(-full, Math.min(full, v)), o, bytes)
+      o += bytes
     }
   const h = Buffer.alloc(44)
   h.write('RIFF', 0)
@@ -305,9 +308,9 @@ export function encodeWav(chans, { sampleRate = 48000 } = {}) {
   h.writeUInt16LE(1, 20)
   h.writeUInt16LE(ch, 22)
   h.writeUInt32LE(sampleRate, 24)
-  h.writeUInt32LE(sampleRate * 3 * ch, 28)
-  h.writeUInt16LE(3 * ch, 32)
-  h.writeUInt16LE(24, 34)
+  h.writeUInt32LE(sampleRate * bytes * ch, 28)
+  h.writeUInt16LE(bytes * ch, 32)
+  h.writeUInt16LE(bits, 34)
   h.write('data', 36)
   h.writeUInt32LE(pcm.length, 40)
   return Buffer.concat([h, pcm])

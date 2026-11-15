@@ -131,7 +131,7 @@ console.log(measure(out, 48000).integrated, cut)
 | `gain(chans, db)`, `dbToGain(db)` | A copy `db` louder; dB to a linear gain. |
 | `biquad(x, f)` | One `Biquad` over one channel. |
 | `pass(kind, hz, { q })`, `shelf(kind, hz, db)` | RBJ filters as a `Biquad`: `'high'` or `'low'`. `q` defaults to 0.7071. |
-| `encodeWav(chans)` | A 24-bit PCM WAV in a `Buffer`, clipped at full scale. |
+| `encodeWav(chans, { sampleRate?, bits? })` | A PCM WAV in a `Buffer`, clipped at full scale. `sampleRate` defaults to 48000; `bits` is 24 (the default) or 16, and anything else throws. |
 
 **Into a cut.** A finished soundtrack goes into [`umm-dev cut`](media.md) as its `music`, one
 range long: `"music": { "file": "dist-audio/soundtrack.wav", "ranges": [[0, 60]], "fadeOut": 0.01 }`.

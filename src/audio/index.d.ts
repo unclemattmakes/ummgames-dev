@@ -149,4 +149,7 @@ export declare function phone(
   options?: { sampleRate?: number },
 ): Float32Array[]
 /** A 24-bit PCM WAV, clipped at full scale. */
-export declare function encodeWav(chans: Float32Array[], options?: { sampleRate?: number }): Buffer
+export declare function encodeWav(
+  chans: Float32Array[],
+  options?: { sampleRate?: number; bits?: 16 | 24 },
+): Buffer
