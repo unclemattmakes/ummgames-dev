@@ -35,3 +35,49 @@ export async function inPool(items, n, f) {
     }),
   )
 }
+
+/**
+ * A line's words as a list, by the same rules as `wordsOf`: capitals and digits, a lone digit as
+ * its word, `N'` as AND, a dot before a domain ending as DOT. An apostrophe joins its word
+ * ("we'll" is WELL); any other mark between letters splits them. `alike` maps a word as heard to
+ * the word it stands for, for a transcript's own spellings of the same sound (`{ GREY:
+ * 'GRAY' }`).
+ * @param {string} text
+ * @param {Readonly<Record<string, string>>} [alike]
+ */
+export function wordList(text, alike = {}) {
+  return text
+    .toUpperCase()
+    .replace(/\.(COM|NET|ORG|TV|IO|GG|APP|DEV)\b/g, ' DOT $1')
+    .replace(/\b\d\b/g, (d) => DIGITS[Number(d)])
+    .replace(/\bN'/g, 'AND')
+    .replace(/['’]/g, '')
+    .split(/[^A-Z0-9]+/)
+    .filter(Boolean)
+    .map((w) => alike[w] ?? w)
+}
+
+/**
+ * How many words a take got wrong: the word-level edit distance between the line asked for and
+ * the transcript, each read by `wordList`. 0 is a clean take. A game with its own spoken forms
+ * (a time said as words, a name spelled for the voice) changes both texts the same way first.
+ * @param {string} want
+ * @param {string} heard
+ * @param {{ alike?: Readonly<Record<string, string>> }} [options]
+ */
+export function misses(want, heard, { alike = {} } = {}) {
+  const a = wordList(want, alike)
+  const b = wordList(heard, alike)
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j)
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i]
+    for (let j = 1; j <= b.length; j++)
+      row[j] = Math.min(
+        (prev[j] ?? 0) + 1,
+        (row[j - 1] ?? 0) + 1,
+        (prev[j - 1] ?? 0) + (a[i - 1] === b[j - 1] ? 0 : 1),
+      )
+    prev = row
+  }
+  return prev[b.length] ?? 0
+}

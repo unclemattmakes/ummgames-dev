@@ -6,7 +6,8 @@ target before it ships. It is **linked**: the command and the meter behind it ru
 `node_modules`, and `@ummgames/dev/audio` exports the meter and a [mix bus](#the-mix-bus) for a
 game's own tools. The command needs `ffmpeg` and `ffprobe` on `PATH`. The core of a game's own procedural music sequencer (pitch,
 form, conductor and step clock) is runtime code a game copies, in
-[runtime.md](runtime.md#runtimeaudio).
+[runtime.md](runtime.md#runtimeaudio). Recorded voice is in [voice.md](voice.md): the tools that
+make and ship the takes, and `runtime/audio/voice.ts`, the player a game copies to say them.
 
 ## Quick start
 

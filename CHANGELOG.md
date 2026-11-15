@@ -11,6 +11,18 @@
   there. See [docs/voice.md](docs/voice.md).
 - **To take it:** nothing. A game with its own copies of these helpers can import them instead;
   its paths now resolve against the working directory.
+- **New: `runtime/audio/voice.ts`, a voice player a game copies.** `VoiceBins` fetches each
+  speaker's bin once; `VoicePlayer` decodes a piece when a line says it, keeps the last 40, gives
+  the floor to the newest line (one still decoding loses its turn), fades the line before, drops a
+  line more than 0.5 s late, and splices several pieces as one line. `overlap` lines talk over
+  the floor; `board` and `schedule` let a game keep its own boards and layouts. Every outcome
+  goes to `log`. See [docs/voice.md](docs/voice.md#the-player-runtimeaudiovoicets).
+- **New in `@ummgames/dev/voice`: the take loop and bins.** `wordList` and `misses` count the
+  words a take got wrong, `takeKey` keys a take by what made it, `bestTake` tries seeds until
+  a take is clean and keeps the closest, and `packBins` and `writeBins` ship pieces in the
+  player's format.
+- **To take them:** a game with a voice player copied from another game runs
+  `umm-dev copy audio/voice.ts` and follows "Adopting the player in a game" in docs/voice.md.
 
 ## 0.14.1 (2026-11-14)
 

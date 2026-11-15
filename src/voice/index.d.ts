@@ -66,6 +66,67 @@ export declare function transcribe(
  */
 export declare function wordsOf(text: string): string
 
+/**
+ * A line's words as a list, by `wordsOf`'s rules; an apostrophe joins its word. `alike` maps a
+ * word as heard to the word it stands for (`{ GREY: 'GRAY' }`).
+ */
+export declare function wordList(text: string, alike?: Readonly<Record<string, string>>): string[]
+
+/**
+ * How many words a take got wrong: the word-level edit distance between `want` and `heard`, each
+ * read by `wordList`. 0 is a clean take.
+ */
+export declare function misses(
+  want: string,
+  heard: string,
+  options?: { alike?: Readonly<Record<string, string>> },
+): number
+
+/**
+ * A short, stable key for a take: 16 hex digits of the SHA-256 of `parts` as JSON. Put in all
+ * that changes the take (voice, model, settings, words said, seed), and a stale take shows.
+ */
+export declare function takeKey(...parts: unknown[]): string
+
+/** One take `bestTake` made. */
+export interface Tried<T> {
+  seed: number
+  made: T
+  miss: number
+}
+
+/**
+ * Takes a line with each seed in turn, one at a time, until `judge` says 0, and returns the best:
+ * the fewest misses, the earliest seed on a tie, with every take tried. Throws on no seeds.
+ */
+export declare function bestTake<T>(
+  seeds: readonly number[],
+  take: (seed: number) => Promise<T>,
+  judge: (made: T, seed: number) => number | Promise<number>,
+): Promise<Tried<T> & { tried: Tried<T>[] }>
+
+/** Where a shipped piece sits: its bin, its byte offset `o` and length `n`, and the rest it was given. */
+export type PackedCue<R> = { bin: string; o: number; n: number } & Omit<R, 'bin' | 'key' | 'bytes'>
+
+/**
+ * Packs shipped pieces one bin a speaker, in the order given, the format
+ * `runtime/audio/voice.ts` plays. Extra fields on a piece stay on its cue. A key given twice
+ * throws.
+ */
+export declare function packBins<R extends Record<string, unknown>>(
+  pieces: Iterable<{ bin: string; key: string; bytes: Uint8Array } & R>,
+): { bins: Record<string, Buffer>; cues: Record<string, PackedCue<R>> }
+
+/**
+ * Writes packed bins into `dir`, made if missing. With `clear`, every other `.bin` there goes
+ * first. Returns the files written.
+ */
+export declare function writeBins(
+  dir: string,
+  bins: Record<string, Uint8Array>,
+  options?: { clear?: boolean },
+): string[]
+
 /** Runs `f` over `items`, at most `n` at once. Rejects on the first failure. */
 export declare function inPool<T>(
   items: T[],

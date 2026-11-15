@@ -19,4 +19,5 @@ export {
   SPEECH_MODEL,
   transcribe,
 } from './eleven.mjs'
-export { inPool, wordsOf } from './words.mjs'
+export { bestTake, packBins, takeKey, writeBins } from './takes.mjs'
+export { inPool, misses, wordList, wordsOf } from './words.mjs'

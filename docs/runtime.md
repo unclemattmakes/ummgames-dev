@@ -659,7 +659,8 @@ Until the hand-written block is gone the plugin adds nothing, so the steps can l
 
 The pure core of a procedural music sequencer: the pitch arithmetic, where a step falls in its
 bar, phrase and form, a conductor that decides which song plays and how many layers of it, and
-the look-ahead clock that decides when each step is queued. None of those touches Web Audio or
+the look-ahead clock that decides when each step is queued. Beside them, `voice.ts` plays a game's
+recorded lines ([voice.md](voice.md)). None of those touches Web Audio or
 reads a clock, so a test or an offline render can replay it exactly. `synth.ts` adds a set of
 instruments on Web Audio for a sequencer that wants them. The sequencer itself (its tracks, its
 mix, its `queue(step, at)`) stays the game's own. Only `synth.ts` imports another file
@@ -672,6 +673,7 @@ mix, its `queue(step, at)`) stays the game's own. Only `synth.ts` imports anothe
 | `conductor.ts` | nothing | What plays: the song and the level, changed only on bar or phrase lines. |
 | `step-clock.ts` | nothing | When: queues each step at its exact audio time. |
 | `synth.ts` | `pitch.ts` | How it sounds: drums, bass, pads, plucks, a lead and stabs on Web Audio. |
+| `voice.ts` | nothing | Recorded lines: bins of mp3 pieces, decoded on demand, one line on the floor at a time. |
 
 **How a sequencer puts them together.** The game's timer calls `advanceSteps`; for each step it
 asks the conductor what plays, finds the step's place in the form, and plays its own patterns:
@@ -887,6 +889,14 @@ seconds, a level.
 
 **Not deterministic.** The noise comes from `Math.random`, and the voices from the audio clock.
 Nothing here feeds a sim.
+
+### `voice.ts`
+
+A player for recorded lines: each speaker's takes packed in a bin, a cues list of byte offsets,
+a piece decoded when first said and a few dozen kept, a new line fading the one before, and a
+line too late dropped. It is the page half of the voice tools; its exports, options and how a
+game adopts it are in [voice.md](voice.md#the-player-runtimeaudiovoicets). Not part of the
+sequencer: copy it alone with `umm-dev copy audio/voice.ts`.
 
 ## `runtime/sim/`
 

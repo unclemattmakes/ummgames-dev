@@ -27,7 +27,7 @@
 | A making-of site: pages, toys, numbers and code quoted from the source | [making-of.md](making-of.md) | linked: `umm-dev making-of`, `@ummgames/dev/making-of`, `createImportGraph` in `@ummgames/dev/testing`; copied: `runtime/making-of/` |
 | Biome, TypeScript, Vitest, Playwright | [presets.md](presets.md) | linked: `@ummgames/dev/biome`, `/tsconfig`, `/vitest`, `/playwright` |
 | Loudness | [audio.md](audio.md) | linked: `umm-dev loudness`; `@ummgames/dev/audio` |
-| Voice tools: ElevenLabs takes, transcripts, spoken and sung cuts | [voice.md](voice.md) | linked: `@ummgames/dev/voice` |
+| Voice: ElevenLabs takes, transcripts, cuts, bins; the page's voice player | [voice.md](voice.md) | linked: `@ummgames/dev/voice`; copied: `runtime/audio/voice.ts` |
 | GLB optimizing, meshopt decoding | [gltf.md](gltf.md) | linked: `umm-dev gltf`; `@ummgames/dev/gltf` |
 
 **Linked** code runs from `node_modules` and never ships in a game's build; nobody edits it in the

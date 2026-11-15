@@ -179,8 +179,9 @@ GLBs; its glTF packages are optional peers a game adds itself ([docs/gltf.md](do
 numbers and code from the game's source; `typescript` is an optional peer a game adds itself
 ([docs/making-of.md](docs/making-of.md)).
 `@ummgames/dev/voice` is the shared half of a game's voice tools: ElevenLabs requests with the key
-read in one place, Scribe transcripts, and ffmpeg cuts for spoken and sung takes
-([docs/voice.md](docs/voice.md)).
+read in one place, Scribe transcripts, the best of a few seeds by its words, ffmpeg cuts for spoken
+and sung takes, and bins of pieces for the page. `runtime/audio/voice.ts` is the player a game
+copies to say them ([docs/voice.md](docs/voice.md)).
 
 ## For AI agents
 

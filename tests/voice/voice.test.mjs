@@ -186,3 +186,112 @@ describe('transcribe', () => {
     expect(init.headers['content-type']).toBeUndefined()
   })
 })
+
+describe('wordList and misses', async () => {
+  const { misses, wordList } = await import('../../src/voice/index.mjs')
+
+  it('reads words by the rules of wordsOf', () => {
+    expect(wordList("We'll be right back with round 2!")).toEqual([
+      'WELL',
+      'BE',
+      'RIGHT',
+      'BACK',
+      'WITH',
+      'ROUND',
+      'TWO',
+    ])
+    expect(wordList('see site.com')).toEqual(wordList('see site dot com'))
+    expect(wordList('Ka-blendo')).toEqual(['KA', 'BLENDO'])
+    expect(wordList('Mr Grey', { GREY: 'GRAY' })).toEqual(['MR', 'GRAY'])
+  })
+
+  it('counts the words a take got wrong', () => {
+    expect(misses('The clock stopped at nine forty.', 'The clock, stopped at nine forty!')).toBe(0)
+    expect(misses('Hold on', 'Old on')).toBe(1)
+    expect(misses('a b c', 'a c')).toBe(1)
+    expect(misses('a b', 'a b c d')).toBe(2)
+    expect(misses('', 'hello')).toBe(1)
+    expect(misses('Gray House', 'Grey House', { alike: { GREY: 'GRAY' } })).toBe(0)
+  })
+})
+
+describe('takeKey, bestTake, packBins and writeBins', async () => {
+  const { bestTake, packBins, takeKey, writeBins } = await import('../../src/voice/index.mjs')
+
+  it('keys a take by everything that made it', () => {
+    const k = takeKey('voice', 'eleven_v3', { stability: 0.5 }, 'Hello.', 101)
+    expect(k).toMatch(/^[0-9a-f]{16}$/)
+    expect(takeKey('voice', 'eleven_v3', { stability: 0.5 }, 'Hello.', 101)).toBe(k)
+    expect(takeKey('voice', 'eleven_v3', { stability: 0.5 }, 'Hello.', 102)).not.toBe(k)
+  })
+
+  it('stops at the first clean take', async () => {
+    const made = /** @type {number[]} */ ([])
+    const best = await bestTake(
+      [101, 202, 303],
+      async (seed) => {
+        made.push(seed)
+        return `take-${seed}`
+      },
+      (_t, seed) => (seed === 202 ? 0 : 2),
+    )
+    expect(made).toEqual([101, 202])
+    expect(best).toMatchObject({ seed: 202, made: 'take-202', miss: 0 })
+    expect(best.tried.length).toBe(2)
+  })
+
+  it('keeps the closest take when none is clean, the earliest on a tie', async () => {
+    const miss = /** @type {Record<number, number>} */ ({ 1: 3, 2: 1, 3: 1 })
+    const best = await bestTake(
+      [1, 2, 3],
+      async (s) => s,
+      (s) => miss[s] ?? 9,
+    )
+    expect(best.seed).toBe(2)
+    expect(best.tried.map((t) => t.seed)).toEqual([1, 2, 3])
+    await expect(
+      bestTake(
+        [],
+        async () => 0,
+        () => 0,
+      ),
+    ).rejects.toThrow('at least one seed')
+  })
+
+  it('packs pieces one bin a speaker, with offsets and the rest kept', () => {
+    const { bins, cues } = packBins([
+      { bin: 'host.bin', key: 'host|Hello.', bytes: Buffer.from('aaa'), ticks: 12 },
+      { bin: 'guest.bin', key: 'guest|Sir.', bytes: Buffer.from('bb'), ticks: 4 },
+      { bin: 'host.bin', key: 'host|Noted.', bytes: Buffer.from('cccc'), ticks: 9 },
+    ])
+    expect(bins['host.bin']?.toString()).toBe('aaacccc')
+    expect(bins['guest.bin']?.toString()).toBe('bb')
+    expect(cues).toEqual({
+      'host|Hello.': { bin: 'host.bin', o: 0, n: 3, ticks: 12 },
+      'guest|Sir.': { bin: 'guest.bin', o: 0, n: 2, ticks: 4 },
+      'host|Noted.': { bin: 'host.bin', o: 3, n: 4, ticks: 9 },
+    })
+    const cue = cues['host|Noted.']
+    const o = cue?.o ?? 0
+    expect(bins['host.bin']?.subarray(o, o + (cue?.n ?? 0)).toString()).toBe('cccc')
+    expect(() =>
+      packBins([
+        { bin: 'a.bin', key: 'k', bytes: Buffer.from('a') },
+        { bin: 'a.bin', key: 'k', bytes: Buffer.from('b') },
+      ]),
+    ).toThrow('given twice')
+  })
+
+  it('writes bins and clears stale ones on request', () => {
+    const dir = path.join(tmp, 'bins')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'old.bin'), 'x')
+    fs.writeFileSync(path.join(dir, 'keep.txt'), 'x')
+    writeBins(dir, { 'a.bin': Buffer.from('a') })
+    expect(fs.existsSync(path.join(dir, 'old.bin'))).toBe(true)
+    const written = writeBins(dir, { 'a.bin': Buffer.from('ab') }, { clear: true })
+    expect(written).toEqual([path.join(dir, 'a.bin')])
+    expect(fs.readdirSync(dir).sort()).toEqual(['a.bin', 'keep.txt'])
+    expect(fs.readFileSync(path.join(dir, 'a.bin'), 'utf8')).toBe('ab')
+  })
+})
