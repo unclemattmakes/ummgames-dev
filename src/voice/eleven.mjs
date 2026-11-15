@@ -87,25 +87,21 @@ export async function call(method, route, body, { root, key } = {}) {
  * What Scribe hears in a take, and when its last word ends, in seconds. `file` is a path,
  * resolved against the working directory, or the audio's bytes (a piece read from a bin).
  * `fields` are more form fields for the request, such as `{ tag_audio_events: 'false' }`; `type`
- * is the audio's media type, `audio/mpeg` unless given.
+ * is the audio's media type, `audio/mpeg` unless given, and `name` its file name, `take.mp3`.
  * @param {string | Uint8Array} file
- * @param {{ root?: string, key?: string, language?: string, type?: string, fields?: Record<string, string> }} [options]
+ * @param {{ root?: string, key?: string, language?: string, type?: string, name?: string, fields?: Record<string, string> }} [options]
  * @returns {Promise<{ heard: string, speechEnds: number, words: { text: string, start: number, end: number }[] }>}
  */
 export async function transcribe(
   file,
-  { language = 'eng', type = 'audio/mpeg', fields = {}, ...options } = {},
+  { language = 'eng', type = 'audio/mpeg', name = 'take.mp3', fields = {}, ...options } = {},
 ) {
   const form = new FormData()
   form.append('model_id', SCRIBE_MODEL)
   form.append('language_code', language)
   for (const [k, v] of Object.entries(fields)) form.append(k, v)
   const bytes = typeof file === 'string' ? fs.readFileSync(path.resolve(file)) : file
-  form.append(
-    'file',
-    new Blob([/** @type {Uint8Array<ArrayBuffer>} */ (bytes)], { type }),
-    'take.mp3',
-  )
+  form.append('file', new Blob([/** @type {Uint8Array<ArrayBuffer>} */ (bytes)], { type }), name)
   const r = await call('POST', '/v1/speech-to-text', form, options)
   /** @type {{ text: string, type: string, start: number, end: number }[]} */
   const spoken = r.words.filter((/** @type {{ type: string }} */ w) => w.type === 'word')

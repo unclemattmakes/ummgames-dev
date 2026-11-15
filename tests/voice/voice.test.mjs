@@ -192,6 +192,7 @@ describe('transcribe', () => {
     const r = await transcribe(Uint8Array.of(1, 2, 3), {
       key: 'k',
       type: 'audio/wav',
+      name: 'stretch.wav',
       fields: { tag_audio_events: 'false' },
     })
     expect(r).toEqual({ heard: 'Hi', speechEnds: 0, words: [] })
@@ -199,6 +200,7 @@ describe('transcribe', () => {
     expect(body.get('tag_audio_events')).toBe('false')
     const file = body.get('file')
     expect(file.type).toBe('audio/wav')
+    expect(file.name).toBe('stretch.wav')
     expect([...new Uint8Array(await file.arrayBuffer())]).toEqual([1, 2, 3])
   })
 })

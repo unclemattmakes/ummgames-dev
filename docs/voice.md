@@ -87,7 +87,7 @@ if (cue) void voice.say(cue.bin, cue, { label: 'host: the clock' })
 |---|---|
 | `call(method, route, body?, { root?, key? })` | One request to `https://api.elevenlabs.io` + `route`. An object body goes as JSON, a `FormData` as a form. A JSON reply is parsed; audio or a zip comes back as a `Buffer`. A 429 is retried after 2, 4, 8, 16, 32 and 64 s, then thrown; any other error status throws `METHOD route: status text`. |
 | `apiKey({ root?, env?, platform? })` | The key, as above. `root` defaults to the game's root. |
-| `transcribe(file, { language?, type?, fields? })` | Scribe's transcript of a take: `{ heard, speechEnds, words }`, each word with `start` and `end` in seconds. `file` is a path or the audio's bytes, such as a piece read from a bin. `language` defaults to `eng` and `type` to `audio/mpeg`. `fields` are more form fields for the request, such as `{ tag_audio_events: 'false' }`. |
+| `transcribe(file, { language?, type?, fields? })` | Scribe's transcript of a take: `{ heard, speechEnds, words }`, each word with `start` and `end` in seconds. `file` is a path or the audio's bytes, such as a piece read from a bin. `language` defaults to `eng`, `type` to `audio/mpeg` and `name`, the file name sent, to `take.mp3`. `fields` are more form fields for the request, such as `{ tag_audio_events: 'false' }`. |
 | `inPool(items, n, f)` | Runs `f` over `items`, at most `n` at once. Rejects on the first failure. |
 | `DESIGN_MODEL`, `SPEECH_MODEL`, `SCRIBE_MODEL` | `eleven_ttv_v3`, `eleven_v3`, `scribe_v2`. |
 

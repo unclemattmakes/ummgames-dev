@@ -28,7 +28,7 @@
 - **`packBins(pieces, { bin: false })`** leaves the bin off each cue. **`encodeWav(chans, { bits:
   16 })`** writes 16-bit; 24 stays the default.
 - **`transcribe` takes the audio's bytes** as well as a path, and `fields` for more form fields
-  (`{ tag_audio_events: 'false' }`) and `type` for its media type.
+  (`{ tag_audio_events: 'false' }`) and `type` and `name` for its media type and file name.
 - **To take them:** a game with a voice player copied from another game runs
   `umm-dev copy audio/voice.ts` and follows "Adopting the player in a game" in docs/voice.md.
 
