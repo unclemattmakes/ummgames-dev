@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.15.0 (2026-11-15)
+
+- **New: `runtime/audio/mix.ts`, a mixer a game copies.** `createMix(ctx, options)` builds named
+  buses at levels in dB into a glue compressor, a limiter, an optional soft clip and a master
+  trim, on a live `AudioContext` or an `OfflineAudioContext`. Chosen buses dip under talk
+  (`mix.talk(at, talking)`), chosen buses skip the glue, a shared room can be added, and
+  `mix.solo` renders one stem. Imports only `pitch.ts`. See
+  [docs/runtime.md](docs/runtime.md#mixts).
+- **New in docs/audio.md: rendering a game's sound offline,** a window at a time with
+  `OfflineAudioContext.suspend(t)`, not every note up front.
+- **To take it:** nothing. A game with its own mixer of this shape can run
+  `umm-dev copy audio/mix.ts audio/pitch.ts` and pass its level table as `buses`.
 - **New: `@ummgames/dev/voice`, the shared half of a game's voice tools.** `call` makes one
   ElevenLabs request with the key read in one place (the environment, `.env.local`, then the
   Windows user variables, never printed) and waits out a 429. `transcribe` returns Scribe's

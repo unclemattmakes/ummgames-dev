@@ -662,9 +662,10 @@ bar, phrase and form, a conductor that decides which song plays and how many lay
 the look-ahead clock that decides when each step is queued. Beside them, `voice.ts` plays a game's
 recorded lines ([voice.md](voice.md)). None of those touches Web Audio or
 reads a clock, so a test or an offline render can replay it exactly. `synth.ts` adds a set of
-instruments on Web Audio for a sequencer that wants them. The sequencer itself (its tracks, its
-mix, its `queue(step, at)`) stays the game's own. Only `synth.ts` imports another file
-(`pitch.ts`), so any other one can be copied alone (`umm-dev copy audio`, or one file by name).
+instruments on Web Audio for a sequencer that wants them, and `mix.ts` the buses they play into.
+The sequencer itself (its tracks, its `queue(step, at)`) stays the game's own. Only `synth.ts` and
+`mix.ts` import another file (`pitch.ts`), so any other one can be copied alone
+(`umm-dev copy audio`, or one file by name).
 
 | File | Imports | What it decides |
 |---|---|---|
@@ -673,6 +674,7 @@ mix, its `queue(step, at)`) stays the game's own. Only `synth.ts` imports anothe
 | `conductor.ts` | nothing | What plays: the song and the level, changed only on bar or phrase lines. |
 | `step-clock.ts` | nothing | When: queues each step at its exact audio time. |
 | `synth.ts` | `pitch.ts` | How it sounds: drums, bass, pads, plucks, a lead and stabs on Web Audio. |
+| `mix.ts` | `pitch.ts` | How loud: named buses at levels in dB, a glue, a limiter, a duck under talk. |
 | `voice.ts` | nothing | Recorded lines: bins of mp3 pieces, decoded on demand, one line on the floor at a time. |
 
 **How a sequencer puts them together.** The game's timer calls `advanceSteps`; for each step it
@@ -889,6 +891,70 @@ seconds, a level.
 
 **Not deterministic.** The noise comes from `Math.random`, and the voices from the audio clock.
 Nothing here feeds a sim.
+
+### `mix.ts`
+
+**Exports:** `createMix(ctx, options)`, `room(ctx, seconds, decay?)`, `GLUE`, `LIMIT`, `DUCK`, and
+the types `Mix`, `MixOptions`, `Compressor`, `DuckOptions`, `VerbOptions`. Imports `dbToGain` from
+`pitch.ts`: copy both.
+
+A game's mixer: named buses, each at its level in dB, into a glue compressor, a limiter, an
+optional soft clip and a master trim. The levels are one table the game passes in, so the whole
+mix is tuned in one place. It takes a `BaseAudioContext`, so the page's `AudioContext` and a render
+tool's `OfflineAudioContext` build the same graph.
+
+```ts
+import { createMix } from './audio/mix'
+import { softClipCurve } from './audio/synth'
+
+/** Every level in the mix, dB. */
+export const MIX = { music: -21, sfx: -11, bed: -36, voice: 0 } as const
+
+const mix = createMix(ctx, {
+  buses: MIX,
+  master: -1,
+  ducked: ['music'],
+  verb: { seconds: 1.4, wet: -14 },
+  clip: softClipCurve(),
+})
+kit.kick(at, 0.8, mix.buses.music)
+mix.talk(lineStart, true) // the music dips under the line
+mix.talk(lineEnd, false)
+```
+
+The graph, for each bus: its level, then its duck if it is ducked, then the glue (or the limiter,
+for a bypass bus), the limiter, the clip, the master trim, and `into`.
+
+| Option | Default | What it does |
+|---|---|---|
+| `buses` | (required) | Each bus's level, dB, by name. The keys name the buses: `mix.buses.<name>` is each one's input. |
+| `master` | `0` | The trim after the limiter, dB: the ceiling the mix leaves at. |
+| `ducked` | `[]` | The buses that dip under talk. Each gets its own gain after its level, in `mix.ducks`. |
+| `duck` | `DUCK`: `{ by: -7, in: 0.25, out: 0.9 }` | How far a ducked bus dips, dB, and the seconds it takes to go down and come back. Each is three time constants of `setTargetAtTime`. |
+| `bypass` | `[]` | The buses that skip the glue and go straight to the limiter, so their hits never press the rest down. |
+| `glue` | `GLUE`: threshold -18, knee 8, ratio 3, attack 0.01, release 0.25 | Settings laid over the default, or `null` for no glue. |
+| `limit` | `LIMIT`: threshold -3, knee 0, ratio 20, attack 0.002, release 0.1 | Settings laid over the default, or `null` for no limiter. |
+| `clip` | none | A curve for a `WaveShaperNode` after the limiter, such as `softClipCurve()` from `synth.ts`. |
+| `verb` | none | A shared room, `{ seconds, wet, decay? }`: its send is `mix.verb`, its return comes back at `wet` dB into the glue. `decay` defaults to 3. |
+| `into` | `ctx.destination` | Where the mix goes. |
+
+| On the mix | What it does |
+|---|---|
+| `talk(at, talking)` | Talk starts (`true`) or ends (`false`) at `at` on the context's clock: each ducked bus heads down to `duck.by`, or back to 0 dB. Call the start and the end from whichever window they fall in. |
+| `set(bus, db)` | A bus's level, now. |
+| `solo(...buses)` | Every other bus to silence, these at their levels: one stem alone, for a level check. `solo` with every bus brings the rest back. |
+| `buses`, `ducks`, `verb`, `glue`, `limit`, `out` | The nodes, for a game that adds its own: a bus's filter, a bus routed into another. |
+
+`room(ctx, seconds, decay?)` is the verb's impulse: stereo noise from a fixed seed, falling as
+`(1 - t) ** decay`, so every page and every render hears the same room. `impulse` in `synth.ts`
+is the random one.
+
+A ducked bus is a bus the game wants under talk, not the voice bus itself. A bed that dips under a
+hit, as in a racing game, is the same `talk` call on a bus of its own, from the hit.
+
+**Offline renders.** Queue the notes a window at a time, as the page does, with
+`OfflineAudioContext.suspend(t)`. Not every note up front: see
+[audio.md](audio.md#rendering-offline).
 
 ### `voice.ts`
 

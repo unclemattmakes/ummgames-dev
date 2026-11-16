@@ -5,8 +5,9 @@ the loudest moment. It is how a game checks a mix, a music bed or a trailer's au
 target before it ships. It is **linked**: the command and the meter behind it run from
 `node_modules`, and `@ummgames/dev/audio` exports the meter and a [mix bus](#the-mix-bus) for a
 game's own tools. The command needs `ffmpeg` and `ffprobe` on `PATH`. The core of a game's own procedural music sequencer (pitch,
-form, conductor and step clock) is runtime code a game copies, in
-[runtime.md](runtime.md#runtimeaudio). Recorded voice is in [voice.md](voice.md): the tools that
+form, conductor and step clock), its instruments and its mixer are runtime code a game copies, in
+[runtime.md](runtime.md#runtimeaudio). How to render that sound offline, for a capture or a level
+check, is [below](#rendering-offline). Recorded voice is in [voice.md](voice.md): the tools that
 make and ship the takes, and `runtime/audio/voice.ts`, the player a game copies to say them.
 
 ## Quick start
@@ -148,6 +149,43 @@ the game, works those out first and writes the plain list.
 made before the clip opens, such as the music's opening state or a pre-roll, would all arrive on
 frame 0. A game trying it has to log each call's own time and convert it to the clip's clock. That
 route is untested. Rendering the calls is the game's own code, since only it has its synth.
+
+### Rendering offline
+
+A game that synthesizes its sound can render it to a file in the page itself: build the same graph
+on an `OfflineAudioContext` (`createMix` in `runtime/audio/mix.ts` takes either context), play the
+same steps into it, and save what `startRendering()` returns. Then mix any recorded voices on top
+and meter it with `umm-dev loudness`, or hand it to [`umm-dev cut`](media.md) as its `music`.
+
+**Queue a window at a time, not every note up front.** An offline context processes every connected node,
+whether it sounds yet or not. A whole chapter queued at once keeps thousands of idle
+filters and oscillators in the graph from the first block, and Chrome processes each of them in
+every 128-sample block. One 250 s chapter took 400 s to render that way, and 18 s queued in 2 s
+windows. Queue the first window, then hold the render just before each next one with
+`suspend(t)`, queue it, and resume:
+
+```ts
+const ctx = new OfflineAudioContext(2, Math.ceil(seconds * 48000), 48000)
+const mix = createMix(ctx, { buses: MIX, ducked: ['music'] })
+const WINDOW = 2
+queue(mix, 0, WINDOW) // the game's own: every note, effect and duck in [from, to)
+for (let t = WINDOW; t < seconds; t += WINDOW) {
+  const from = t
+  void ctx.suspend(from - 0.5).then(() => {
+    queue(mix, from, Math.min(seconds, from + WINDOW))
+    void ctx.resume()
+  })
+}
+const buffer = await ctx.startRendering()
+```
+
+- **Suspend a little before the window,** half a second here, so a note that starts at its first
+  sample is queued before the render reaches it. `suspend` rounds to a 128-sample block.
+- **Call every `suspend` before `startRendering`.** A suspend at a time the render has passed is
+  refused.
+- **The queue is the page's own.** A sequencer that already queues a little ahead of a live clock
+  (`advanceSteps`) has the function this needs; give it the window instead of the clock.
+- **One stem at a time** for a level check: `mix.solo('music')` before rendering, then meter each.
 
 ## Config: `loudness`
 
