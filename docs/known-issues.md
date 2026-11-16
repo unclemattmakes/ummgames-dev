@@ -49,3 +49,4 @@ here, or upstream as an issue, never into a local patch of `node_modules`.
 | `loudness` does not convert a string from the config, and then says `--target needs a number` even with no flag given | Write numbers, not strings, in the `loudness` section |
 | `loudness` reads any file with 4 or more channels as 5.1, so a quad file's 4th channel weighs 0 | Meter quad files as stereo pairs |
 | `runtime/dev/palette.ts`: `destroy()` removes the tuner panel without calling its `close()`, so its 500 ms poll keeps running | Close the tuner before destroying the palette |
+| `pnpm test:slow`: `tests/testing/fake-portal.slow.test.mjs` can time out in its 10 s setup hook while the other slow files run beside it | Run that file alone: `pnpm exec vitest run --project slow tests/testing/fake-portal.slow.test.mjs` |
