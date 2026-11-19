@@ -67,6 +67,9 @@ The game owns its events and its sums.
 
 6. Write the report tool with `@ummgames/dev/stats` (below) and an rclone remote that can read
    the bucket.
+7. If the game has a portal build, add the Worker's origin to `portal.endpoints` in
+   `umm-dev.config.mjs`, so `umm-dev portal check` answers its beacons instead of failing the run
+   ([portal.md](portal.md)).
 
 ## `runtime/stats/batch.ts`
 

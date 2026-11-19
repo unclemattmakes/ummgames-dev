@@ -329,6 +329,12 @@ export interface PortalCheckOptions {
   out?: string
   /** Words the build's `.js`, `.mjs`, `.html` and `.css` must not hold. Case matters. */
   forbidden?: readonly string[]
+  /**
+   * Origins the build may send to, such as its play stats Worker (`https://stats.example.com`).
+   * The check answers each request to one with a 204 itself, so nothing reaches the network, and
+   * lists it in the run's `posted`. Any other host still fails the run. Default none.
+   */
+  endpoints?: readonly string[]
   /** The upload limits for `checkPortalBuild`; `false` skips them. Default CrazyGames'. */
   limits?: { files: number; bytes: number } | false
   /** Run in the game's frame until it returns true: the game has loaded. Default `document.readyState === 'complete'`. */
@@ -370,6 +376,8 @@ export interface PortalRunReport {
   elsewhere: string[]
   missing: string[]
   sockets: string[]
+  /** Requests to `endpoints`, answered by the check: `<method> <url>`. */
+  posted: string[]
   /** How many files the fake portal served. */
   served: number
   /** The stills, relative to `out`. */

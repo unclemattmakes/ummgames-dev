@@ -223,6 +223,8 @@ export async function runPortalCheck(options = {}) {
       const report = await oneRun(browser, run, { ...options, dir, out, settleMs, log, ok, fail })
       reports.push(report)
       for (const p of report.problems) fail(`${run.name}: ${p}`)
+      if (report.posted.length)
+        ok(`${run.name}: ${report.posted.length} request(s) to the game's endpoints, answered here`)
       if (report.problems.length === 0) ok(`${run.name}: loaded in ${report.loadMs} ms, clean`)
     }
   } finally {
@@ -275,10 +277,23 @@ async function oneRun(browser, run, o) {
     if (m.type() === 'error') errors.push(m.text().slice(0, 300))
   })
   page.on('pageerror', (e) => errors.push(`uncaught: ${e.message}`))
+  /** Requests to the game's own endpoints, answered here with a 204 (`endpoints`). */
+  /** @type {string[]} */
+  const posted = []
+  const endpoints = new Set((o.endpoints ?? []).map((e) => new URL(e).origin))
   const portal = await fakePortal(page, {
     dist: o.dir,
     frame,
     sdk,
+    routes: [
+      {
+        match: (u) => endpoints.has(u.origin),
+        handle: (route) => {
+          posted.push(`${route.request().method()} ${route.request().url()}`)
+          return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } })
+        },
+      },
+    ],
     ...(o.gamePath ? { gamePath: o.gamePath } : {}),
     ...(run.query ? { query: run.query } : {}),
   })
@@ -342,5 +357,5 @@ async function oneRun(browser, run, o) {
     }),
   )
   await context.close()
-  return { name: run.name, ...seen, served: portal.served.length, stills, problems }
+  return { name: run.name, ...seen, posted, served: portal.served.length, stills, problems }
 }

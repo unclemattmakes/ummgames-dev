@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.17.0 (2026-11-19)
+
+- **New: `portal.endpoints` for `umm-dev portal check`.** Origins the build may send to, such as
+  a play stats Worker. The check answers each request to one with a 204 itself, so nothing reaches
+  the network, and lists it in the run's `posted` in `report.json`. Before this, a portal build
+  with telemetry failed every run on "asked other hosts". Any other host still fails.
+- **To take it:** nothing. A game whose portal build sends play stats adds the Worker's origin.
+
 ## 0.16.1 (2026-11-19)
 
 - **Fix: `runtime/stats` types a union of events.** `Pushed<E>` and a spec's `event` return were a

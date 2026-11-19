@@ -42,6 +42,7 @@ const DEFAULTS = {
   build: null,
   out: 'test-results/portal-check',
   forbidden: [],
+  endpoints: [],
   ready: null,
   readyTimeoutMs: 60_000,
   loadLimitMs: 20_000,

@@ -109,4 +109,28 @@ describe('runPortalCheck', () => {
     // The blocked beacon's console line is reported once, as another host, not as an error too.
     expect(all).not.toContain('ERR_BLOCKED_BY_CLIENT')
   })
+
+  it("answers the game's own endpoints itself, and still fails any other host", async () => {
+    const result = await runPortalCheck({
+      dir: dist,
+      out: tempDir(),
+      cpu: true,
+      ready,
+      settleMs: 100,
+      only: ['desktop'],
+      endpoints: ['https://elsewhere.example/'],
+      async play({ game, page }) {
+        await game().evaluate(() => /** @type {any} */ (window).__game.reachOut())
+        await page.waitForTimeout(500)
+      },
+      log: () => {},
+    })
+    const [desk] = result.runs
+    expect(desk?.posted.some((p) => p.endsWith('https://elsewhere.example/beacon'))).toBe(true)
+    expect(desk?.elsewhere).toEqual([])
+    const all = result.problems.join('\n')
+    expect(all).not.toContain('elsewhere.example')
+    // The fixture's socket dial is not an endpoint: it still fails the run.
+    expect(all).toContain('wss://relay.example/room')
+  })
 })

@@ -738,7 +738,7 @@ portal build must do, and runs the game's own steps in the middle.
    page and the game frame.
 4. Fails a run on:
    - a console error or an uncaught exception;
-   - a request to any other host;
+   - a request to any other host (an origin in `portal.endpoints` is answered with a 204 instead);
    - a missing file;
    - a WebSocket dial;
    - a load over `loadLimitMs` (20 s, CrazyGames' limit for desktop Chrome);
@@ -864,6 +864,7 @@ process.exit(result.ok ? 0 : 1)
 | `build` | `null` | A shell command run in the game root first (`'pnpm build:portal'`). None: the folder is checked as it is. |
 | `out` | `'test-results/portal-check'` | Where the stills and `report.json` go. |
 | `forbidden` | `[]` | Words the build's `.js`, `.mjs`, `.html` and `.css` files must not hold. Case matters. |
+| `endpoints` | `[]` | Origins the build may send to, such as its play stats Worker ([stats.md](stats.md)). The check answers each request to one with a 204 itself, so nothing reaches the network, and lists it in the run's `posted`. Any other host still fails the run. |
 | `limits` | CrazyGames': `{ files: 1500, bytes: 50000000 }` | `checkPortalBuild`'s limits; `false` checks none. |
 | `ready` | `null`, which waits for `document.readyState === 'complete'` | A function run in the game frame until it returns true: the game has loaded. The load time runs from opening the portal page to this. |
 | `readyTimeoutMs` | `60000` | How long `ready` may take before the run stops. |
