@@ -182,6 +182,9 @@ numbers and code from the game's source; `typescript` is an optional peer a game
 read in one place, Scribe transcripts, the best of a few seeds by its words, ffmpeg cuts for spoken
 and sung takes, and bins of pieces for the page. `runtime/audio/voice.ts` is the player a game
 copies to say them ([docs/voice.md](docs/voice.md)).
+`@ummgames/dev/stats` is a play stats report's shared half: day ranges, pulling a bucket's days
+with rclone, and grouping kept batches into sessions. `runtime/stats/` is the page's queue, the
+batch check and the Worker a game copies ([docs/stats.md](docs/stats.md)).
 
 ## For AI agents
 

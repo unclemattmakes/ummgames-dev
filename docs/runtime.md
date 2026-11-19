@@ -1193,6 +1193,13 @@ slow. `build-target.ts` is the `PORTAL` flag the bundler drops code on. Copy the
 (`umm-dev copy portal`); `portal-sdk.ts` imports `./build-target`. It has its own page:
 [portal.md](portal.md).
 
+## `runtime/stats/`
+
+A game's play telemetry: the batch shape and its check (`batch.ts`), the page's queue and
+beacon sender (`client.ts`) and the Worker that keeps batches in R2 (`worker.ts`). The game
+writes its events as a spec and keeps its own sums. Copy the folder (`umm-dev copy stats`). It
+has its own page: [stats.md](stats.md).
+
 ## `runtime/making-of/`
 
 A making-of site's toy host, its controls, a 2D canvas, what a page's script calls, and a base

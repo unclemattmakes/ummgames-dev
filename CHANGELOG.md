@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.16.0 (2026-11-19)
+
+- **New: play stats.** `runtime/stats/` is a game's play telemetry, copied with
+  `umm-dev copy stats`: `batch.ts` checks a batch through the game's own spec (its version, its
+  batch fields, its events) and keeps nothing else; `client.ts` queues events in the page and
+  sends them by beacon after the first input, every 30 s and as the page hides; `worker.ts` is
+  the Cloudflare Worker that matches the origin to a site and keeps each batch in R2 with no IP.
+  `@ummgames/dev/stats` is the report's shared half: day ranges, rclone pulls, sessions, a
+  median and a text table. See [docs/stats.md](docs/stats.md).
+- **To take it:** nothing. A game with its own stats pipeline of this shape can copy the folder
+  and write its events as a `StatsSpec`.
+
 ## 0.15.0 (2026-11-15)
 
 - **New: `runtime/audio/mix.ts`, a mixer a game copies.** `createMix(ctx, options)` builds named
