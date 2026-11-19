@@ -11,7 +11,7 @@
 // PAGE-SAFE. `createStatsQueue` has no DOM, so a unit test drives it; `startStats` listens on the
 // page. Imports only batch.ts.
 
-import { type Batch, type Device, type EventBase, MAX_EVENTS } from './batch'
+import { type Batch, type Device, type EventBase, MAX_EVENTS, type Unstamped } from './batch'
 
 /** Past this many unsent events, more are dropped: an endpoint cannot keep a runaway session. */
 export const MAX_QUEUE = 2000
@@ -19,7 +19,7 @@ export const MAX_QUEUE = 2000
 export const FLUSH_MS = 30_000
 
 /** An event as the game pushes it: the queue adds `t` and `dev`. */
-export type Pushed<E extends EventBase> = Omit<E, 't' | 'dev'>
+export type Pushed<E extends EventBase> = Unstamped<E>
 
 export interface StatsQueue<E extends EventBase> {
   /** Events waiting to go. */

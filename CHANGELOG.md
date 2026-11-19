@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.16.1 (2026-11-19)
+
+- **Fix: `runtime/stats` types a union of events.** `Pushed<E>` and a spec's `event` return were a
+  plain `Omit` of the union, which keeps only the fields every event shares, so pushing an event
+  with its own fields failed to typecheck. Both are now `Unstamped<E>`, which omits per member.
+- **Fix: copying `runtime/stats` no longer warns** that `worker.ts` imports files that are not
+  beside it. The warning came from an example in a comment.
+- **To take it:** `umm-dev copy stats` again over an untouched copy.
+
 ## 0.16.0 (2026-11-19)
 
 - **New: play stats.** `runtime/stats/` is a game's play telemetry, copied with

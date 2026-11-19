@@ -249,3 +249,13 @@ describe('createStatsQueue', () => {
     expect(q.size).toBe(MAX_QUEUE)
   })
 })
+
+describe('the copy', () => {
+  it('names no import outside the folder, comments included', async () => {
+    const fs = await import('node:fs')
+    for (const f of ['batch.ts', 'client.ts', 'worker.ts']) {
+      const text = fs.readFileSync(new URL(`../../runtime/stats/${f}`, import.meta.url), 'utf8')
+      for (const m of text.matchAll(/from '([^']+)'/g)) expect(m[1], f).toMatch(/^\.\/[a-z-]+$/)
+    }
+  })
+})

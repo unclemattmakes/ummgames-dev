@@ -6,11 +6,8 @@
 //
 // SERVER-SAFE: web platform only. Imports only batch.ts.
 //
-// A game's Worker is a few lines:
-//
-//   import { statsWorker } from '../../src/stats/worker'
-//   import { SPEC } from '../../src/stats/events'
-//   export default statsWorker({ name: 'my-game', spec: SPEC, sites: [CRAZYGAMES, ...] })
+// A game's Worker is a few lines: its default export is `statsWorker({ name, spec, sites })`, with
+// the game's own spec and site rules. docs/stats.md in @ummgames/dev has the whole file.
 
 import {
   batchKey,

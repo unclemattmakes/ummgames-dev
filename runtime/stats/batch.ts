@@ -44,6 +44,12 @@ export interface EventBase {
   dev: Device
 }
 
+/**
+ * An event without the two fields the queue stamps, kept apart per member of a union: a plain
+ * `Omit` of a union keeps only the fields every member shares.
+ */
+export type Unstamped<E extends EventBase> = E extends EventBase ? Omit<E, 't' | 'dev'> : never
+
 /** A whole batch: the envelope, the game's own fields `M`, and its events `E`. */
 export type Batch<M, E extends EventBase> = Envelope & M & { events: E[] }
 
@@ -71,7 +77,7 @@ export interface StatsSpec<M, E extends EventBase> {
    * and `t` and `dev` are already checked; return the event with its `e` and its own fields, and
    * the parser adds `t` and `dev`.
    */
-  readonly event: (raw: Readonly<Record<string, unknown>>) => Omit<E, 't' | 'dev'> | null
+  readonly event: (raw: Readonly<Record<string, unknown>>) => Unstamped<E> | null
 }
 
 // Checks a game's parsers use.

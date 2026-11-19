@@ -79,6 +79,7 @@ Server-safe and page-safe: no DOM, no imports.
 | `MAX_T` | 604800: the latest an event's `t` may be, in seconds |
 | `DEVICES` | `keyboard`, `mouse`, `gamepad`, `touch` |
 | `StatsSpec<M, E>` | The game's half: `version`, `meta(raw)` and `event(raw)` |
+| `Unstamped<E>` | An event without `t` and `dev`, per member of a union: what `event(raw)` returns and `push` takes |
 | `parseBatch(spec, raw)` | The batch rebuilt from known fields only, or a reason string |
 | `parseStored(spec, raw)` | A kept object read back, with `at`, `site` and `browser`; or null |
 | `isObj`, `oneOf`, `num`, `int`, `isSlug`, `isName`, `parsePos` | Checks for the game's parsers |
