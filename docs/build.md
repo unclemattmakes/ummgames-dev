@@ -83,6 +83,8 @@ of `<head>`.
 headers(options?: {
   immutableAssets?: boolean
   rules?: Record<string, Record<string, string>>
+  framedBy?: string[]
+  scripts?: boolean | { hosts?: string[]; wasm?: boolean; webAnalytics?: boolean; reportOnly?: boolean }
 }): Plugin
 ```
 
@@ -95,6 +97,7 @@ its own; Workers static assets, where the game sites are, sends neither, so the 
 | `immutableAssets` | `boolean` | `false` | Adds a year-long immutable cache rule for `/<build.assetsDir>/*`, and fails the build on an unhashed file there. |
 | `rules` | `Record<string, Record<string, string>>` | `{}` | More path rules, written after the built-in ones. |
 | `framedBy` | `string[]` | `[]` | Exact `https://` origins that may frame the site beside its own. |
+| `scripts` | `boolean` or `ScriptOptions` | `false` | Send the script rule (below). `true` takes its defaults. |
 
 The assets folder is Vite's `build.assetsDir` (default `assets`), read from the config.
 
@@ -113,10 +116,55 @@ which cannot name another origin; every browser that reads `frame-ancestors` pre
 exact `https://` origins are taken: no path, no wildcard, no `http://`. Do not use it to keep one
 `/*` rule of your own beside the kit's, since Cloudflare drops an earlier rule with the same pattern.
 
+**The script rule.** `scripts: true` adds `script-src`, `object-src` and `base-uri` to the one
+`Content-Security-Policy` on `/*`, after `frame-ancestors`:
+
+```
+Content-Security-Policy: frame-ancestors 'self'; script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com; object-src 'none'; base-uri 'self'
+```
+
+Script then runs only from the site's own files. An HTML injection cannot run script: inline
+`<script>`, inline handlers such as `onload="..."`, `javascript:` links, `eval` and
+`new Function` are all refused. What each source is for:
+- `'self'`: the site's bundle, its chunks and its module workers (`new Worker(new URL(...))`).
+- `'wasm-unsafe-eval'`: WebAssembly compiles. Rapier needs it, and so does three.js's meshopt
+  decoder, which compiles as soon as it is imported. It allows wasm only, not `eval`.
+- `https://static.cloudflareinsights.com`: Cloudflare's Web Analytics beacon. Cloudflare writes its
+  `<script>` tag into every HTML page it proxies when Web Analytics is on, so the built HTML does
+  not show it; the live page does.
+- `object-src 'none'` and `base-uri 'self'`: no plugins, and no `<base>` that moves the site's
+  relative script URLs to another host.
+
+| `ScriptOptions` | Type | Default | What it does |
+|---|---|---|---|
+| `hosts` | `string[]` | `[]` | More exact `https://` origins scripts may load from, such as an SDK's. No path, no wildcard, no keyword. |
+| `wasm` | `boolean` | `true` | `false` drops `'wasm-unsafe-eval'`, for a site with no WebAssembly. |
+| `webAnalytics` | `boolean` | `true` | `false` drops the beacon's origin, for a site with Web Analytics off. |
+| `reportOnly` | `boolean` | `false` | Send the rule as `Content-Security-Policy-Report-Only` instead. The browser logs each script it would refuse and runs it anyway; `frame-ancestors` stays enforced. |
+
+**Off by default.** Every game takes the kit's `main`, so a default reaches every site on its next
+update. A site that needs inline script, an inline handler, `eval` or a `blob:` worker breaks
+under the rule, and the build cannot tell: Cloudflare adds the beacon at the edge, and a page may
+build `new Function` at run time. Turn it on per site, after checking:
+1. `vite build`, then serve `dist/` with the rule's header and play the game with the console
+   open. Any `Refused to ...` line is a source the rule must name or the code must lose.
+2. Or ship `scripts: { reportOnly: true }` first and read the live console, then drop
+   `reportOnly`.
+
+```js
+// A site that loads an SDK from its host, and has no WebAssembly.
+plugins: [headers({ scripts: { hosts: ['https://sdk.example.com'], wasm: false } })]
+```
+
+**Not covered:** `blob:` workers and inline script have no option, on purpose. Move a `blob:`
+worker into its own file (`new Worker(new URL('./x.worker.ts', import.meta.url))`), and inline
+script into a module. `connect-src`, `img-src` and `style-src` stay open: none of them stops
+injected script, and a wrong one breaks the game.
+
 **What the Worker answers itself.** `_headers` reaches only the static files. A page or API route
 the site Worker's script answers goes out without these headers unless the script adds them: copy
 `worker/security-headers.ts` ([runtime.md](runtime.md#security-headersts)), give its
-`securityHeaders()` the same `framedBy` and `rules`, and wrap each response in
+`securityHeaders()` the same `framedBy`, `scripts` and `rules`, and wrap each response in
 `withSecurityHeaders`. The kit's tests hold that file to this plugin's `/*` rules.
 
 **For the site build only.** Leave `headers()` out of a portal build: the portal hosts the files
@@ -135,8 +183,9 @@ its files after the check has run, so an unhashed file there is cached for a yea
 
 **Left out on purpose:**
 - **COOP and COEP.** They break cross-origin assets unless every host opts in.
-- **A full Content-Security-Policy.** A wrong policy breaks the game. Run one in Report-Only
-  first.
+- **The rest of a full Content-Security-Policy** (`default-src`, `connect-src`, `img-src`,
+  `style-src`). A wrong policy breaks the game, and none of them stops injected script. The script
+  rule is the part that does, and it is opt-in (above).
 
 ```js
 plugins: [headers({ immutableAssets: true, rules: { '/levels/*': { 'Cache-Control': 'no-cache' } } })]
@@ -421,7 +470,8 @@ Each plugin's logic is exported for tests and scripts.
 | `headersFile(options?)` | The text of `_headers`. Takes `assetsDir` too. |
 | `hashedAsset(assetsDir?)` | The `RegExp` a hashed file name under `assetsDir` matches. |
 | `unhashedUnderAssets(fileNames, assetsDir?)` | The names the immutable check fails on. |
-| `HEADERS_FILE`, `HSTS`, `IMMUTABLE_CACHE`, `PERMISSIONS_POLICY`, `REFERRER_POLICY` | `'_headers'` and the header values above. |
+| `scriptPolicy(options?)` | The script rule's directives, as `scripts` writes them after `frame-ancestors`. |
+| `HEADERS_FILE`, `HSTS`, `IMMUTABLE_CACHE`, `PERMISSIONS_POLICY`, `REFERRER_POLICY`, `WEB_ANALYTICS` | `'_headers'` and the header values above. |
 | `notFoundHtml(options?)`, `NOT_FOUND_FILE` | The 404 page's text, and `'404.html'`. |
 | `collectLicences(root, options?)` | The licence list for the game at `root`. Throws on a dependency with no notice. |
 | `fallbackName(pkg)` | `@scope/name` to `scope-name.LICENSE`. |
@@ -475,6 +525,12 @@ expect(headersFor('dist', '/assets/index-CGx80H_5.js')['cache-control']).toConta
 | `/assets/* is cached immutable but these have no content hash: assets/hero.glb` | `immutableAssets` is on and a file under `assets/` has a stable name, often from `public/assets/`. | Move the file out of `public/assets/` (`public/models/`), or import it so the bundler hashes it. |
 | An unhashed file under `assets/` ships with the immutable rule | A plugin after `headers()` emitted it. | Put `headers()` last in `plugins`. |
 | `headers: target was removed in 0.2.0; _headers is for the site build only` (or `frameAncestors`) | A config from before 0.2.0, for a build another origin frames. | Drop `headers()` from that build and write its `_headers` yourself. Keep `headers()` in the site build. |
+| `headers: scripts.hosts takes exact https:// origins, not "<host>"` | A host with a path, a wildcard, `http://`, or a keyword such as `'unsafe-inline'`. | Name the exact origin. Inline script has no option: move it into a module. |
+| `headers: scripts takes hosts, wasm, webAnalytics, reportOnly, not <name>` | An unknown option, often a typo. | Use one of the four. |
+| The page is blank, and the console says `Refused to execute inline script` or `Refused to evaluate a string as JavaScript` | `scripts` is on and the page runs inline script, an inline handler, `eval` or `new Function`. | Move the script into a module, or the handler into the bundle. Turn `scripts` off until it is gone. |
+| `Refused to create a worker from 'blob:...'` | A library builds its worker from a `blob:` URL. | Give the worker its own file, or leave `scripts` off. |
+| `Refused to compile or instantiate WebAssembly module` | `scripts: { wasm: false }` on a site that compiles wasm. | Drop `wasm: false`. |
+| `Refused to load the script 'https://static.cloudflareinsights.com/...'` | `webAnalytics: false` on a site Cloudflare adds the beacon to. | Drop `webAnalytics: false`, or turn Web Analytics off for the site. |
 | `bad _headers text: "<text>"` | A rule's path, name or value is empty or holds a newline. | Fix the `rules` entry. |
 | `<name> ships no licence file or no "license": add licences/<name>.LICENSE` | A dependency has no notice file, or no `license` field. | Add the fallback file. If the `license` field is what is missing, `exclude` it and list its notice yourself. |
 | `ENOENT: no such file or directory, open '...node_modules/<name>/package.json'` | An `include` entry is not installed at `node_modules/<name>`, as with a transitive dependency under pnpm. | Make it a direct dependency, or leave it out. |
@@ -506,5 +562,8 @@ expect(headersFor('dist', '/assets/index-CGx80H_5.js')['cache-control']).toConta
   do not replace the plugin with a committed PNG.
 - **Keep the splash in one place.** With `devSplash`, the game's name lives in its options only:
   no hand-written `#dev-splash` block, no word list in the game's code, no portrait in `public/`.
+- **Turn `scripts` on only after the game boots under it** with the console open, from the built
+  `dist/`, never the dev server: Vite's dev server runs inline script the rule would refuse. Never
+  add a host to make a console error go away without knowing what loads from it.
 - **Check your own work:** run `vite build`, then read `dist/_headers`, check `dist/404.html`
   exists, and check `dist/index.html` has one `apple-touch-icon` link.

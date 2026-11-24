@@ -1136,15 +1136,16 @@ the time carried over, and `stepSeconds` reads the step length back.
 
 ### `security-headers.ts`
 
-**Exports:** `securityHeaders(options?)`, `withSecurityHeaders(res, headers?)`, `NOINDEX`,
-`HSTS`, `REFERRER_POLICY`, `PERMISSIONS_POLICY`, and the type `SecurityHeaderOptions`.
+**Exports:** `securityHeaders(options?)`, `withSecurityHeaders(res, headers?)`,
+`scriptPolicy(options?)`, `NOINDEX`, `HSTS`, `REFERRER_POLICY`, `PERMISSIONS_POLICY`,
+`WEB_ANALYTICS`, and the types `SecurityHeaderOptions` and `ScriptOptions`.
 
 The security headers for what a site Worker answers itself. The `headers()` Vite plugin
 ([build.md](build.md#headersoptions-_headers)) writes them into `_headers`, but `_headers` only
 reaches the static assets: a route the Worker's script answers (`/privacy`, `/api/*`, a
-redirect) goes out without them. `securityHeaders` takes the same `framedBy` and `rules` as
-`headers()` and returns every header its `/*` rules write, in the same order. Give both the same
-options and the two cannot drift.
+redirect) goes out without them. `securityHeaders` takes the same `framedBy`, `scripts` and
+`rules` as `headers()` and returns every header its `/*` rules write, in the same order. Give
+both the same options and the two cannot drift.
 
 ```ts
 // worker/site/src/site-headers.ts, read by the Worker and by vite.config.ts
@@ -1165,12 +1166,14 @@ return withSecurityHeaders(await route(req), SECURITY_HEADERS)
 | `securityHeaders(options?)` | Header name to value: `nosniff`, the referrer policy, HSTS, framing, the Permissions-Policy, then the `/*` rule from `rules`, which replaces a built-in header of the same name. With no options, exactly the plugin's `securityHeaders()`. Throws, as `headers()` does, on an origin that is not an exact `https://` origin and on a newline in a header. |
 | `withSecurityHeaders(res, headers?)` | A new `Response` over `res`'s body, with every header in `headers` (default `securityHeaders()`) that `res` does not already set. A header the route set is kept. Works on a redirect, whose own headers are immutable. |
 | `NOINDEX` | `{ 'X-Robots-Tag': 'noindex' }`, for a site that is not listed yet: `rules: { '/*': NOINDEX }`, given to both. Drop it on release. |
-| `HSTS`, `REFERRER_POLICY`, `PERMISSIONS_POLICY` | The values, as the plugin exports them. |
+| `scriptPolicy(options?)` | The script rule's directives, as the plugin's `scriptPolicy`. |
+| `HSTS`, `REFERRER_POLICY`, `PERMISSIONS_POLICY`, `WEB_ANALYTICS` | The values, as the plugin exports them. |
 
 | Option | Default | What it does |
 |---|---|---|
 | `framedBy` | `[]` | Exact `https://` origins that may frame the site beside its own. They join `frame-ancestors 'self'`, and `X-Frame-Options` is left out. |
 | `rules` | `{}` | As `headers()` takes them. Only `rules['/*']` is read here; a rule for another path is the static files' alone. |
+| `scripts` | `false` | The script rule, as `headers()` takes it ([build.md](build.md#headersoptions-_headers)). A copy from before it ignores the option, so copy the file again before passing it to both. |
 
 **The kit holds the two together.** `tests/runtime/worker.test.mjs` compares this file with
 `headersFile()` for every combination of options a game uses, so a change to the plugin's set

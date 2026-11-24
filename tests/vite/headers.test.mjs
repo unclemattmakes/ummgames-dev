@@ -6,6 +6,7 @@ import {
   headersFile,
   IMMUTABLE_CACHE,
   notFoundPage,
+  scriptPolicy,
   securityHeaders,
   unhashedUnderAssets,
 } from '../../src/vite/index.mjs'
@@ -112,5 +113,75 @@ describe('the headers plugin', () => {
     expect(() => headers({ target: 'portal' })).toThrow(/target was removed in 0\.2\.0/)
     // @ts-expect-error: removed in 0.2.0
     expect(() => headers({ frameAncestors: ['https://a.example'] })).toThrow(/frameAncestors/)
+  })
+})
+
+describe('the script rule', () => {
+  const RULE = "script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com"
+  const TAIL = "object-src 'none'; base-uri 'self'"
+
+  it('is off unless a site asks for it', () => {
+    expect(header(headersFile(), 'Content-Security-Policy')).toBe("frame-ancestors 'self'")
+    expect(header(headersFile({ scripts: false }), 'Content-Security-Policy')).toBe(
+      "frame-ancestors 'self'",
+    )
+    expect(headersFile()).not.toContain('Report-Only')
+  })
+
+  it('joins frame-ancestors in the one policy: own scripts, wasm and the analytics beacon', () => {
+    expect(scriptPolicy()).toBe(`${RULE}; ${TAIL}`)
+    expect(header(headersFile({ scripts: true }), 'Content-Security-Policy')).toBe(
+      `frame-ancestors 'self'; ${RULE}; ${TAIL}`,
+    )
+    const framed = headersFile({ scripts: true, framedBy: ['https://tv.example.com'] })
+    expect(header(framed, 'Content-Security-Policy')).toBe(
+      `frame-ancestors 'self' https://tv.example.com; ${RULE}; ${TAIL}`,
+    )
+    expect(framed.match(/Content-Security-Policy/g)).toHaveLength(1)
+  })
+
+  it('takes more hosts, and drops wasm or the beacon on request', () => {
+    expect(
+      scriptPolicy({ hosts: ['https://sdk.example.com', 'https://cdn.example.org:8443'] }),
+    ).toBe(
+      "script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com https://sdk.example.com https://cdn.example.org:8443; " +
+        TAIL,
+    )
+    expect(scriptPolicy({ wasm: false, webAnalytics: false })).toBe(`script-src 'self'; ${TAIL}`)
+  })
+
+  it('can report without enforcing, beside the enforced frame-ancestors', () => {
+    const text = headersFile({ scripts: { reportOnly: true } })
+    expect(header(text, 'Content-Security-Policy')).toBe("frame-ancestors 'self'")
+    expect(header(text, 'Content-Security-Policy-Report-Only')).toBe(`${RULE}; ${TAIL}`)
+  })
+
+  it('takes only exact https origins and known options', () => {
+    for (const bad of [
+      'http://sdk.example.com',
+      'https://*.example.com',
+      'https://sdk.example.com/',
+      "'unsafe-inline'",
+      "'unsafe-eval'",
+      'https://a.example.com https://b.example.com',
+      'data:',
+      'blob:',
+    ]) {
+      expect(() => headersFile({ scripts: { hosts: [bad] } }), bad).toThrow(/scripts\.hosts/)
+    }
+    // @ts-expect-error: not an option
+    expect(() => headersFile({ scripts: { inline: true } })).toThrow(/scripts takes/)
+    // @ts-expect-error: not an option
+    expect(() => headers({ scripts: 'strict' })).toThrow(/scripts takes/)
+  })
+
+  it('reaches the built _headers', async () => {
+    const { read } = await buildFixture({
+      publicDir: false,
+      plugins: [headers({ scripts: { hosts: ['https://sdk.example.com'] } })],
+    })
+    expect(header(read('_headers'), 'Content-Security-Policy')).toBe(
+      `frame-ancestors 'self'; ${RULE} https://sdk.example.com; ${TAIL}`,
+    )
   })
 })

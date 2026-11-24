@@ -15,8 +15,16 @@
  * - **Permissions-Policy** denying what a game never asks for: camera, microphone, geolocation,
  *   payment, USB. Gamepads, fullscreen and the clipboard stay at the browser's default.
  *
+ * - **A script rule, when a site turns it on** (`scripts`). `script-src` allows the site's own
+ *   files, WebAssembly and Cloudflare's Web Analytics beacon, which Cloudflare writes into every
+ *   page it proxies; `object-src 'none'` and `base-uri 'self'` close the other ways in. Inline
+ *   script, inline handlers (`onload="..."`), `eval` and `blob:` workers stop running, so an
+ *   HTML injection cannot run script. Off by default: many sites take the kit's `main`, and a
+ *   page that needs any of those goes blank. `reportOnly` sends it as Report-Only first.
+ *
  * Left out on purpose: COOP and COEP (they break cross-origin assets unless every host opts in)
- * and a full Content-Security-Policy (a wrong one is a broken game; run it in Report-Only first).
+ * and the rest of a full Content-Security-Policy (`connect-src`, `img-src`, `style-src`: a
+ * wrong one is a broken game, and none of them stops injected script).
  *
  * The cache rule marks `/assets/*` immutable, which is safe only when nothing under `assets/` has
  * a stable name: turn it on when `publicDir` is off, and the build fails if a file there lacks
@@ -30,6 +38,8 @@ export const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable'
 export const HSTS = 'max-age=31536000'
 export const REFERRER_POLICY = 'strict-origin-when-cross-origin'
 export const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
+/** Where Cloudflare's Web Analytics beacon loads from. Cloudflare adds its tag to proxied pages. */
+export const WEB_ANALYTICS = 'https://static.cloudflareinsights.com'
 
 /**
  * Header name to value for every path of the build.
@@ -54,20 +64,69 @@ export function securityHeaders() {
  *   More rules, path pattern to headers, after the built-in ones.
  * @property {readonly string[]} [framedBy] Exact `https://` origins that may frame the site, beside
  *   its own.
+ * @property {boolean | ScriptOptions} [scripts] Send the script rule. Default false.
+ */
+
+/**
+ * @typedef {object} ScriptOptions
+ * @property {readonly string[]} [hosts] More exact `https://` origins scripts may load from.
+ * @property {boolean} [wasm] Allow WebAssembly (`'wasm-unsafe-eval'`). Default true.
+ * @property {boolean} [webAnalytics] Allow Cloudflare's Web Analytics beacon. Default true.
+ * @property {boolean} [reportOnly] Send the rule as `Content-Security-Policy-Report-Only`, so the
+ *   browser logs what it would block and blocks nothing. Default false.
  */
 
 /** `https://host` or `https://host:port`, nothing more: no path, no wildcard, no scheme but https. */
 const ORIGIN =
   /^https:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:\d{1,5})?$/
 
+const SCRIPT_KEYS = ['hosts', 'wasm', 'webAnalytics', 'reportOnly']
+
 /**
- * The `/*` headers, with `framedBy` folded in.
+ * The script rule's directives: `script-src`, `object-src 'none'` and `base-uri 'self'`.
+ * @param {ScriptOptions} [options]
+ * @returns {string}
+ */
+export function scriptPolicy(options = {}) {
+  const extra = Object.keys(options).filter((k) => !SCRIPT_KEYS.includes(k))
+  if (extra.length > 0) {
+    throw new Error(`headers: scripts takes ${SCRIPT_KEYS.join(', ')}, not ${extra.join(', ')}`)
+  }
+  const { hosts = [], wasm = true, webAnalytics = true } = options
+  for (const host of hosts) {
+    if (!ORIGIN.test(host)) {
+      throw new Error(
+        `headers: scripts.hosts takes exact https:// origins, not ${JSON.stringify(host)}`,
+      )
+    }
+  }
+  const src = ["'self'"]
+  if (wasm) src.push("'wasm-unsafe-eval'")
+  if (webAnalytics) src.push(WEB_ANALYTICS)
+  src.push(...hosts)
+  return `script-src ${src.join(' ')}; object-src 'none'; base-uri 'self'`
+}
+
+/**
+ * `scripts` as options, or null when the rule is off.
+ * @param {unknown} scripts
+ * @returns {ScriptOptions | null}
+ */
+function scriptOptions(scripts) {
+  if (scripts === undefined || scripts === false) return null
+  if (scripts === true) return {}
+  if (typeof scripts === 'object' && scripts !== null && !Array.isArray(scripts)) return scripts
+  throw new Error(`headers: scripts takes true, false or { ${SCRIPT_KEYS.join(', ')} }`)
+}
+
+/**
+ * The `/*` headers, with `framedBy` and the script rule folded in. The script rule joins
+ * `frame-ancestors` in the one policy, or follows it as a Report-Only header.
  * @param {readonly string[]} framedBy
+ * @param {unknown} scripts
  * @returns {Record<string, string>}
  */
-function siteHeaders(framedBy) {
-  const h = securityHeaders()
-  if (framedBy.length === 0) return h
+function siteHeaders(framedBy, scripts) {
   for (const origin of framedBy) {
     if (!ORIGIN.test(origin)) {
       throw new Error(
@@ -75,8 +134,21 @@ function siteHeaders(framedBy) {
       )
     }
   }
-  const { 'X-Frame-Options': _, ...rest } = h
-  return { ...rest, 'Content-Security-Policy': `frame-ancestors 'self' ${framedBy.join(' ')}` }
+  const script = scriptOptions(scripts)
+  const policy = script ? scriptPolicy(script) : ''
+  /** @type {Record<string, string>} */
+  const out = {}
+  for (const [name, value] of Object.entries(securityHeaders())) {
+    if (name === 'X-Frame-Options' && framedBy.length > 0) continue
+    if (name !== 'Content-Security-Policy') {
+      out[name] = value
+      continue
+    }
+    const frame = ["frame-ancestors 'self'", ...framedBy].join(' ')
+    out[name] = policy && !script?.reportOnly ? `${frame}; ${policy}` : frame
+    if (policy && script?.reportOnly) out['Content-Security-Policy-Report-Only'] = policy
+  }
+  return out
 }
 
 /**
@@ -91,13 +163,19 @@ export function headersFile(options = {}) {
       throw new Error(`headers: ${gone} was removed in 0.2.0; _headers is for the site build only`)
     }
   }
-  const { immutableAssets = false, assetsDir = 'assets', rules = {}, framedBy = [] } = options
+  const {
+    immutableAssets = false,
+    assetsDir = 'assets',
+    rules = {},
+    framedBy = [],
+    scripts = false,
+  } = options
   const block = (/** @type {string} */ pattern, /** @type {Record<string, string>} */ h) => {
     clean(pattern)
     const lines = Object.entries(h).map(([k, v]) => `  ${clean(k)}: ${clean(v)}\n`)
     return `${pattern}\n${lines.join('')}`
   }
-  const sections = [block('/*', siteHeaders(framedBy))]
+  const sections = [block('/*', siteHeaders(framedBy, scripts))]
   if (immutableAssets) sections.push(block(`/${assetsDir}/*`, { 'Cache-Control': IMMUTABLE_CACHE }))
   for (const [pattern, h] of Object.entries(rules)) sections.push(block(pattern, { ...h }))
   return sections.join('')

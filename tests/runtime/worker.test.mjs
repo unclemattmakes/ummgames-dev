@@ -9,7 +9,9 @@ import {
   headersFile,
   PERMISSIONS_POLICY,
   REFERRER_POLICY,
+  scriptPolicy,
   securityHeaders as viteSecurityHeaders,
+  WEB_ANALYTICS,
 } from '../../src/vite/index.mjs'
 
 /** @param {string} rel @returns {Promise<any>} */
@@ -58,6 +60,12 @@ const CASES = [
     },
   },
   { rules: { '/*': { 'Content-Security-Policy': "frame-ancestors 'none'" } } },
+  { scripts: false },
+  { scripts: true },
+  { scripts: true, framedBy: ORIGINS, rules: { '/*': { 'X-Robots-Tag': 'noindex' } } },
+  { scripts: { hosts: ['https://sdk.example.com'], wasm: false }, framedBy: ORIGINS },
+  { scripts: { webAnalytics: false } },
+  { scripts: { reportOnly: true }, framedBy: ORIGINS },
 ]
 
 describe('worker/security-headers', async () => {
@@ -78,11 +86,15 @@ describe('worker/security-headers', async () => {
 
   it('with no options, is the plugin securityHeaders(), and shares its values', () => {
     expect(Object.entries(w.securityHeaders())).toEqual(Object.entries(viteSecurityHeaders()))
-    expect([w.HSTS, w.REFERRER_POLICY, w.PERMISSIONS_POLICY]).toEqual([
+    expect([w.HSTS, w.REFERRER_POLICY, w.PERMISSIONS_POLICY, w.WEB_ANALYTICS]).toEqual([
       HSTS,
       REFERRER_POLICY,
       PERMISSIONS_POLICY,
+      WEB_ANALYTICS,
     ])
+    expect(w.scriptPolicy({ hosts: ['https://sdk.example.com'] })).toBe(
+      scriptPolicy({ hosts: ['https://sdk.example.com'] }),
+    )
   })
 
   it('keeps a noindex constant, as a site that is not listed yet passes it to both', () => {
@@ -109,6 +121,13 @@ describe('worker/security-headers', async () => {
       expect(() => w.securityHeaders({ framedBy: [bad] }), bad).toThrow(/framedBy/)
       expect(() => headersFile({ framedBy: [bad] }), bad).toThrow(/framedBy/)
     }
+    for (const host of ['https://*.example.com', "'unsafe-inline'"]) {
+      const scripts = { hosts: [host] }
+      expect(() => w.securityHeaders({ scripts }), host).toThrow(/scripts\.hosts/)
+      expect(() => headersFile({ scripts }), host).toThrow(/scripts\.hosts/)
+    }
+    expect(() => w.securityHeaders({ scripts: { inline: true } })).toThrow(/scripts takes/)
+    expect(() => w.securityHeaders({ scripts: 'strict' })).toThrow(/scripts takes/)
     const nl = { rules: { '/*': { A: 'b\nC: d' } } }
     expect(() => w.securityHeaders(nl)).toThrow(/bad _headers text/)
     expect(() => headersFile(nl)).toThrow(/bad _headers text/)

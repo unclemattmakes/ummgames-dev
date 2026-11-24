@@ -128,6 +128,8 @@ export declare const IMMUTABLE_CACHE: string
 export declare const PERMISSIONS_POLICY: string
 /** `strict-origin-when-cross-origin`. */
 export declare const REFERRER_POLICY: string
+/** `https://static.cloudflareinsights.com`, where Cloudflare's Web Analytics beacon loads from. */
+export declare const WEB_ANALYTICS: string
 
 /**
  * Header name to value for every path of the build: `nosniff`, the referrer policy, HSTS, framing
@@ -148,7 +150,34 @@ export interface HeadersOptions {
    * They join `frame-ancestors 'self'`, and `X-Frame-Options` is left out. Default none.
    */
   framedBy?: readonly string[]
+  /**
+   * Send the script rule on `/*`: `script-src 'self' 'wasm-unsafe-eval'
+   * https://static.cloudflareinsights.com; object-src 'none'; base-uri 'self'`, joined to
+   * `frame-ancestors` in the one `Content-Security-Policy`. `true` takes the defaults; an object
+   * adds hosts, drops wasm or the beacon, or reports only. Default false.
+   */
+  scripts?: boolean | ScriptOptions
 }
+
+export interface ScriptOptions {
+  /** More exact `https://` origins scripts may load from, such as an SDK's. Default none. */
+  hosts?: readonly string[]
+  /** Allow WebAssembly to compile (`'wasm-unsafe-eval'`). Default true. */
+  wasm?: boolean
+  /** Allow Cloudflare's Web Analytics beacon, which Cloudflare adds to proxied pages. Default true. */
+  webAnalytics?: boolean
+  /**
+   * Send the rule as `Content-Security-Policy-Report-Only` instead: the browser logs what it
+   * would block and blocks nothing. `frame-ancestors` stays enforced. Default false.
+   */
+  reportOnly?: boolean
+}
+/**
+ * The script rule's directives: `script-src` with `'self'`, then `'wasm-unsafe-eval'`, the
+ * beacon's origin and `hosts`, then `object-src 'none'; base-uri 'self'`. Throws on a host that
+ * is not an exact `https://` origin and on an unknown option.
+ */
+export declare function scriptPolicy(options?: ScriptOptions): string
 /**
  * The text of `_headers`. Throws on a newline in a rule, and on `target` or `frameAncestors`
  * (removed in 0.2.0).

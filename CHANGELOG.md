@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **New: a script rule for `headers()`, off by default.** `scripts: true` adds
+  `script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com; object-src 'none';
+  base-uri 'self'` to the `/*` Content-Security-Policy, after `frame-ancestors`, so an HTML
+  injection cannot run script. `scripts: { hosts, wasm, webAnalytics, reportOnly }` adds script
+  origins, drops wasm or the Web Analytics beacon, or sends the rule as Report-Only.
+  `runtime/worker/security-headers.ts` takes the same option, and `scriptPolicy()` gives the
+  directives. See [docs/build.md](docs/build.md#headersoptions-_headers).
+- **To take it:** nothing changes until a site passes `scripts`. To turn it on, build, serve
+  `dist/` with its `_headers` and play with the console open. A site Worker with a copy of
+  `security-headers.ts` copies it again and passes the same `scripts`.
+
 ## 0.17.0 (2026-11-19)
 
 - **New: `portal.endpoints` for `umm-dev portal check`.** Origins the build may send to, such as

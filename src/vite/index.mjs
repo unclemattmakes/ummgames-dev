@@ -12,8 +12,10 @@ export {
   IMMUTABLE_CACHE,
   PERMISSIONS_POLICY,
   REFERRER_POLICY,
+  scriptPolicy,
   securityHeaders,
   unhashedUnderAssets,
+  WEB_ANALYTICS,
 } from './headers.mjs'
 export {
   APPLE_TOUCH_ICON,
