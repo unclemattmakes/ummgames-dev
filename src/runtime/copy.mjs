@@ -254,6 +254,44 @@ function place({ runtimePath, dest, root, namedOne, force, dryRun, hint, text: m
 }
 
 /**
+ * The packages a runtime file may import by name: libraries a game that wants the file already
+ * depends on, and that this repo has as a devDependency so the runtime typecheck covers them.
+ * Anything else a runtime file needs travels with it, in its own folder.
+ */
+export const RUNTIME_PACKAGES = ['three']
+
+/**
+ * The package a bare import names: `three` for `three/examples/jsm/x.js`, `@a/b` for `@a/b/c`.
+ * @param {string} spec
+ */
+export function packageOf(spec) {
+  const parts = spec.split('/')
+  return spec.startsWith('@') ? parts.slice(0, 2).join('/') : /** @type {string} */ (parts[0])
+}
+
+/**
+ * Packages a copied file imports by name that the game's package.json does not list in any of
+ * its dependency fields. Empty when the game has no package.json.
+ * @param {string} dest absolute path of the copy
+ * @param {string} root the game's root
+ * @returns {string[]}
+ */
+export function missingPackages(dest, root) {
+  const pkgFile = path.join(root, 'package.json')
+  if (!fs.existsSync(pkgFile)) return []
+  const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'))
+  const listed = new Set(
+    ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'].flatMap((k) =>
+      Object.keys(pkg[k] ?? {}),
+    ),
+  )
+  const text = fs.readFileSync(dest, 'utf8')
+  return [...text.matchAll(/(?:import|export)[^'"]*?from\s*['"]([^'"./][^'"]*)['"]/g)]
+    .map((m) => packageOf(/** @type {string} */ (m[1])))
+    .filter((p, i, a) => a.indexOf(p) === i && !p.startsWith('node:') && !listed.has(p))
+}
+
+/**
  * Relative imports a copied file makes that have no file beside it in the game: the sibling
  * runtime files the game still has to copy.
  * @param {string} dest absolute path of the copy

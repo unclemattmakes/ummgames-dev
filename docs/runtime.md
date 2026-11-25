@@ -3,7 +3,7 @@
 Code that ships inside a game's build lives in `runtime/`, as TypeScript: the perf HUD, the dev
 command bar, the gamepad profiles and stick shaping, the loading splash, the pure core of a
 procedural music sequencer and its instruments, a sim's seeded random numbers, deterministic math
-and fixed step, the security headers a site Worker sends, and a web portal's SDK adapter. It is
+and fixed step, a three.js draw-call baker, the security headers a site Worker sends, and a web portal's SDK adapter. It is
 **copied**, not linked. `umm-dev copy` writes a file into the game with a header on line 1, and from then on
 the copy is the game's to change. `umm-dev drift` reports how far each copy has moved from the
 version it came from, and how far the installed version has moved since. Reach for it when a game
@@ -88,6 +88,8 @@ umm-dev copy [--from <source>] --list
 
 After writing, copy names any relative import that has no file beside the copy:
 `imports ./registry, which is not beside it: copy that too`. Copy that sibling to the same folder.
+It also names a package the copy imports by name that the game's package.json does not list:
+`imports three, which the game's package.json does not list: add it`.
 
 **Exit codes.**
 
@@ -289,6 +291,7 @@ folder (`umm-dev copy dev`) to use it.
 |---|---|
 | `perf-recorder.ts`, `fuzzy.ts`, `registry-types.ts`, `tuner-panel.ts` | nothing |
 | `perf-hud.ts` | `perf-recorder` (types) |
+| `perf-handle.ts` | `perf-recorder` |
 | `registry.ts` | `registry-types` |
 | `command-bar.ts` | `fuzzy`, `registry`, `registry-types` |
 | `palette.ts` | `command-bar`, `perf-hud`, `registry`, `registry-types`, `tuner-panel` |
@@ -309,6 +312,12 @@ it. `sample()` and `push()` allocate nothing; call `stats()` a few times a secon
 |---|---|---|
 | `capacity` | 600 | Samples in the ring: ten seconds at 60 Hz, less on a faster display. |
 | `hitchMs` | 33.4 | A frame over this counts as a hitch. |
+
+### `perf-handle.ts`
+
+The `window.__pf` handle a perf spec reads: `installPerfHandle(options?)` puts `frames` and
+`stats()` (and the game's own readings) on `window`, and its `frame(now)` samples the recorder
+once per rAF. It has its own section in [perf.md](perf.md#runtimedevperf-handlets).
 
 ### `perf-hud.ts`
 
@@ -1196,6 +1205,12 @@ slow. `build-target.ts` is the `PORTAL` flag the bundler drops code on. Copy the
 (`umm-dev copy portal`); `portal-sdk.ts` imports `./build-target`. It has its own page:
 [portal.md](portal.md).
 
+## `runtime/render/`
+
+`bake.ts` merges a three.js part's per-material meshes into a few draws: one per plain finish in
+vertex colour, plus one per glow, see-through or kept material. It imports `three`, which the
+game must depend on. It has its own section in [perf.md](perf.md#runtimerenderbakets).
+
 ## `runtime/stats/`
 
 A game's play telemetry: the batch shape and its check (`batch.ts`), the page's queue and
@@ -1283,6 +1298,8 @@ and `runtime/env.d.ts` are the folder's own tooling and are never listed.
   any linked worktree.
 - **The game root** is the nearest folder at or above the current one holding a `package.json`.
 - **Each runtime file imports nothing outside its own folder**, so a folder copies as a unit.
+  The one exception is a library the game already has, named by package: `render/bake.ts`
+  imports `three`.
   Each typechecks under `runtime/tsconfig.json` (strict, Bundler resolution, DOM, `types: []`).
 
 ## Troubleshooting
@@ -1296,6 +1313,7 @@ and `runtime/env.d.ts` are the folder's own tooling and are never listed.
 | `refused  <file>: no comment syntax for .json` | The destination's type cannot carry a header. | Use a destination with an extension from the table above. |
 | `umm-dev copy: no runtime file or folder "<path>". umm-dev copy --list shows them.` | No such runtime path. | `umm-dev copy --list`. |
 | `imports ./<name>, which is not beside it: copy that too` | The copy needs a sibling file. | Copy the sibling into the same folder. |
+| `imports <package>, which the game's package.json does not list: add it` | The copy imports a library by name (`three`) that the game does not depend on. | Add it to the game's dependencies at an exact version. |
 | `umm-dev copy: no source "<name>" in runtime.sources` | `--from` names a source the game's config does not. | Add it to `runtime.sources`, or fix the name. |
 | `umm-dev copy: source "<name>": <path> is not on this machine` | The source's checkout is not where `repo` says. | Clone it there, or fix `repo`. A relative `repo` is read from the game's main checkout. |
 | A source copy says `source not found` in drift. | The same, seen by drift. | As above. The copy still builds; only the comparison is missing. |

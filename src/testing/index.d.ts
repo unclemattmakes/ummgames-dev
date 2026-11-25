@@ -424,3 +424,175 @@ export declare function forbiddenHits(
 ): { word: string; files: string[] }[]
 /** Chrome's flags for the real GPU, or SwiftShader with `cpu`. */
 export declare function portalChromeArgs(options?: { cpu?: boolean; platform?: string }): string[]
+
+// ── Perf specs (docs/perf.md) ────────────────────────────────────────────────
+
+/** The slice of Playwright's `CDPSession` the perf helpers use. */
+export interface CdpSessionLike {
+  // biome-ignore lint/suspicious/noExplicitAny: each protocol method returns its own shape
+  send(method: string, params?: Record<string, unknown>): Promise<any>
+}
+/** The slice of Playwright's `Page` the perf helpers use. */
+export interface PerfPageLike {
+  goto(url: string, options?: { waitUntil?: 'commit' | 'load' }): Promise<unknown>
+  waitForFunction<R, A>(fn: (arg: A) => R, arg: A, options?: { timeout?: number }): Promise<unknown>
+  waitForTimeout(ms: number): Promise<void>
+  evaluate<R, A>(fn: (arg: A) => R | Promise<R>, arg: A): Promise<R>
+  // biome-ignore lint/suspicious/noExplicitAny: Playwright's own Page goes in here
+  context(): { newCDPSession(page: any): Promise<CdpSessionLike> }
+}
+
+/** What the perf recorder's `stats()` gives (`runtime/dev/perf-recorder.ts`). */
+export interface PerfStatsLike {
+  fps: number
+  avgMs: number
+  p50Ms: number
+  p95Ms: number
+  p99Ms: number
+  minMs: number
+  maxMs: number
+  count: number
+  hitchCount: number
+}
+
+/** A perf case: `use` goes to `test.use`, `cpu` is the throttle rate. */
+export interface PerfDevice {
+  name: string
+  use: { viewport: { width: number; height: number }; deviceScaleFactor: number }
+  cpu: number
+}
+/**
+ * `desktop`: 1280x720 at DPR 1, no throttle. `phone`: 812x375 at DPR 2 with the CPU at 4x, a mid
+ * phone held sideways. The GPU stays this machine's, so a phone run speaks for the CPU only.
+ */
+export declare const PERF_DEVICES: { desktop: PerfDevice; phone: PerfDevice }
+
+/** A throttled network. `download` and `upload` are bytes a second; `latency` is ms. */
+export interface Network {
+  name?: string
+  download: number
+  /** Default a quarter of `download`. */
+  upload?: number
+  latency: number
+}
+/** `fast4g`: 9 Mbit/s down, 60 ms. `slow4g`: 1.6 Mbit/s down, 150 ms. Up is a quarter of down. */
+export declare const NETWORKS: { fast4g: Network; slow4g: Network }
+
+/** Slow the page's CPU by `rate` (4: a quarter speed). Throws on a rate under 1. Chromium only. */
+export declare function throttleCpu(page: PerfPageLike, rate: number): Promise<void>
+/** Throttle the page's network; the cache is off unless `cache` is true. Chromium only. */
+export declare function throttleNetwork(
+  page: PerfPageLike,
+  network: Network,
+  options?: { cache?: boolean },
+): Promise<void>
+/** Wait until `window[handle].frames` is over `n`. `handle` default `'__pf'`, `timeout` 45 000 ms. */
+export declare function waitForFrames(
+  page: PerfPageLike,
+  n: number,
+  options?: { handle?: string; timeout?: number },
+): Promise<void>
+/** `window[handle][method]()` in the page, or null when either is missing. Plain data only. */
+export declare function readPerfHandle(
+  page: PerfPageLike,
+  method: string,
+  options?: { handle?: string },
+): Promise<unknown>
+/**
+ * A CPU profile of the page over `ms`, written to `out` when given (folders made). Sum it with
+ * `umm-dev perf top <out>` or `selfTime`.
+ */
+export declare function cpuProfile(
+  page: PerfPageLike,
+  ms: number,
+  out?: string,
+): Promise<CpuProfile>
+
+export interface MeasureFramesOptions {
+  /** Load this first. Default: measure the page where it is. */
+  url?: string
+  /** CPU throttle rate, set before the load. Default 1, none. */
+  cpu?: number
+  /** The handle's name on `window`. Default `'__pf'`. */
+  handle?: string
+  /** Frames the handle must count before the settle starts. Default 120. */
+  minFrames?: number
+  /** Wait this long after `minFrames`, for shaders to compile and the scene to fill. Default 8000 ms. */
+  settleMs?: number
+  /** How long to wait for `minFrames`. Default 45 000 ms. */
+  timeout?: number
+  /** More of the handle's methods to call after `stats()`, into `extra`: `['gpu', 'info']`. */
+  read?: string[]
+  /** Record a CPU profile this long after the settle, before reading. Default 0, none. */
+  profileMs?: number
+  /** Write the profile here. */
+  profileOut?: string
+}
+export interface FrameMeasure {
+  stats: PerfStatsLike
+  /** Each method in `read`, by name; null where the handle has no such method. */
+  extra: Record<string, unknown>
+  /** With `profileMs`. */
+  profile?: CpuProfile
+}
+/**
+ * Throttle the CPU, load `url`, wait for `minFrames`, settle, profile if asked, then read
+ * `stats()` and `read` from the handle. Throws when `stats()` gives nothing.
+ */
+export declare function measureFrames(
+  page: PerfPageLike,
+  options?: MeasureFramesOptions,
+): Promise<FrameMeasure>
+
+export interface ColdLoadOptions {
+  network: Network
+  /** CPU throttle rate. Default 4. */
+  cpu?: number
+  /** Frames the handle must count. Default 2: the first frame is drawn. */
+  frames?: number
+  /** Default `'__pf'`. */
+  handle?: string
+  /** Default 60 000 ms. */
+  timeout?: number
+}
+/**
+ * Milliseconds from navigating to `url` (network throttled, cache off, CPU throttled) until the
+ * handle counts `frames` frames. Use a fresh page: the throttles stay on it.
+ */
+export declare function coldLoad(
+  page: PerfPageLike,
+  url: string,
+  options: ColdLoadOptions,
+): Promise<number>
+/** `p50 12.3 ms, p95 15.1 ms, fps 60, hitches 0`. */
+export declare function formatFrames(stats: PerfStatsLike): string
+
+/** A V8 CPU profile, as Chrome's `Profiler.stop` gives and DevTools saves (`.cpuprofile`). */
+export interface CpuProfile {
+  nodes: {
+    id: number
+    callFrame: { functionName: string; url: string; lineNumber: number; columnNumber?: number }
+  }[]
+  startTime: number
+  endTime: number
+  samples?: number[]
+  timeDeltas?: number[]
+}
+export interface SelfTimeRow {
+  /** `name file:line`, or the name alone for Chrome's own entries. */
+  key: string
+  functionName: string
+  url: string
+  /** 1-based; 0 without a URL. */
+  line: number
+  ms: number
+  /** Of the profile's total, 0 to 1. */
+  share: number
+}
+/** Self time by function, most first. Throws `not a CPU profile` on anything else. */
+export declare function selfTime(profile: CpuProfile): { rows: SelfTimeRow[]; totalMs: number }
+/** The top `n` (default 20) rows as text, and a total line: what `umm-dev perf top` prints. */
+export declare function formatTop(
+  summed: { rows: SelfTimeRow[]; totalMs: number },
+  n?: number,
+): string

@@ -200,6 +200,10 @@ the port. It imports nothing from Playwright: pass `devices['Desktop Chrome']` a
 `E2E_PORT` must be a positive integer, or the config throws `E2E_PORT is not a port: <value>`. An
 existing server on the port is reused, so it must be this checkout's.
 
+**The perf probe has its own config.** `perfConfig(options?)` is this preset on the production
+build (`vite build && vite preview`), running only `PERF_SPEC`, and never reusing a server. Put
+`testIgnore: [PERF_SPEC]` in the main config. See [perf.md](perf.md#perfconfigoptions-the-probes-config).
+
 ## File formats
 
 | Export | File | Format |
@@ -207,7 +211,7 @@ existing server on the port is reused, so it must be this checkout's.
 | `@ummgames/dev/biome` | `config/biome.preset.json` | Biome config JSON |
 | `@ummgames/dev/tsconfig` | `config/tsconfig.json` | tsconfig JSON, `compilerOptions` only |
 | `@ummgames/dev/vitest` | `config/vitest.mjs`, types in `config/vitest.d.ts` | ESM; default and named `vitestConfig`, and `rootDir` |
-| `@ummgames/dev/playwright` | `config/playwright.mjs`, types in `config/playwright.d.ts` | ESM; default and named `playwrightConfig`, and `resolveFlags`, `BASE_LAUNCH_ARGS`, `IGPU_LAUNCH_ARGS` |
+| `@ummgames/dev/playwright` | `config/playwright.mjs`, types in `config/playwright.d.ts` | ESM; default and named `playwrightConfig`, and `perfConfig`, `PERF_SPEC`, `resolveFlags`, `BASE_LAUNCH_ARGS`, `IGPU_LAUNCH_ARGS` |
 
 ## How it works
 

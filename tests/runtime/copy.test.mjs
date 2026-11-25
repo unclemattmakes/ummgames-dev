@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { copyRuntime, missingSiblings } from '../../src/runtime/copy.mjs'
+import { copyRuntime, missingPackages, missingSiblings } from '../../src/runtime/copy.mjs'
 import { bodyHash, makeHeader, parseCopy, stamp } from '../../src/runtime/header.mjs'
 import { listRuntime, resolveRuntime } from '../../src/runtime/source.mjs'
 import { A_TS, cleanup, makeGame, makePackage, read, STYLE_CSS, writeTree } from './fixture.mjs'
@@ -148,5 +148,28 @@ describe('copyRuntime', () => {
     expect(missingSiblings(path.join(game, 'src/kit/b.ts'))).toEqual(['./a'])
     copyRuntime({ spec: 'kit/a.ts', root: game, pkgRoot: pkg })
     expect(missingSiblings(path.join(game, 'src/kit/b.ts'))).toEqual([])
+  })
+
+  it('names the packages a copy imports that the game does not list', () => {
+    const game = makeGame()
+    const file = path.join(game, 'src/render/x.ts')
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(
+      file,
+      [
+        "import * as THREE from 'three'",
+        "import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'",
+        "import type { X } from '@scope/lib/sub'",
+        "import fs from 'node:fs'",
+        "import { y } from './y'",
+      ].join('\n'),
+    )
+    const pkg = path.join(game, 'package.json')
+    fs.writeFileSync(pkg, JSON.stringify({ devDependencies: { '@scope/lib': '1.0.0' } }))
+    expect(missingPackages(file, game)).toEqual(['three'])
+    fs.writeFileSync(pkg, JSON.stringify({ dependencies: { three: '0.185.1', '@scope/lib': '1' } }))
+    expect(missingPackages(file, game)).toEqual([])
+    fs.rmSync(pkg)
+    expect(missingPackages(file, game)).toEqual([])
   })
 })

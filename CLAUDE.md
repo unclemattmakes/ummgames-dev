@@ -20,7 +20,8 @@ game as a devDependency that tracks `main`. Read README.md for what is here and 
    (splash, perf HUD, dev palette, gamepad profiles). A game takes a file with
    `umm-dev copy <runtime path>`, which stamps a header naming this repo, the path and the commit;
    `umm-dev drift` reports how far each copy has moved. Files in `runtime/` import nothing outside
-   their own folder.
+   their own folder, except a package in `RUNTIME_PACKAGES` (`src/runtime/copy.mjs`, now
+   `three`): a library the game already has, kept here as a devDependency for the typecheck.
 5. **No install-time scripts.** No `prepare`, `postinstall` or git-hook installer in package.json.
    A game installs this from git, and pnpm would run them in every worktree.
 6. **A tool reads its game's settings from the game.** `loadConfig(section)` in `src/config.mjs`

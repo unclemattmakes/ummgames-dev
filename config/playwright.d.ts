@@ -57,4 +57,32 @@ export declare function resolveFlags(options?: PlaywrightPresetOptions): {
 export declare function playwrightConfig(
   options?: PlaywrightPresetOptions,
 ): Record<string, unknown> & { use: Record<string, unknown>; projects: Record<string, unknown>[] }
+/** The perf spec's glob: every `perf.spec.ts` under the tests. Pass it to the main config's `testIgnore`. */
+export declare const PERF_SPEC: string
+
+/** Options for {@link perfConfig}: {@link PlaywrightPresetOptions} and three more. */
+export interface PerfPresetOptions extends PlaywrightPresetOptions {
+  /** Builds the production bundle. Default `'pnpm exec vite build'`. */
+  buildCommand?: string
+  /**
+   * Serves it; the preset adds `--port <port> --strictPort`. Default `'pnpm exec vite preview'`.
+   * Under npm: `'npx vite preview'`.
+   */
+  previewCommand?: string
+  /** Which specs run. Default {@link PERF_SPEC}. */
+  testMatch?: string | string[]
+}
+
+/**
+ * The perf probe's config: {@link playwrightConfig} with the web server running
+ * `<buildCommand> && <previewCommand> --port <port> --strictPort` (port default 4173, Vite
+ * preview's), never reusing a server already on the port, a 300 s server timeout, a 120 s test
+ * timeout, and only {@link PERF_SPEC}. See docs/perf.md.
+ *
+ *   export default defineConfig(perfConfig({ device: devices['Desktop Chrome'], port: 5591 }))
+ */
+export declare function perfConfig(
+  options?: PerfPresetOptions,
+): Record<string, unknown> & { use: Record<string, unknown>; projects: Record<string, unknown>[] }
+
 export default playwrightConfig

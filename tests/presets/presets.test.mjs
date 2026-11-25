@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { playwrightConfig, resolveFlags } from '../../config/playwright.mjs'
+import { PERF_SPEC, perfConfig, playwrightConfig, resolveFlags } from '../../config/playwright.mjs'
 import { rootDir, vitestConfig } from '../../config/vitest.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -151,5 +151,42 @@ describe('playwrightConfig', () => {
     expect(c.use.trace).toBe('on')
     expect(c).not.toHaveProperty('env')
     expect(c).not.toHaveProperty('device')
+  })
+})
+
+describe('perfConfig', () => {
+  it('serves the production build, never reuses a server, and runs only the perf spec', () => {
+    const c = perfConfig({ env: {}, port: 5591, channel: 'chrome' })
+    expect(c).toMatchObject({
+      testMatch: PERF_SPEC,
+      timeout: 120_000,
+      workers: 1,
+      use: { baseURL: 'http://localhost:5591' },
+      webServer: {
+        command: 'pnpm exec vite build && pnpm exec vite preview --port 5591 --strictPort',
+        port: 5591,
+        reuseExistingServer: false,
+        timeout: 300_000,
+      },
+    })
+    const project = /** @type {{ use: Record<string, any> }} */ (c.projects[0])
+    expect(project.use.channel).toBe('chrome')
+    expect(perfConfig({ env: {} }).use.baseURL).toBe('http://localhost:4173')
+  })
+
+  it('takes its own commands, spec pattern and E2E_PORT', () => {
+    const c = perfConfig({
+      env: { E2E_PORT: '6200' },
+      buildCommand: 'npm run build',
+      previewCommand: 'npx vite preview',
+      testMatch: ['**/load.spec.ts'],
+      webServer: { reuseExistingServer: true },
+    })
+    expect(c.testMatch).toEqual(['**/load.spec.ts'])
+    expect(c.webServer).toMatchObject({
+      command: 'npm run build && npx vite preview --port 6200 --strictPort',
+      reuseExistingServer: true,
+    })
+    expect(perfConfig({ env: {}, webServer: false })).not.toHaveProperty('webServer')
   })
 })

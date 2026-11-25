@@ -79,6 +79,7 @@ Run `pnpm exec umm-dev help` for the list, and `umm-dev <command> --help` for a 
 | `umm-dev worktree` | Hydrate a new git worktree, or remove one without following its links | [agent](docs/agent.md) |
 | `umm-dev merge` | Resolve markdown append and table-row conflicts, by hand or as a merge driver | [agent](docs/agent.md) |
 | `umm-dev guard` | Repo guards: em dashes, CLAUDE.md size, a path denylist, git hooks | [guard](docs/guard.md) |
+| `umm-dev perf` | Read perf captures: `perf top` sums a CPU profile's self time by function | [perf](docs/perf.md) |
 | `umm-dev questions` | A local page for answering agents' questions files one card at a time; answers land in `ANSWERS.md` | [questions](docs/answering.md) |
 
 ## Configuration

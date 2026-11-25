@@ -12,7 +12,7 @@
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { loadConfig } from '../config.mjs'
-import { copyRuntime, copySource, missingSiblings } from '../runtime/copy.mjs'
+import { copyRuntime, copySource, missingPackages, missingSiblings } from '../runtime/copy.mjs'
 import { listRuntime, packageVersion } from '../runtime/source.mjs'
 import { getSource, listSource, resolveSources } from '../runtime/sources.mjs'
 
@@ -143,6 +143,8 @@ export async function run(argv, ctx) {
     if (r.outcome === 'written' || r.outcome === 'updated') {
       for (const s of missingSiblings(path.join(cfg.root, r.file)))
         console.log(`         imports ${s}, which is not beside it: copy that too`)
+      for (const p of missingPackages(path.join(cfg.root, r.file), cfg.root))
+        console.log(`         imports ${p}, which the game's package.json does not list: add it`)
     }
   }
   return refused ? 1 : 0

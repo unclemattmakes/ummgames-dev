@@ -83,7 +83,9 @@ describe('docs', () => {
       const page = docs.find((d) => read(d).includes(`umm-dev ${name}`))
       expect(page, `no docs page mentions "umm-dev ${name}"`).toBeTruthy()
     }
-  })
+    // One node start per command, in turn: the time grows with the commands, and a busy machine
+    // took more than the default 5 s once there were sixteen.
+  }, 30_000)
 
   it('every config section a game can set has a Config table in docs/', () => {
     const types = read('src/index.d.ts')

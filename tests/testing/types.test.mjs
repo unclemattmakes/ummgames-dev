@@ -47,9 +47,42 @@ async function _typesOnly(page) {
 }
 void _typesOnly
 
+/**
+ * Never called: a Playwright `Page` fits the perf helpers.
+ * @param {import('playwright').Page} page
+ */
+async function _perfTypesOnly(page) {
+  await testing.throttleCpu(page, testing.PERF_DEVICES.phone.cpu)
+  const m = await testing.measureFrames(page, { url: '/', read: ['gpu'], profileMs: 100 })
+  /** @type {number} */
+  const p95 = m.stats.p95Ms
+  /** @type {number} */
+  const ms = await testing.coldLoad(page, '/', { network: testing.NETWORKS.slow4g })
+  void [p95, ms, testing.formatFrames(m.stats)]
+  if (m.profile) void testing.formatTop(testing.selfTime(m.profile), 5)
+}
+void _perfTypesOnly
+
 describe('the package entry points', () => {
   it('export what their .d.ts files declare', () => {
-    for (const name of ['headersFor', 'fakePortal', 'fakeSdkScript', 'PORTAL_HOST']) {
+    for (const name of [
+      'headersFor',
+      'fakePortal',
+      'fakeSdkScript',
+      'PORTAL_HOST',
+      'measureFrames',
+      'coldLoad',
+      'cpuProfile',
+      'throttleCpu',
+      'throttleNetwork',
+      'waitForFrames',
+      'readPerfHandle',
+      'formatFrames',
+      'selfTime',
+      'formatTop',
+      'PERF_DEVICES',
+      'NETWORKS',
+    ]) {
       expect(testing).toHaveProperty(name)
     }
     for (const name of [

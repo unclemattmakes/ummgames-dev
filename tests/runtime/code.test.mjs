@@ -40,6 +40,25 @@ describe('dev/perf-recorder', async () => {
   })
 })
 
+describe('dev/perf-handle', async () => {
+  const { installPerfHandle } = await load('dev/perf-handle.ts')
+
+  it('puts a handle on the target that counts frames, reads the recorder and its extras', () => {
+    /** @type {Record<string, any>} */
+    const target = {}
+    const pf = installPerfHandle({ target, extras: { info: () => ({ calls: 7 }) } })
+    expect(target.__pf).toBe(pf.handle)
+    for (const t of [0, 16, 32, 48]) pf.frame(t)
+    expect(target.__pf.frames).toBe(4)
+    expect(target.__pf.stats()).toMatchObject({ count: 3, p50Ms: 16 })
+    expect(target.__pf.info()).toEqual({ calls: 7 })
+    pf.remove()
+    expect(target).not.toHaveProperty('__pf')
+    const named = installPerfHandle({ target, name: '__perf' })
+    expect(target.__perf).toBe(named.handle)
+  })
+})
+
 describe('dev/fuzzy and the command bar’s ranking', async () => {
   const { fuzzyScore } = await load('dev/fuzzy.ts')
   const { filterTools } = await load('dev/command-bar.ts')

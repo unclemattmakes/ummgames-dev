@@ -46,7 +46,20 @@ export {
 } from './fake-portal.mjs'
 
 export { createImportGraph } from './import-graph.mjs'
-
+export {
+  coldLoad,
+  cpuProfile,
+  formatFrames,
+  formatTop,
+  measureFrames,
+  NETWORKS,
+  PERF_DEVICES,
+  readPerfHandle,
+  selfTime,
+  throttleCpu,
+  throttleNetwork,
+  waitForFrames,
+} from './perf.mjs'
 export {
   CRAZYGAMES_SMALLEST_FRAME,
   DEFAULT_PORTAL_RUNS,

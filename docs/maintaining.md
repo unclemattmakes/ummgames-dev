@@ -25,7 +25,7 @@ public-names test skips instead of guarding.
 | A Vite plugin or test helper | `src/vite/` or `src/testing/`, exported from its `index.mjs` and `index.d.ts` | docs/build.md |
 | A library entry point | `src/<area>/index.mjs` and `index.d.ts`, plus an entry in `exports` in package.json | README "Libraries" |
 | A preset | `config/`. Never call a file `biome.json` there: Biome treats any such file as a second root config | docs/presets.md |
-| Runtime code a game copies | `runtime/<folder>/`, TypeScript that imports nothing outside its folder | docs/runtime.md, or the area page |
+| Runtime code a game copies | `runtime/<folder>/`, TypeScript that imports nothing outside its folder, except a package in `RUNTIME_PACKAGES` | docs/runtime.md, or the area page |
 | A platform spec | `presets/<name>.json` | docs/media.md |
 
 The dispatcher finds commands by listing `src/commands/`, so adding a command never touches
@@ -38,7 +38,7 @@ package.json. Files starting with `_` are skipped.
 | One package, no internal packages | pnpm cannot resolve `workspace:*` between packages when a game installs from git (`ERR_PNPM_WORKSPACE_PKG_NOT_FOUND`). |
 | Linked code is `.mjs` with JSDoc, not `.ts` | Node refuses to strip types inside `node_modules` (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`), so a `.ts` bin or import fails in every game. |
 | No install-time scripts | A game installs this from git, so pnpm would run them in every worktree of every game. |
-| Runtime files import nothing outside their folder | A game copies a folder as a unit, and has no copy of anything else. |
+| Runtime files import nothing outside their folder | A game copies a folder as a unit, and has no copy of anything else. The one exception is a package in `RUNTIME_PACKAGES` in `src/runtime/copy.mjs` (now `three`): a library every game that wants the file already depends on. Adding one means adding it to devDependencies here too, at an exact version, so `runtime/tsconfig.json` checks against it; `tests/runtime/sources.test.mjs` holds both. `umm-dev copy` warns when the game's package.json does not list it. |
 | Defaults are generic | No game's URL flags, debug global, ports or paths. A game sets its own in `umm-dev.config.mjs`. |
 | Tags never move | Lockfiles pin the commit, and drift fetches originals by tag. A moved tag breaks both silently. |
 

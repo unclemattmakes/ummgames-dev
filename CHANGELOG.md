@@ -13,6 +13,33 @@
   `dist/` with its `_headers` and play with the console open. A site Worker with a copy of
   `security-headers.ts` copies it again and passes the same `scripts`.
 
+- **New: a perf probe kit.** See [docs/perf.md](docs/perf.md).
+  - `perfConfig` in `@ummgames/dev/playwright` is the probe's own config: the production build
+    on `vite preview`, only `perf.spec.ts` (`PERF_SPEC`), never a reused server.
+  - `@ummgames/dev/testing` gains `measureFrames` (throttle the CPU, load, settle, read the
+    handle, optionally keep a CPU profile), `coldLoad` (first frame on a throttled network),
+    `cpuProfile`, `throttleCpu`, `throttleNetwork`, `waitForFrames`, `readPerfHandle`,
+    `formatFrames`, and the presets `PERF_DEVICES` (desktop, phone at CPU 4x) and `NETWORKS`
+    (fast and slow 4G).
+  - `runtime/dev/perf-handle.ts` puts the `window.__pf` handle the helpers read: `frames`,
+    `stats()` from the perf recorder, and the game's own readings.
+- **New: `umm-dev perf top <profile> [n]`.** Sums a `.cpuprofile`'s self time by function and
+  prints the top ones, or every row with `--json`. A sample's time is the gap to the next
+  sample, as DevTools counts it.
+- **New: `runtime/render/bake.ts`.** Merges a three.js part's per-material meshes into one
+  vertex-coloured draw per plain finish, keeping glows, see-through, textured and named
+  materials (`keepApart`) as their own draws, with a hook for the game's shader
+  (`onMaterial`). `bakeInPlace` leaves sockets, hidden and skinned meshes where they are. It
+  imports `three`.
+- **Changed: a runtime file may import a package the game already has.** Rule 4 now allows the
+  packages in `RUNTIME_PACKAGES` (`three`), which the kit keeps as exact devDependencies so the
+  runtime typecheck covers them. `umm-dev copy` says when the game's package.json does not list
+  one: `imports three, which the game's package.json does not list: add it`.
+- **To take them:** nothing changes until a game uses them. A game with its own probe moves its
+  config onto `perfConfig`, its steps onto the helpers, and its profile script onto
+  `umm-dev perf top`. A game with its own baker of this shape copies `render/bake.ts` with
+  `--force` over it and passes its rules as options.
+
 ## 0.17.0 (2026-11-19)
 
 - **New: `portal.endpoints` for `umm-dev portal check`.** Origins the build may send to, such as

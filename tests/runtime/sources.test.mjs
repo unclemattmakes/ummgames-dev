@@ -7,6 +7,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
+import { packageOf, RUNTIME_PACKAGES } from '../../src/runtime/copy.mjs'
 import { commentStyleFor } from '../../src/runtime/header.mjs'
 import { listRuntime, PACKAGE_ROOT } from '../../src/runtime/source.mjs'
 import { cleanup, makeGame, read } from './fixture.mjs'
@@ -42,6 +43,11 @@ describe('runtime/', () => {
     expect(text).not.toMatch(/^.*(Copied|Forked) from/)
   })
 
+  it('names only packages this repo typechecks the runtime against', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
+    for (const p of RUNTIME_PACKAGES) expect(pkg.devDependencies, p).toHaveProperty(p)
+  })
+
   it.each(files.filter((f) => /\.[cm]?[jt]sx?$/.test(f)))(
     '%s imports nothing outside its own folder',
     (f) => {
@@ -53,7 +59,13 @@ describe('runtime/', () => {
         ...text.matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g),
       ].map((m) => /** @type {string} */ (m[1]))
       for (const s of specs) {
-        expect(s.startsWith('.'), `${s}: bare imports do not travel with a copy`).toBe(true)
+        if (!s.startsWith('.')) {
+          expect(
+            RUNTIME_PACKAGES,
+            `${s}: bare imports do not travel with a copy (only RUNTIME_PACKAGES may be named)`,
+          ).toContain(packageOf(s))
+          continue
+        }
         const target = path.posix.normalize(path.posix.join(path.posix.dirname(f), s))
         expect(target.split('/')[1], `${s} leaves runtime/${top}/`).toBe(top)
       }

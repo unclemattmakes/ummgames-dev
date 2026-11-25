@@ -18,6 +18,8 @@
  *   powerPreference on Windows). Pair it with `E2E_HEADED=1`.
  *
  * This file imports nothing from Playwright: pass `devices['Desktop Chrome']` as `device`.
+ *
+ * `perfConfig` is the perf probe's own config, on the production build (docs/perf.md).
  */
 
 /**
@@ -128,6 +130,49 @@ export function playwrightConfig(options = {}) {
             ...webServer,
           },
         }),
+  }
+}
+
+/** The perf spec's file pattern: `perfConfig` runs it, and a game's main config ignores it. */
+export const PERF_SPEC = '**/perf.spec.ts'
+
+/**
+ * @typedef {PlaywrightPresetOptions & {
+ *   buildCommand?: string,
+ *   previewCommand?: string,
+ *   testMatch?: string | string[],
+ * }} PerfPresetOptions
+ */
+
+/**
+ * The perf probe's config: `playwrightConfig` serving the production build with
+ * `<buildCommand> && <previewCommand> --port <port> --strictPort`, running only the perf spec.
+ * The server is never reused, so a stale build or another checkout's server cannot be measured.
+ * @param {PerfPresetOptions} [options]
+ * @returns {Record<string, unknown> & { use: Record<string, unknown>, projects: Record<string, unknown>[] }}
+ */
+export function perfConfig(options = {}) {
+  const {
+    buildCommand = 'pnpm exec vite build',
+    previewCommand = 'pnpm exec vite preview',
+    testMatch = PERF_SPEC,
+    port = 4173,
+    timeout = 120_000,
+    webServer,
+    ...rest
+  } = options
+  return {
+    ...playwrightConfig({
+      ...rest,
+      port,
+      timeout,
+      devCommand: `${buildCommand} && ${previewCommand}`,
+      webServer:
+        webServer === false
+          ? false
+          : { reuseExistingServer: false, timeout: 300_000, ...(webServer ?? {}) },
+    }),
+    testMatch,
   }
 }
 
