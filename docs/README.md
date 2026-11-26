@@ -30,6 +30,7 @@
 | Loudness | [audio.md](audio.md) | linked: `umm-dev loudness`; `@ummgames/dev/audio` |
 | Voice: ElevenLabs takes, transcripts, cuts, bins; the page's voice player | [voice.md](voice.md) | linked: `@ummgames/dev/voice`; copied: `runtime/audio/voice.ts` |
 | Play stats: events from the page to a Worker and R2, and the report's days and sessions | [stats.md](stats.md) | copied: `runtime/stats/`; linked: `@ummgames/dev/stats` |
+| A simulated playtest: fictional players through a game's real sim and bot; dead stretches and verb ablation | [playtest.md](playtest.md) | linked: `@ummgames/dev/playtest` |
 | GLB optimizing, meshopt decoding | [gltf.md](gltf.md) | linked: `umm-dev gltf`; `@ummgames/dev/gltf` |
 
 **Linked** code runs from `node_modules` and never ships in a game's build; nobody edits it in the

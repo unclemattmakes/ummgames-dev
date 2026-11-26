@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **New: `@ummgames/dev/playtest`, a simulated playtest.** A game writes an adapter (start a run,
+  step it with its bot, read its moments, over and won, and an optional between-runs hook) and
+  the kit runs a seeded cast of fictional players through it: seven default archetypes of a web
+  portal's audience, verbs found on a timetable, an attention model with drought, frame rate drag
+  and habituation, Day 1 odds, a `BOREDOM` scale, JSON day records and a text report. Two
+  sim-only probes come with it: `deadStretches` (stretches with no moment, by skill) and
+  `verbAblation` (run length with each verb off). Pure: no DOM, no node APIs. See
+  [docs/playtest.md](docs/playtest.md).
+- **To take it:** nothing changes until a game adds a lab probe. A game with its own copy of this
+  loop moves onto `runPlaytest` with its verbs listed in the order its copy drew them, and gets
+  the same days for the same seed. In the kit's records the chances of quitting on a loss and of
+  leaving between runs are `loseQuit` and `betweenLeave`, and those exits are `lost` and
+  `between`; the adapter's `labels` give the report the game's own words.
+
 - **New: a script rule for `headers()`, off by default.** `scripts: true` adds
   `script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com; object-src 'none';
   base-uri 'self'` to the `/*` Content-Security-Policy, after `frame-ancestors`, so an HTML

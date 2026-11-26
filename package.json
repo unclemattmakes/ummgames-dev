@@ -53,6 +53,10 @@
       "types": "./src/stats/index.d.ts",
       "default": "./src/stats/index.mjs"
     },
+    "./playtest": {
+      "types": "./src/playtest/index.d.ts",
+      "default": "./src/playtest/index.mjs"
+    },
     "./biome": "./config/biome.preset.json",
     "./tsconfig": "./config/tsconfig.json",
     "./vitest": {
