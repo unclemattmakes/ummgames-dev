@@ -26,6 +26,7 @@
 | Leaderboard servers on a Worker and D1: rate limits, blocks, admin routes; a D1 test shim | [board.md](board.md) | copied: `runtime/board/`; linked: `createD1` in `@ummgames/dev/testing` |
 | A making-of site: pages, toys, numbers and code quoted from the source | [making-of.md](making-of.md) | linked: `umm-dev making-of`, `@ummgames/dev/making-of`, `createImportGraph` in `@ummgames/dev/testing`; copied: `runtime/making-of/` |
 | Perf probes: frame times on a throttled phone, cold loads, CPU profiles; fewer draw calls | [perf.md](perf.md) | linked: `perfConfig` in `@ummgames/dev/playwright`, `measureFrames` and friends in `@ummgames/dev/testing`, `umm-dev perf`; copied: `runtime/dev/perf-handle.ts`, `runtime/render/bake.ts` |
+| A world drawn curved over a flat sim: one bend rule in three.js, its uniforms, shadows, pointer picking | [bend.md](bend.md) | copied: `runtime/render/bend.ts` |
 | Biome, TypeScript, Vitest, Playwright | [presets.md](presets.md) | linked: `@ummgames/dev/biome`, `/tsconfig`, `/vitest`, `/playwright` |
 | Loudness | [audio.md](audio.md) | linked: `umm-dev loudness`; `@ummgames/dev/audio` |
 | Voice: ElevenLabs takes, transcripts, cuts, bins; the page's voice player | [voice.md](voice.md) | linked: `@ummgames/dev/voice`; copied: `runtime/audio/voice.ts` |

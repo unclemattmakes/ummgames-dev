@@ -14,6 +14,9 @@ profile of the same run says where the time went, and `umm-dev perf top` sums it
 | `runtime/dev/perf-handle.ts` | copied | The handle on `window`: `frames` and `stats()`, plus the game's own readings |
 | `runtime/render/bake.ts` | copied | Merges a three.js part's per-material meshes into a few draws |
 
+A game that bends its world in a shader pays per draw if the shader reads `modelMatrix`:
+[bend.md](bend.md#how-it-works) has the finding and the module that avoids it.
+
 ## Quick start
 
 1. Copy the handle and the recorder into the game, and install the handle in every build (the

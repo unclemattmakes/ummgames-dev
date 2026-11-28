@@ -3,7 +3,7 @@
 Code that ships inside a game's build lives in `runtime/`, as TypeScript: the perf HUD, the dev
 command bar, the gamepad profiles and stick shaping, the loading splash, the pure core of a
 procedural music sequencer and its instruments, a sim's seeded random numbers, deterministic math
-and fixed step, a three.js draw-call baker, the security headers a site Worker sends, and a web portal's SDK adapter. It is
+and fixed step, a three.js draw-call baker and world bend, the security headers a site Worker sends, and a web portal's SDK adapter. It is
 **copied**, not linked. `umm-dev copy` writes a file into the game with a header on line 1, and from then on
 the copy is the game's to change. `umm-dev drift` reports how far each copy has moved from the
 version it came from, and how far the installed version has moved since. Reach for it when a game
@@ -1211,6 +1211,11 @@ slow. `build-target.ts` is the `PORTAL` flag the bundler drops code on. Copy the
 vertex colour, plus one per glow, see-through or kept material. It imports `three`, which the
 game must depend on. It has its own section in [perf.md](perf.md#runtimerenderbakets).
 
+`bend.ts` draws a world curved over a sim that stays flat. The game writes one rule (where a
+point in the scene is drawn) in GLSL and in JavaScript; the file puts it into three's vertex
+chunk, hands its uniforms to every program, keeps marked materials straight, and finds a press
+on the bent ground. It imports `three`. It has its own page: [bend.md](bend.md).
+
 ## `runtime/stats/`
 
 A game's play telemetry: the batch shape and its check (`batch.ts`), the page's queue and
@@ -1299,7 +1304,7 @@ and `runtime/env.d.ts` are the folder's own tooling and are never listed.
 - **The game root** is the nearest folder at or above the current one holding a `package.json`.
 - **Each runtime file imports nothing outside its own folder**, so a folder copies as a unit.
   The one exception is a library the game already has, named by package: `render/bake.ts`
-  imports `three`.
+  and `render/bend.ts` import `three`.
   Each typechecks under `runtime/tsconfig.json` (strict, Bundler resolution, DOM, `types: []`).
 
 ## Troubleshooting

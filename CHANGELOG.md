@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- **New: `runtime/render/bend.ts`, a world bend.** A game draws its flat sim curved (a horizon
+  that falls away, a half pipe, a road turned in plan) by writing one rule three ways: GLSL
+  (`vec3 bendWorld(vec3 p)`), its uniforms, and the same rule in JavaScript. `installBend(rule)`
+  patches three's `project_vertex` chunk once, so every built-in material bends, and adds the
+  rule's uniforms to every `ShaderLib` entry, so they reach every program whatever
+  `onBeforeCompile` a material has. `keepStraight(root)` and the `BEND_OFF` define keep a part
+  straight at no cost; `shadows: 'flat' | 'bent'` picks how the shadow map is drawn and read;
+  `groundHit(rule, ray)` finds a press on the bent ground; `bendGlsl(rule)` is for hand-written
+  shaders. It imports `three`. See [docs/bend.md](docs/bend.md).
+- **A finding it carries:** a bend that reads `modelMatrix` in the chunk has three upload that
+  matrix for every draw (75 uploads and 0.3 ms a frame in one game, on a phone at a 4x CPU
+  throttle). The module rebuilds the scene point from the eye's point and `viewMatrix`, which
+  three sends once a program, and refuses a rule that names `modelMatrix`.
+- **To take it:** nothing changes until a game copies it. A game with its own patch of
+  `project_vertex` adopts it by shape (a dome, a half pipe, a map in plan):
+  [docs/bend.md](docs/bend.md#adopting-it-over-a-games-own-bend). A hand patch that sets
+  `Material.prototype.onBeforeCompile` loses that hook and every call to it.
+
 - **New: `@ummgames/dev/playtest`, a simulated playtest.** A game writes an adapter (start a run,
   step it with its bot, read its moments, over and won, and an optional between-runs hook) and
   the kit runs a seeded cast of fictional players through it: seven default archetypes of a web
